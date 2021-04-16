@@ -78,11 +78,29 @@ def main(arguments):
                          f"but not primary. Skipping this host...")
                     logger.info(e)
                     continue
+            # With -t flag: add Tenant name to hostgroup name.
+            if(arguments.tenant):
+                if(device.tenant):
+                    device.hg_format.insert(1, device.tenant.name)
+                    device.setHostgroup()
+                    logger.debug(f"Added Tenant {device.tenant.name} to "
+                                 f"hostgroup format of {device.name}.")
+                else:
+                    logger.debug(f"{device.name} is not linked to a tenant. "
+                                 f"Using HG format '{device.hostgroup}'.")
             # Checks if device is in cleanup state
             if(device.status != "Active"):
-                # Delete device from Zabbix
-                # and remove hostID from Netbox.
-                device.cleanup()
+                if(device.zabbix_id):
+                    # Delete device from Zabbix
+                    # and remove hostID from Netbox.
+                    device.cleanup()
+                    logger.info(f"Cleaned up host {device.name}.")
+
+                else:
+                    # Device has been added to Netbox
+                    # but is not in Activate state
+                    logger.info(f"Skipping host {device.name} since its "
+                                f"not in the active state.")
                 continue
             if(device.zabbix_id):
                 # Device is already present in Zabbix
@@ -90,15 +108,13 @@ def main(arguments):
             else:
                 # Add hostgroup is flag is true
                 # and Hostgroup is not present in Zabbix
-                if(not device.getZabbixGroup(zabbix_groups)
-                   and arguments.hostgroups):
+                if(not device.hostgroup and arguments.hostgroups):
                     # Create new hostgroup
                     device.createZabbixHostgroup()
                     zabbix_groups = zabbix.hostgroup.get(output=['name'])
                 # Add device to Zabbix
                 device.createInZabbix(zabbix_groups, zabbix_templates)
         except SyncError:
-            # logger.error(e)
             pass
 
 
@@ -133,10 +149,13 @@ class NetworkDevice():
         self.name = nb.name
         self.status = nb.status.label
         self.zabbix = zabbix
-        self.hg_format = (f"{self.nb.site.name}/"
-                          f"{self.nb.device_type.manufacturer.name}/"
-                          f"{self.nb.device_role.name}")
+        self.tenant = nb.tenant
+        self.hostgroup = None
+        self.hg_format = [self.nb.site.name,
+                          self.nb.device_type.manufacturer.name,
+                          self.nb.device_role.name]
         self._setBasics()
+        self.setHostgroup()
 
     def _setBasics(self):
         """
@@ -168,6 +187,10 @@ class NetworkDevice():
             e = f"Custom field {template_cf} not found for {self.name}."
             logger.warning(e)
             raise SyncInventoryError(e)
+
+    def setHostgroup(self):
+        """Sets hostgroup to a string with hg_format parameters."""
+        self.hostgroup = "/".join(self.hg_format)
 
     def isCluster(self):
         """
@@ -215,7 +238,7 @@ class NetworkDevice():
         """
         if(not self.template_name):
             e = (f"Device template '{self.nb.device_type.display_name}' "
-                 "has no template defined.")
+                 "has no Zabbix template defined.")
             logger.info(e)
             raise SyncInventoryError()
         for template in templates:
@@ -239,16 +262,18 @@ class NetworkDevice():
         """
         # Go through all groups
         for group in groups:
-            if(group['name'] == self.hg_format):
+            if(group['name'] == self.hostgroup):
                 self.group_id = group['groupid']
-                e = (f"Found group ID {str(group['groupid'])} "
-                     f"for host {self.name}.")
+                e = (f"Found group {group['name']} for host {self.name}.")
+                #e = (f"Found group ID {str(group['groupid'])} "
+                #     f"for host {self.name}.")
                 logger.debug(e)
                 return True
         else:
-            e = (f"Unable to find group '{self.hg_format}' "
+            e = (f"Unable to find group '{self.hostgroup}' "
                  f"for host {self.name} in Zabbix.")
             logger.warning(e)
+            raise SyncInventoryError(e)
 
     def cleanup(self):
         """
@@ -320,8 +345,8 @@ class NetworkDevice():
         Creates Zabbix host group based on hostgroup format.
         """
         try:
-            self.zabbix.hostgroup.create(name=self.hg_format)
-            e = f"Added hostgroup '{self.hg_format}'."
+            self.zabbix.hostgroup.create(name=self.hostgroup)
+            e = f"Added hostgroup '{self.hostgroup}'."
             logger.info(e)
         except ZabbixAPIException as e:
             e = f"Couldn't add hostgroup, Zabbix returned {str(e)}."
@@ -427,6 +452,9 @@ if(__name__ == "__main__"):
     parser.add_argument("-H", "--hostgroups",
                         help="Create Zabbix hostgroups if not present",
                         action="store_true")
+    parser.add_argument("-t", "--tenant", action="store_true",
+                        help=("Add Tenant name to the Zabbix "
+                        "hostgroup name scheme."))
     args = parser.parse_args()
 
     main(args)
