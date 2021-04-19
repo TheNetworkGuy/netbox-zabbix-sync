@@ -23,6 +23,7 @@ logger.addHandler(lgout)
 logger.addHandler(lgfile)
 logger.setLevel(logging.WARNING)
 
+# Set template and device Netbox "custom field" names
 template_cf = "zabbix_template"
 device_cf = "zabbix_hostid"
 
@@ -143,10 +144,12 @@ class InterfaceConfigError(SyncError):
 
 
 class NetworkDevice():
+
     """
     Represents Network device.
     INPUT: (Netbox device class, ZabbixAPI class)
     """
+
     def __init__(self, nb, zabbix):
         self.nb = nb
         self.id = nb.id
@@ -269,8 +272,6 @@ class NetworkDevice():
             if(group['name'] == self.hostgroup):
                 self.group_id = group['groupid']
                 e = (f"Found group {group['name']} for host {self.name}.")
-                #e = (f"Found group ID {str(group['groupid'])} "
-                #     f"for host {self.name}.")
                 logger.debug(e)
                 return True
         else:
@@ -438,8 +439,8 @@ class NetworkDevice():
             logger.warning(f"Device {self.name}: hostgroup OUT of sync.")
             self.updateZabbixHost(groups={'groupid': self.group_id})
 
+        # If only 1 interface has been found
         if(len(host['interfaces']) == 1):
-            # If only 1 interface has been found
             updates = {}
             # Go through each key / item and check if it matches Zabbix
             for key, item in self.setInterfaceDetails()[0].items():
@@ -456,16 +457,35 @@ class NetworkDevice():
                                     if(key not in updates):
                                         updates[key] = {}
                                     updates[key][k] = str(i)
+                                    # If SNMP version has been changed
+                                    # break loop and force full SNMP update
+                                    if(k == "version"):
+                                        break
+                        # Force full SNMP config update
+                        # when version has changed.
+                        if(key in updates):
+                            if("version" in updates[key]):
+                                for k, i in item.items():
+                                    updates[key][k] = str(i)
                         continue
                     # Set update if values don't match
                     if(host["interfaces"][0][key] != str(item)):
                         updates[key] = item
             if(updates):
+                # If interface updates have been found: push to Zabbix
                 logger.warning(f"Device {self.name}: Interface OUT of sync.")
+                if("type" in updates):
+                    # Changing interface type not supported. Raise exception.
+                    e = (f"Device {self.name}: changing interface type to "
+                         f"{str(updates['type'])} is not supported.")
+                    logger.error(e)
+                    raise InterfaceConfigError(e)
+                # Set interfaceID for Zabbix config
                 updates["interfaceid"] = host["interfaces"][0]['interfaceid']
-                logger.debug(f"{self.name}: Updating interface "
+                logger.debug(f"{self.name}: Updating interface with "
                              f"config {updates}")
                 try:
+                    # API call to Zabbix
                     self.zabbix.hostinterface.update(updates)
                     e = f"Solved {self.name} interface conflict."
                     logger.info(e)
@@ -474,12 +494,13 @@ class NetworkDevice():
                     logger.error(e)
                     raise SyncExternalError(e)
             else:
+                # If no updates are found, Zabbix interface is in-sync
                 e = f"Device {self.name}: interface in-sync."
                 logger.debug(e)
         else:
-            e = (f"Device {self.name} has conflicting IP. Host has total "
-                 f"of {len(host['interfaces'])} interfaces. Manual "
-                 "interfention required.")
+            e = (f"Device {self.name} has unsupported interface configuration."
+                 f" Host has total of {len(host['interfaces'])} interfaces. "
+                 "Manual interfention required.")
             logger.error(e)
             SyncInventoryError(e)
 
@@ -493,6 +514,7 @@ class ZabbixInterface():
         self.interface = self.skelet
 
     def get_context(self):
+        # check if Netbox custom context has been defined.
         if("zabbix" in self.context):
             try:
                 zabbix = self.context["zabbix"]
@@ -508,20 +530,25 @@ class ZabbixInterface():
             return False
 
     def set_snmp(self):
+        # Check if interface is type SNMP
         if(self.interface["type"] == 2):
+            # Checks if SNMP settings are defined in Netbox
             if("snmp" in self.context["zabbix"]):
                 snmp = self.context["zabbix"]["snmp"]
                 self.interface["details"] = {}
+                # Checks if bulk config has been defined
                 if(snmp.get("bulk")):
                     self.interface["details"]["bulk"] = str(snmp.pop("bulk"))
                 else:
-                    e = "SNMP bulk option is not defined."
-                    raise InterfaceConfigError(e)
+                    # Fallback to bulk enabled if not specified
+                    self.interface["details"]["bulk"] = "1"
+                # SNMP Version config is required in Netbox config context
                 if(snmp.get("version")):
                     self.interface["details"]["version"] = str(snmp.pop("version"))
                 else:
                     e = "SNMP version option is not defined."
                     raise InterfaceConfigError(e)
+                # If version 2 is used, get community string
                 if(self.interface["details"]["version"] == '2'):
                     if("community" in snmp):
                         community = snmp["community"]
@@ -530,6 +557,8 @@ class ZabbixInterface():
                         e = ("No SNMP community string "
                              "defined in custom context.")
                         raise InterfaceConfigError(e)
+                # If version 3 has been used, get all
+                # SNMPv3 Netbox related configs
                 elif(self.interface["details"]["version"] == '3'):
                     items = ["securityname", "securitylevel", "authpassphrase",
                              "privpassphrase", "authprotocol", "privprotocol",
@@ -548,12 +577,14 @@ class ZabbixInterface():
             raise InterfaceConfigError(e)
 
     def set_default(self):
+        # Set default config to SNMPv2,port 161 and community macro.
         self.interface = self.skelet
         self.interface["type"] = "2"
         self.interface["port"] = "161"
         self.interface["details"] = {"version": "2",
                                      "community": "{$SNMP_COMMUNITY}",
                                      "bulk": "1"}
+
 
 if(__name__ == "__main__"):
     # Arguments parsing
@@ -564,14 +595,14 @@ if(__name__ == "__main__"):
                         action="store_true")
     parser.add_argument("-c", "--cluster", action="store_true",
                         help=("Only add the primary node of a cluster "
-                        "to Zabbix. Usefull when a shared virtual IP is "
-                        "used for the control plane."))
+                              "to Zabbix. Usefull when a shared virtual IP is "
+                              "used for the control plane."))
     parser.add_argument("-H", "--hostgroups",
                         help="Create Zabbix hostgroups if not present",
                         action="store_true")
     parser.add_argument("-t", "--tenant", action="store_true",
                         help=("Add Tenant name to the Zabbix "
-                        "hostgroup name scheme."))
+                              "hostgroup name scheme."))
     args = parser.parse_args()
 
     main(args)
