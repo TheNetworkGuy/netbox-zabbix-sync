@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Netbox to Zabbix sync script."""
 
-from os import environ
+from os import environ, path
 import logging
 import argparse
 from pynetbox import api
@@ -14,7 +14,7 @@ lgout = logging.StreamHandler()
 lgout.setFormatter(log_format)
 lgout.setLevel(logging.DEBUG)
 
-lgfile = logging.FileHandler("sync.log")
+lgfile = logging.FileHandler(path.join(path.dirname(path.realpath(__file__)), "sync.log"))
 lgfile.setFormatter(log_format)
 lgfile.setLevel(logging.DEBUG)
 
