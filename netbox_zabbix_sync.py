@@ -109,10 +109,15 @@ def main(arguments):
             else:
                 # Add hostgroup is flag is true
                 # and Hostgroup is not present in Zabbix
-                if(not device.hostgroup and arguments.hostgroups):
-                    # Create new hostgroup
-                    device.createZabbixHostgroup()
-                    zabbix_groups = zabbix.hostgroup.get(output=['name'])
+                if(arguments.hostgroups):
+                    for group in zabbix_groups:
+                        if(group["name"] == device.hostgroup):
+                            # If hostgroup is already present in Zabbix
+                            break
+                    else:
+                        # Create new hostgroup
+                        hostgroup = device.createZabbixHostgroup()
+                        zabbix_groups.append(hostgroup)
                 # Add device to Zabbix
                 device.createInZabbix(zabbix_groups, zabbix_templates)
         except SyncError:
@@ -369,9 +374,11 @@ class NetworkDevice():
         Creates Zabbix host group based on hostgroup format.
         """
         try:
-            self.zabbix.hostgroup.create(name=self.hostgroup)
+            groupid = self.zabbix.hostgroup.create(name=self.hostgroup)
             e = f"Added hostgroup '{self.hostgroup}'."
             logger.info(e)
+            data = {'groupid': groupid["groupids"][0], 'name': self.hostgroup}
+            return data
         except ZabbixAPIException as e:
             e = f"Couldn't add hostgroup, Zabbix returned {str(e)}."
             logger.error(e)
