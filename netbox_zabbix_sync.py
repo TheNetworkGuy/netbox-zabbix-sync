@@ -49,6 +49,11 @@ def main(arguments):
     netbox_token = environ.get("NETBOX_TOKEN")
     netbox_key = environ.get("NETBOX_KEY")
 
+    if(arguments.secret and not netbox_key):
+        e = ("You need a private user key to"
+             " use the Netbox secrets functionality.")
+        logger.warning(e)
+        EnvironmentVarError(e)
     # Set Zabbix API
     try:
         zabbix = ZabbixAPI(zabbix_host)
@@ -94,7 +99,6 @@ def main(arguments):
                                  f"Using HG format '{device.hostgroup}'.")
             # -s flag: collect secrets from this device
             if(arguments.secret):
-                # This triggers another API query, might cause delay.
                 device.getNetboxSecrets(netbox)
             # Checks if device is in cleanup state
             if(device.status != "Active"):
@@ -261,7 +265,7 @@ class NetworkDevice():
                 logger.debug(f"Got {len(self.secrets)} secret(s)"
                              f" for host {self.name}.")
         except NetboxRequestError as e:
-            e = f"Couldn't get Netbox secrets, error {e}."
+            e = f"Device {self.name}: unable to get Netbox secrets, error: {e}"
             logger.warning(e)
 
     def getZabbixTemplate(self, templates):
@@ -512,8 +516,6 @@ class NetworkDevice():
                     raise InterfaceConfigError(e)
                 # Set interfaceID for Zabbix config
                 updates["interfaceid"] = host["interfaces"][0]['interfaceid']
-                logger.debug(f"{self.name}: Updating interface with "
-                             f"config {updates}")
                 try:
                     # API call to Zabbix
                     self.zabbix.hostinterface.update(updates)
@@ -567,10 +569,13 @@ class ZabbixInterface():
             if("snmp" in self.context["zabbix"]):
                 snmp = self.context["zabbix"]["snmp"]
                 # Check if matching SNMP Netbox secret is found for host.
-                secrets = ["community", "authpassphrase", "privpassphrase"]
+                supported_secrets = ["community", "authpassphrase",
+                                     "privpassphrase"]
+                # Check if Netbox host has secrets
                 if(self.secrets):
                     for secret in self.secrets:
-                        if(secret.name in secrets):
+                        # If secret is supported, add to SNMP details
+                        if(secret.name in supported_secrets):
                             snmp[secret.name] = secret.plaintext
                 self.interface["details"] = {}
                 # Checks if bulk config has been defined
