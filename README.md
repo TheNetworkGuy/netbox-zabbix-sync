@@ -119,6 +119,8 @@ You will need to use the -s option for this. Keep in mind that you will need a N
 
 This method of setting device SNMP parameters is working, but i would recommend going for a "secret macro" implementation to keep your environment more predictable. Refer to the macro from the config context and set the macro inside of Zabbix to the actual community string / authentication secret etc.
 
+WARNING: Due to the pynetbox and Netbox API constuction, retrieving secrets requires an 2nd API call. Using this functionality could slow the script down, especially with a large device inventory. 
+
 #### Permissions
 Make sure that the user has proper permissions for device read and modify (modify to set the Zabbix HostID custom field) operations.
 
