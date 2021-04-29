@@ -114,22 +114,22 @@ def main(arguments):
                     logger.info(f"Skipping host {device.name} since its "
                                 f"not in the active state.")
                 continue
+            # Add hostgroup is flag is true
+            # and Hostgroup is not present in Zabbix
+            if(arguments.hostgroups):
+                for group in zabbix_groups:
+                    # If hostgroup is already present in Zabbix
+                    if(group["name"] == device.hostgroup):
+                        break
+                else:
+                    # Create new hostgroup
+                    hostgroup = device.createZabbixHostgroup()
+                    zabbix_groups.append(hostgroup)
+            # Device is already present in Zabbix
             if(device.zabbix_id):
-                # Device is already present in Zabbix
                 device.ConsistencyCheck(zabbix_groups, zabbix_templates)
+            # Add device to Zabbix
             else:
-                # Add hostgroup is flag is true
-                # and Hostgroup is not present in Zabbix
-                if(arguments.hostgroups):
-                    for group in zabbix_groups:
-                        if(group["name"] == device.hostgroup):
-                            # If hostgroup is already present in Zabbix
-                            break
-                    else:
-                        # Create new hostgroup
-                        hostgroup = device.createZabbixHostgroup()
-                        zabbix_groups.append(hostgroup)
-                # Add device to Zabbix
                 device.createInZabbix(zabbix_groups, zabbix_templates)
         except SyncError:
             pass
