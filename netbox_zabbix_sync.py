@@ -6,6 +6,7 @@ import logging
 import argparse
 from pynetbox import api
 from pyzabbix import ZabbixAPI, ZabbixAPIException
+from pynetbox.core.query import RequestError as NetboxRequestError
 
 # Set logging
 log_format = logging.Formatter('%(asctime)s - %(name)s - '
@@ -46,7 +47,13 @@ def main(arguments):
     zabbix_pass = environ.get("ZABBIX_PASS")
     netbox_host = environ.get("NETBOX_HOST")
     netbox_token = environ.get("NETBOX_TOKEN")
+    netbox_key = environ.get("NETBOX_KEY")
 
+    if(arguments.secret and not netbox_key):
+        e = ("You need a private user key to"
+             " use the Netbox secrets functionality.")
+        logger.warning(e)
+        EnvironmentVarError(e)
     # Set Zabbix API
     try:
         zabbix = ZabbixAPI(zabbix_host)
@@ -55,7 +62,8 @@ def main(arguments):
         e = f"Zabbix returned the following error: {str(e)}."
         logger.error(e)
     # Set Netbox API
-    netbox = api(netbox_host, netbox_token, threading=True)
+    netbox = api(netbox_host, token=netbox_token,
+                 private_key=netbox_key, threading=True)
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.all()
     zabbix_groups = zabbix.hostgroup.get(output=['name'])
@@ -89,6 +97,9 @@ def main(arguments):
                 else:
                     logger.debug(f"{device.name} is not linked to a tenant. "
                                  f"Using HG format '{device.hostgroup}'.")
+            # -s flag: collect secrets from this device
+            if(arguments.secret):
+                device.getNetboxSecrets(netbox)
             # Checks if device is in cleanup state
             if(device.status != "Active"):
                 if(device.zabbix_id):
@@ -163,6 +174,7 @@ class NetworkDevice():
         self.zabbix = zabbix
         self.tenant = nb.tenant
         self.hostgroup = None
+        self.secrets = None
         self.hg_format = [self.nb.site.name,
                           self.nb.device_type.manufacturer.name,
                           self.nb.device_role.name]
@@ -237,10 +249,24 @@ class NetworkDevice():
                          f"Modifying hostname from {self.name} to " +
                          f"{self.nb.virtual_chassis.name}.")
             self.name = self.nb.virtual_chassis.name
+
             return True
         else:
             logger.debug(f"Device {self.name} is non-primary cluster member.")
             return False
+
+    def getNetboxSecrets(self, nbapi):
+        """
+        Get secrets from this Netbox host
+        """
+        try:
+            self.secrets = nbapi.secrets.secrets.filter(device=self.nb.name)
+            if(self.secrets):
+                logger.debug(f"Got {len(self.secrets)} secret(s)"
+                             f" for host {self.name}.")
+        except NetboxRequestError as e:
+            e = f"Device {self.name}: unable to get Netbox secrets, error: {e}"
+            logger.warning(e)
 
     def getZabbixTemplate(self, templates):
         """
@@ -319,7 +345,8 @@ class NetworkDevice():
         """
         try:
             # Initiate interface class
-            interface = ZabbixInterface(self.nb.config_context, self.ip)
+            interface = ZabbixInterface(self.nb.config_context,
+                                        self.ip, self.secrets)
             # Check if Netbox has device context.
             # If not fall back to old config.
             if(interface.get_context()):
@@ -489,8 +516,6 @@ class NetworkDevice():
                     raise InterfaceConfigError(e)
                 # Set interfaceID for Zabbix config
                 updates["interfaceid"] = host["interfaces"][0]['interfaceid']
-                logger.debug(f"{self.name}: Updating interface with "
-                             f"config {updates}")
                 try:
                     # API call to Zabbix
                     self.zabbix.hostinterface.update(updates)
@@ -513,8 +538,9 @@ class NetworkDevice():
 
 
 class ZabbixInterface():
-    def __init__(self, context, ip):
+    def __init__(self, context, ip, secrets=None):
         self.context = context
+        self.secrets = secrets
         self.type = None
         self.ip = ip
         self.skelet = {"main": "1", "useip": "1", "dns": "", "ip": self.ip}
@@ -542,6 +568,15 @@ class ZabbixInterface():
             # Checks if SNMP settings are defined in Netbox
             if("snmp" in self.context["zabbix"]):
                 snmp = self.context["zabbix"]["snmp"]
+                # Check if matching SNMP Netbox secret is found for host.
+                supported_secrets = ["community", "authpassphrase",
+                                     "privpassphrase"]
+                # Check if Netbox host has secrets
+                if(self.secrets):
+                    for secret in self.secrets:
+                        # If secret is supported, add to SNMP details
+                        if(secret.name in supported_secrets):
+                            snmp[secret.name] = secret.plaintext
                 self.interface["details"] = {}
                 # Checks if bulk config has been defined
                 if(snmp.get("bulk")):
@@ -610,6 +645,8 @@ if(__name__ == "__main__"):
     parser.add_argument("-t", "--tenant", action="store_true",
                         help=("Add Tenant name to the Zabbix "
                               "hostgroup name scheme."))
+    parser.add_argument("-s", "--secret", action="store_true",
+                        help=("Use Netbox secrets for SNMP interfaces."))
     args = parser.parse_args()
 
     main(args)
