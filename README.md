@@ -22,7 +22,7 @@ Optional:
 |  -t | tenant | Add the tenant name to the hostgroup format (Tenant/Site/Manufacturer/Role) |
 |  -s | secret | Use Netbox secrets if present on device for SNMP parameters
 |  -v | verbose | Log with debugging on. |
-
+|  -p | proxy-power | Force a full proxy sync. USE WITH CAUTION, see "Set proxy within Netbox" for more information |
 
 #### Logging
 Logs are generated under sync.log, use -v for debugging.
@@ -55,6 +55,17 @@ And this field for the Zabbix template
 * Required: False
 * Default: null
 * Object: dcim > device_type
+
+#### Set proxy within Netbox
+You can set the proxy for a device using the 'proxy' key in config context.
+```json
+{
+    "zabbix": {
+        "proxy": "yourawesomeproxy.local"
+    }
+}
+```
+Because of the posible amount of destruction when setting up Netbox but forgetting the proxy command, the sync works a bit different. By default everything is synced except in a situation where the Zabbix host has a proxy configured but nothing is configured in Netbox. To force deletion and a full sync, use the -p flag.
 
 #### Set interface parameters within Netbox
 When adding a new device, you can set the interface type with custom context.
