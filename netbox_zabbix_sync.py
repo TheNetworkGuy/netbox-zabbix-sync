@@ -68,6 +68,7 @@ def main(arguments):
     netbox_devices = netbox.dcim.devices.all()
     zabbix_groups = zabbix.hostgroup.get(output=['name'])
     zabbix_templates = zabbix.template.get(output=['name'])
+    zabbix_proxys = zabbix.proxy.get(output=['host'])
     # Go through all Netbox devices
     for nb_device in netbox_devices:
         try:
@@ -127,10 +128,11 @@ def main(arguments):
                     zabbix_groups.append(hostgroup)
             # Device is already present in Zabbix
             if(device.zabbix_id):
-                device.ConsistencyCheck(zabbix_groups, zabbix_templates)
+                device.ConsistencyCheck(zabbix_groups, zabbix_templates,
+                                        zabbix_proxys, arguments.proxy_power)
             # Add device to Zabbix
             else:
-                device.createInZabbix(zabbix_groups, zabbix_templates)
+                device.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxys)
         except SyncError:
             pass
 
@@ -159,6 +161,10 @@ class InterfaceConfigError(SyncError):
     pass
 
 
+class ProxyConfigError(SyncError):
+    pass
+
+
 class NetworkDevice():
 
     """
@@ -175,6 +181,7 @@ class NetworkDevice():
         self.tenant = nb.tenant
         self.hostgroup = None
         self.secrets = None
+        self.zbxproxy = "0"
         self.hg_format = [self.nb.site.name,
                           self.nb.device_type.manufacturer.name,
                           self.nb.device_role.name]
@@ -351,7 +358,7 @@ class NetworkDevice():
             # If not fall back to old config.
             if(interface.get_context()):
                 # If device is SNMP type, add aditional information.
-                if(interface.type == 2):
+                if(interface.interface["type"] == 2):
                     interface.set_snmp()
             else:
                 interface.set_default()
@@ -361,7 +368,24 @@ class NetworkDevice():
             logger.warning(e)
             raise SyncInventoryError(e)
 
-    def createInZabbix(self, groups, templates,
+    def setProxy(self, proxy_list):
+        # check if Zabbix Proxy has been defined in config context
+        if("zabbix" in self.nb.config_context):
+            if("proxy" in self.nb.config_context["zabbix"]):
+                proxy = self.nb.config_context["zabbix"]["proxy"]
+                # Try matching proxy
+                for px in proxy_list:
+                    if(px["host"] == proxy):
+                        self.zbxproxy = px["proxyid"]
+                        logger.debug(f"Found proxy {proxy}"
+                                     f" for {self.name}.")
+                        return True
+                else:
+                    e = f"{self.name}: Defined proxy {proxy} not found."
+                    logger.warning(e)
+                    return False
+
+    def createInZabbix(self, groups, templates, proxys,
                        description="Host added by Netbox sync script."):
         """
         Creates Zabbix host object with parameters from Netbox object.
@@ -376,12 +400,15 @@ class NetworkDevice():
             interfaces = self.setInterfaceDetails()
             groups = [{"groupid": self.group_id}]
             templates = [{"templateid": self.template_id}]
+            # Set Zabbix proxy if defined
+            self.setProxy(proxys)
             # Add host to Zabbix
             try:
                 host = self.zabbix.host.create(host=self.name, status=0,
                                                interfaces=interfaces,
                                                groups=groups,
                                                templates=templates,
+                                               proxy_hostid=self.zbxproxy,
                                                description=description)
                 self.zabbix_id = host["hostids"][0]
             except ZabbixAPIException as e:
@@ -389,7 +416,7 @@ class NetworkDevice():
                 logger.error(e)
                 raise SyncExternalError(e)
             # Set Netbox custom field to hostID value.
-            self.nb.custom_fields[device_cf] = self.zabbix_id
+            self.nb.custom_fields[device_cf] = int(self.zabbix_id)
             self.nb.save()
             logger.info(f"Created host {self.name} in Zabbix.")
         else:
@@ -424,12 +451,13 @@ class NetworkDevice():
             raise SyncExternalError(e)
         logger.info(f"Updated host {self.name} with data {kwargs}.")
 
-    def ConsistencyCheck(self, groups, templates):
+    def ConsistencyCheck(self, groups, templates, proxys, proxy_power):
         """
         Checks if Zabbix object is still valid with Netbox parameters.
         """
         self.getZabbixGroup(groups)
         self.getZabbixTemplate(templates)
+        self.setProxy(proxys)
         host = self.zabbix.host.get(filter={'hostid': self.zabbix_id},
                                     selectInterfaces=['type', 'ip',
                                                       'port', 'details',
@@ -473,6 +501,29 @@ class NetworkDevice():
             logger.warning(f"Device {self.name}: hostgroup OUT of sync.")
             self.updateZabbixHost(groups={'groupid': self.group_id})
 
+        # Check if a proxy has been defined
+        if(self.zbxproxy != "0"):
+            # Check if expected proxyID matches with configured proxy
+            if(host["proxy_hostid"] == self.zbxproxy):
+                logger.debug(f"Device {self.name}: proxy in-sync.")
+            else:
+                # Proxy diff, update value
+                logger.warning(f"Device {self.name}: proxy OUT of sync.")
+                self.updateZabbixHost(proxy_hostid=self.zbxproxy)
+        else:
+            if(not host["proxy_hostid"] == "0"):
+                if(proxy_power):
+                    # If the -p flag has been issued,
+                    # delete the proxy link in Zabbix
+                    self.updateZabbixHost(proxy_hostid=self.zbxproxy)
+                else:
+                    # Instead of deleting the proxy config in zabbix and
+                    # forcing potential data loss,
+                    # an error message is displayed.
+                    logger.error(f"Device {self.name} is configured "
+                                 f"with proxy in Zabbix but not in Netbox. The"
+                                 " -p flag was ommited: no "
+                                 "changes have been made.")
         # If only 1 interface has been found
         if(len(host['interfaces']) == 1):
             updates = {}
@@ -541,7 +592,6 @@ class ZabbixInterface():
     def __init__(self, context, ip, secrets=None):
         self.context = context
         self.secrets = secrets
-        self.type = None
         self.ip = ip
         self.skelet = {"main": "1", "useip": "1", "dns": "", "ip": self.ip}
         self.interface = self.skelet
@@ -549,16 +599,13 @@ class ZabbixInterface():
     def get_context(self):
         # check if Netbox custom context has been defined.
         if("zabbix" in self.context):
-            try:
-                zabbix = self.context["zabbix"]
+            zabbix = self.context["zabbix"]
+            if("interface_type" in zabbix and "interface_port" in zabbix):
                 self.interface["type"] = zabbix["interface_type"]
                 self.interface["port"] = zabbix["interface_port"]
-                self.type = zabbix["interface_type"]
-            except KeyError:
-                e = ("Interface port or type is not defined under "
-                     "config context 'zabbix'.")
-                raise InterfaceConfigError(e)
-            return True
+                return True
+            else:
+                return False
         else:
             return False
 
@@ -647,6 +694,11 @@ if(__name__ == "__main__"):
                               "hostgroup name scheme."))
     parser.add_argument("-s", "--secret", action="store_true",
                         help=("Use Netbox secrets for SNMP interfaces."))
+    parser.add_argument("-p", "--proxy_power", action="store_true",
+                        help=("USE WITH CAUTION. If there is a proxy "
+                              "configured in Zabbix but not in Netbox, sync "
+                              "the device and remove the host - proxy "
+                              "link in Zabbix."))
     args = parser.parse_args()
 
     main(args)
