@@ -11,9 +11,6 @@ A script to sync the Netbox device inventory to Zabbix.
 * NETBOX_HOST="https://netbox.local"
 * NETBOX_TOKEN="secrettoken"
 
-Optional:
-* NETBOX_KEY="Private user key"
-
 #### Flags
 |  Flag | Option  |  Description |
 | ------------ | ------------ | ------------ |
