@@ -20,7 +20,6 @@ Optional:
 |  -c | cluster | For clustered devices: only add the primary node of a cluster and use the cluster name as hostname. |
 |  -H | hostgroup | Create non-existing hostgroups in Zabbix. Usefull for a first run to add all required hostgroups. |
 |  -t | tenant | Add the tenant name to the hostgroup format (Tenant/Site/Manufacturer/Role) |
-|  -s | secret | Use Netbox secrets if present on device for SNMP parameters
 |  -v | verbose | Log with debugging on. |
 |  -p | proxy-power | Force a full proxy sync. USE WITH CAUTION, see "Set proxy within Netbox" for more information |
 
@@ -123,14 +122,6 @@ To configure the interface parameters you'll need to use custom context. Custom 
 }
 ```
 Note: Not all SNMP data is required for a working configuration. [The following parameters are allowed ](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed ")but are not all required, depending on your environment.
-
-##### Secrets
-Instead of having the password in plain-text in the config context, you can also set the password as secret in the Netbox device configuration.
-You will need to use the -s option for this. Keep in mind that you will need a Netbox private user key for this functionality.
-
-This method of setting device SNMP parameters is working, but i would recommend going for a "secret macro" implementation to keep your environment more predictable. Refer to the macro from the config context and set the macro inside of Zabbix to the actual community string / authentication secret etc.
-
-WARNING: Due to the pynetbox and Netbox API constuction, retrieving secrets requires an 2nd API call. Using this functionality could slow the script down, especially with a large device inventory. 
 
 #### Permissions
 Make sure that the user has proper permissions for device read and modify (modify to set the Zabbix HostID custom field) operations.
