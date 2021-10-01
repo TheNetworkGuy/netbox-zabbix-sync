@@ -1,6 +1,7 @@
 A script to sync the Netbox device inventory to Zabbix.
 
 ## Requires pyzabbix and pynetbox.
+From now on only compatible with Netbox 3.x.
 
 ### Script settings
 #### Enviroment variables
