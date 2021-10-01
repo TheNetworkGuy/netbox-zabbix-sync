@@ -6,7 +6,6 @@ import logging
 import argparse
 from pynetbox import api
 from pyzabbix import ZabbixAPI, ZabbixAPIException
-from pynetbox.core.query import RequestError as NetboxRequestError
 
 # Set logging
 log_format = logging.Formatter('%(asctime)s - %(name)s - '
@@ -15,7 +14,8 @@ lgout = logging.StreamHandler()
 lgout.setFormatter(log_format)
 lgout.setLevel(logging.DEBUG)
 
-lgfile = logging.FileHandler(path.join(path.dirname(path.realpath(__file__)), "sync.log"))
+lgfile = logging.FileHandler(path.join(path.dirname(
+                             path.realpath(__file__)), "sync.log"))
 lgfile.setFormatter(log_format)
 lgfile.setLevel(logging.DEBUG)
 
@@ -28,9 +28,13 @@ logger.setLevel(logging.WARNING)
 template_cf = "zabbix_template"
 device_cf = "zabbix_hostid"
 
+# Netbox to Zabbix device state convertion
+zabbix_device_removal = ["Decommissioning", "Inventory"]
+zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
+
 
 def main(arguments):
-    """Module that runs the sync process."""
+    """Run the sync process."""
     # set environment variables
     if(arguments.verbose):
         logger.setLevel(logging.DEBUG)
@@ -92,7 +96,7 @@ def main(arguments):
                     logger.debug(f"{device.name} is not linked to a tenant. "
                                  f"Using HG format '{device.hostgroup}'.")
             # Checks if device is in cleanup state
-            if(device.status != "Active"):
+            if(device.status in zabbix_device_removal):
                 if(device.zabbix_id):
                     # Delete device from Zabbix
                     # and remove hostID from Netbox.
@@ -105,6 +109,8 @@ def main(arguments):
                     logger.info(f"Skipping host {device.name} since its "
                                 f"not in the active state.")
                 continue
+            elif(device.status in zabbix_device_disable):
+                device.zabbix_state = 1
             # Add hostgroup is flag is true
             # and Hostgroup is not present in Zabbix
             if(arguments.hostgroups):
@@ -122,7 +128,8 @@ def main(arguments):
                                         zabbix_proxys, arguments.proxy_power)
             # Add device to Zabbix
             else:
-                device.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxys)
+                device.createInZabbix(zabbix_groups, zabbix_templates,
+                                      zabbix_proxys)
         except SyncError:
             pass
 
@@ -171,6 +178,7 @@ class NetworkDevice():
         self.tenant = nb.tenant
         self.hostgroup = None
         self.zbxproxy = "0"
+        self.zabbix_state = 0
         self.hg_format = [self.nb.site.name,
                           self.nb.device_type.manufacturer.name,
                           self.nb.device_role.name]
@@ -379,7 +387,8 @@ class NetworkDevice():
             self.setProxy(proxys)
             # Add host to Zabbix
             try:
-                host = self.zabbix.host.create(host=self.name, status=0,
+                host = self.zabbix.host.create(host=self.name,
+                                               status=self.zabbix_state,
                                                interfaces=interfaces,
                                                groups=groups,
                                                templates=templates,
@@ -476,6 +485,12 @@ class NetworkDevice():
             logger.warning(f"Device {self.name}: hostgroup OUT of sync.")
             self.updateZabbixHost(groups={'groupid': self.group_id})
 
+        if(int(host["status"]) == self.zabbix_state):
+            logger.debug(f"Device {self.name}: status in-sync.")
+        else:
+            logger.warning(f"Device {self.name}: status OUT of sync.")
+            self.updateZabbixHost(status=str(self.zabbix_state))
+
         # Check if a proxy has been defined
         if(self.zbxproxy != "0"):
             # Check if expected proxyID matches with configured proxy
@@ -564,6 +579,8 @@ class NetworkDevice():
 
 
 class ZabbixInterface():
+    """Class that represents a Zabbix interface."""
+
     def __init__(self, context, ip):
         self.context = context
         self.ip = ip
