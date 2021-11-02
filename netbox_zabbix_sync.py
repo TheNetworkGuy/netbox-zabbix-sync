@@ -207,11 +207,11 @@ class NetworkDevice():
             self.hg_format = []
             for curr_part in parts:
                 if curr_part in self._hg_map:
-                    try:
-                        self.hg_format.append(str(rgetattr(self.nb, curr_part)))
-                    except AttributeError:
+                    val = rgetattr(self.nb, curr_part, 'Unknown')
+                    if val == 'Unknown':
                         logger.error("Value of '{0}' is not set on host '{1}'".\
                             format(curr_part, self.name))
+                    self.hg_format.append(str(val))
                 else:
                     logger.error("Unknown field specifier: {0}".\
                         format(curr_part))
