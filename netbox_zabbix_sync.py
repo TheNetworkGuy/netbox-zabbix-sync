@@ -2,6 +2,7 @@
 """Netbox to Zabbix sync script."""
 
 from os import environ, path
+import functools
 import logging
 import argparse
 from pynetbox import api
@@ -70,7 +71,7 @@ def main(arguments):
     # Go through all Netbox devices
     for nb_device in netbox_devices:
         try:
-            device = NetworkDevice(nb_device, zabbix, hg_spec=hg_spec)
+            device = NetworkDevice(nb_device, zabbix, hg_spec=zabbix_hg_spec)
             # Checks if device is part of cluster.
             # Requires the cluster argument.
             if(device.isCluster() and arguments.cluster):
@@ -177,20 +178,19 @@ class NetworkDevice():
     INPUT: (Netbox device class, ZabbixAPI class)
     """
     _hg_map = {
-        'cluster':      'cluster.name',
-        #'cluster group':      'cluster.name',
-        'device type':  'device_type.model',
-        'location':     'location.name',
-        'manufacturer': 'device_type.manufacturer.name',
-        'platform':     'platform.name',
-        'rack':         'rack.name',
-        'role':         'device_role.name',
-        'site':         'site.name',
-        #'site group':         'site.name',
-        'tenant':       'tenant.name',
-        #'tenant group': self.nb.site.name,
+        'cluster':       'cluster.name',
+        #'cluster_group': 'cluster.name',
+        'device_type':   'device_type.model',
+        'location':      'location.name',
+        'manufacturer':  'device_type.manufacturer.name',
+        'platform':      'platform.name',
+        'rack':          'rack.name',
+        'role':          'device_role.name',
+        'site':          'site.name',
+        #'site_group':    'site.name',
+        'tenant':        'tenant.name',
+        #'tenant_group':  'site.name',
     }
-
 
     def __init__(self, nb, zabbix, hg_spec = None):
         self.nb = nb
@@ -208,7 +208,7 @@ class NetworkDevice():
             for curr_part in parts:
                 if curr_part in self._hg_map:
                     try:
-                        self.hg_format.append(rgetattr(self.nb), curr_part)
+                        self.hg_format.append(str(rgetattr(self.nb, curr_part)))
                     except AttributeError:
                         logger.error("Value of '{0}' is not set on host '{1}'".\
                             format(curr_part, self.name))
