@@ -49,6 +49,7 @@ def main(arguments):
     zabbix_host = environ.get("ZABBIX_HOST")
     zabbix_user = environ.get("ZABBIX_USER")
     zabbix_pass = environ.get("ZABBIX_PASS")
+    zabbix_hg_spec = environ.get("ZABBIX_HG_SPEC", None)
     netbox_host = environ.get("NETBOX_HOST")
     netbox_token = environ.get("NETBOX_TOKEN")
 
@@ -69,7 +70,7 @@ def main(arguments):
     # Go through all Netbox devices
     for nb_device in netbox_devices:
         try:
-            device = NetworkDevice(nb_device, zabbix)
+            device = NetworkDevice(nb_device, zabbix, hg_spec=hg_spec)
             # Checks if device is part of cluster.
             # Requires the cluster argument.
             if(device.isCluster() and arguments.cluster):
@@ -161,6 +162,13 @@ class InterfaceConfigError(SyncError):
 class ProxyConfigError(SyncError):
     pass
 
+def rgetattr(obj, path, default=None):
+    try:
+        return functools.reduce(getattr, path.split('.'), obj)
+    except AttributeError:
+        if default:
+            return default
+        raise
 
 class NetworkDevice():
 
@@ -168,8 +176,23 @@ class NetworkDevice():
     Represents Network device.
     INPUT: (Netbox device class, ZabbixAPI class)
     """
+    _hg_map = {
+        'cluster':      'cluster.name',
+        #'cluster group':      'cluster.name',
+        'device type':  'device_type.model',
+        'location':     'location.name',
+        'manufacturer': 'device_type.manufacturer.name',
+        'platform':     'platform.name',
+        'rack':         'rack.name',
+        'role':         'device_role.name',
+        'site':         'site.name',
+        #'site group':         'site.name',
+        'tenant':       'tenant.name',
+        #'tenant group': self.nb.site.name,
+    }
 
-    def __init__(self, nb, zabbix):
+
+    def __init__(self, nb, zabbix, hg_spec = None):
         self.nb = nb
         self.id = nb.id
         self.name = nb.name
@@ -179,9 +202,23 @@ class NetworkDevice():
         self.hostgroup = None
         self.zbxproxy = "0"
         self.zabbix_state = 0
-        self.hg_format = [self.nb.site.name,
-                          self.nb.device_type.manufacturer.name,
-                          self.nb.device_role.name]
+        if hg_spec:
+            parts = hg_spec.split('/')
+            self.hg_format = []
+            for curr_part in parts:
+                if curr_part in self._hg_map:
+                    try:
+                        self.hg_format.append(rgetattr(self.nb), curr_part)
+                    except AttributeError:
+                        logger.error("Value of '{0}' is not set on host '{1}'".\
+                            format(curr_part, self.name))
+                else:
+                    logger.error("Unknown field specifier: {0}".\
+                        format(curr_part))
+        else:
+            self.hg_format = [self.nb.site.name,
+                              self.nb.device_type.manufacturer.name,
+                              self.nb.device_role.name]
         self._setBasics()
         self.setHostgroup()
 
