@@ -9,6 +9,7 @@ From now on only compatible with Netbox 3.x.
 * ZABBIX_HOST="https://zabbix.local"
 * ZABBIX_USER="username"
 * ZABBIX_PASS="Password"
+* ZABBIX_HG_SPEC=site/manufacturer/role
 * NETBOX_HOST="https://netbox.local"
 * NETBOX_TOKEN="secrettoken"
 
@@ -35,6 +36,21 @@ And with tenants (-t flag):
 
 Make sure that the Zabbix user has proper permissions to create hosts.
 The hostgroups are in a nested format. This means that proper permissions only need to be applied to the site name hostgroup and cascaded to any child hostgroups.
+
+If you want to customize the host groups you can set the ZABBIX_HG_SPEC environment variable.
+
+The following fields are currently supported:
+* cluster
+* device_type
+* location
+* manufacturer
+* platform
+* rack
+* role
+* site
+* tenant
+
+If a value is not set on the host for a specified value it is filled in with 'Unknown' (only really applicable if you use -H to automatically create the host group) and an error message is displayed on the script output.
 
 ### Netbox settings
 #### Custom fields
