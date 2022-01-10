@@ -19,6 +19,7 @@ From now on only compatible with Netbox 3.x.
 |  -H | hostgroup | Create non-existing hostgroups in Zabbix. Usefull for a first run to add all required hostgroups. |
 |  -t | tenant | Add the tenant name to the hostgroup format (Tenant/Site/Manufacturer/Role) |
 |  -v | verbose | Log with debugging on. |
+|  -j | journal | Create journal entries in Netbox when a host gets added, modified or deleted in Zabbix |
 |  -p | proxy-power | Force a full proxy sync. USE WITH CAUTION, see "Set proxy within Netbox" for more information |
 
 #### Logging

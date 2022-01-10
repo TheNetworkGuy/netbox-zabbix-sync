@@ -63,13 +63,15 @@ def main(arguments):
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.all()
+    netbox_journals = netbox.extras.journal_entries
     zabbix_groups = zabbix.hostgroup.get(output=['name'])
     zabbix_templates = zabbix.template.get(output=['name'])
     zabbix_proxys = zabbix.proxy.get(output=['host'])
     # Go through all Netbox devices
     for nb_device in netbox_devices:
         try:
-            device = NetworkDevice(nb_device, zabbix)
+            device = NetworkDevice(nb_device, zabbix, netbox_journals,
+                                   arguments.journal)
             # Checks if device is part of cluster.
             # Requires the cluster argument.
             if(device.isCluster() and arguments.cluster):
@@ -166,10 +168,10 @@ class NetworkDevice():
 
     """
     Represents Network device.
-    INPUT: (Netbox device class, ZabbixAPI class)
+    INPUT: (Netbox device class, ZabbixAPI class, journal flag, NB journal class)
     """
 
-    def __init__(self, nb, zabbix):
+    def __init__(self, nb, zabbix, nb_journal_class, journal=None):
         self.nb = nb
         self.id = nb.id
         self.name = nb.name
@@ -182,6 +184,8 @@ class NetworkDevice():
         self.hg_format = [self.nb.site.name,
                           self.nb.device_type.manufacturer.name,
                           self.nb.device_role.name]
+        self.journal = journal
+        self.nb_journals = nb_journal_class
         self._setBasics()
         self.setHostgroup()
 
@@ -314,6 +318,7 @@ class NetworkDevice():
                 self.nb.save()
                 e = f"Deleted host {self.name} from Zabbix."
                 logger.info(e)
+                self.create_journal_entry("warning", "Deleted host from Zabbix")
             except ZabbixAPIException as e:
                 e = f"Zabbix returned the following error: {str(e)}."
                 logger.error(e)
@@ -402,7 +407,9 @@ class NetworkDevice():
             # Set Netbox custom field to hostID value.
             self.nb.custom_fields[device_cf] = int(self.zabbix_id)
             self.nb.save()
-            logger.info(f"Created host {self.name} in Zabbix.")
+            msg = f"Created host {self.name} in Zabbix."
+            logger.info(msg)
+            self.create_journal_entry("success", msg)
         else:
             e = f"Unable to add {self.name} to Zabbix: host already present."
             logger.warning(e)
@@ -434,6 +441,7 @@ class NetworkDevice():
             logger.error(e)
             raise SyncExternalError(e)
         logger.info(f"Updated host {self.name} with data {kwargs}.")
+        self.create_journal_entry("info", f"Updated host in Zabbix with latest NB data.")
 
     def ConsistencyCheck(self, groups, templates, proxys, proxy_power):
         """
@@ -562,6 +570,7 @@ class NetworkDevice():
                     self.zabbix.hostinterface.update(updates)
                     e = f"Solved {self.name} interface conflict."
                     logger.info(e)
+                    self.create_journal_entry("info", e)
                 except ZabbixAPIException as e:
                     e = f"Zabbix returned the following error: {str(e)}."
                     logger.error(e)
@@ -576,6 +585,27 @@ class NetworkDevice():
                  "Manual interfention required.")
             logger.error(e)
             SyncInventoryError(e)
+
+    def create_journal_entry(self, severity, message):
+        # Send a new Journal entry to Netbox. Usefull for viewing actions
+        # in Netbox without having to look in Zabbix or the script log output
+        if(self.journal):
+            # Check if the severity is valid
+            if severity not in ["info", "success", "warning", "danger"]:
+                logger.warning(f"Value {severity} not valid for NB journal entries.")
+                return False
+            journal = {"assigned_object_type": "dcim.device",
+                       "assigned_object_id": self.id,
+                       "kind": severity,
+                       "comments": message
+                       }
+            try:
+                self.nb_journals.create(journal)
+                return True
+                logger.debug(f"Crated journal entry in NB for host {self.name}")
+            except pynetbox.RequestError as e:
+                logger.warning("Unable to create journal entry for "
+                               f"{self.name}: NB returned {e}")
 
 
 class ZabbixInterface():
@@ -679,6 +709,8 @@ if(__name__ == "__main__"):
                               "configured in Zabbix but not in Netbox, sync "
                               "the device and remove the host - proxy "
                               "link in Zabbix."))
+    parser.add_argument("-j", "--journal", action="store_true",
+                        help="Create journal entries in Netbox at write actions")
     args = parser.parse_args()
 
     main(args)
