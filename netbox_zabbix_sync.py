@@ -64,9 +64,9 @@ def main(arguments):
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.all()
     netbox_journals = netbox.extras.journal_entries
-    zabbix_groups = zabbix.hostgroup.get(output=['name'])
-    zabbix_templates = zabbix.template.get(output=['name'])
-    zabbix_proxys = zabbix.proxy.get(output=['host'])
+    zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
+    zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
+    zabbix_proxys = zabbix.proxy.get(output=['proxyid', 'host'])
     # Go through all Netbox devices
     for nb_device in netbox_devices:
         try:
@@ -459,8 +459,8 @@ class NetworkDevice():
                                     selectInterfaces=['type', 'ip',
                                                       'port', 'details',
                                                       'interfaceid'],
-                                    selectGroups=["id"],
-                                    selectParentTemplates=["id"])
+                                    selectGroups=["groupid"],
+                                    selectParentTemplates=["templateid"])
         if(len(host) > 1):
             e = (f"Got {len(host)} results for Zabbix hosts "
                  f"with ID {self.zabbix_id} - hostname {self.name}.")
