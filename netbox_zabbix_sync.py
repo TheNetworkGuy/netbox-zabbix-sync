@@ -242,6 +242,11 @@ class NetworkDevice():
                  f"not part of a cluster.")
             logger.warning(e)
             raise SyncInventoryError(e)
+        elif(not self.nb.virtual_chassis.master):
+            e = (f"{self.name} is part of a Netbox virtual chassis which does "
+                 "not have a master configured. Skipping for this reason.")
+            logger.error(e)
+            raise SyncInventoryError(e)
         else:
             return self.nb.virtual_chassis.master.id
 
