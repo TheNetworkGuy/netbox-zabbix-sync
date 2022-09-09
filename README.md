@@ -17,7 +17,7 @@ From now on only compatible with Netbox 3.x.
 | ------------ | ------------ | ------------ |
 |  -c | cluster | For clustered devices: only add the primary node of a cluster and use the cluster name as hostname. |
 |  -H | hostgroup | Create non-existing hostgroups in Zabbix. Usefull for a first run to add all required hostgroups. |
-|  -l | layout | Set the hostgroup layout. Default is site/manufacturer/dev_role. Posible options (seperated with '/'): site, manufacturer, dev_role, tenant) |
+|  -l | layout | Set the hostgroup layout. Default is site/manufacturer/dev_role. Posible options (seperated with '/'): site, manufacturer, dev_role, tenant |
 |  -v | verbose | Log with debugging on. |
 |  -j | journal | Create journal entries in Netbox when a host gets added, modified or deleted in Zabbix |
 |  -p | proxy-power | Force a full proxy sync. USE WITH CAUTION, see "Set proxy within Netbox" for more information |
