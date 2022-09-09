@@ -45,6 +45,16 @@ def main(arguments):
             e = f"Environment variable {var} has not been defined."
             logger.error(e)
             raise EnvironmentVarError(e)
+    # Check if the provided Hostgroup layout is valid
+    if(arguments.layout):
+        hg_objects = arguments.layout.split("/")
+        allowed_objects = ["site", "manufacturer", "tenant", "dev_role"]
+        for object in hg_objects:
+            if(object not in allowed_objects):
+                e = (f"Hostgroup item {object} is not valid. Make sure you"
+                     " use valid items and seperate them with '/'.")
+                logger.error(e)
+                raise HostgroupError(e)
     # Get all virtual environment variables
     zabbix_host = environ.get("ZABBIX_HOST")
     zabbix_user = environ.get("ZABBIX_USER")
@@ -72,6 +82,7 @@ def main(arguments):
         try:
             device = NetworkDevice(nb_device, zabbix, netbox_journals,
                                    arguments.journal)
+            device.set_hostgroup(arguments.layout)
             # Checks if device is part of cluster.
             # Requires the cluster argument.
             if(device.isCluster() and arguments.cluster):
@@ -87,16 +98,6 @@ def main(arguments):
                          f"but not primary. Skipping this host...")
                     logger.info(e)
                     continue
-            # With -t flag: add Tenant name to hostgroup name.
-            if(arguments.tenant):
-                if(device.tenant):
-                    device.hg_format.insert(1, device.tenant.name)
-                    device.setHostgroup()
-                    logger.debug(f"Added Tenant {device.tenant.name} to "
-                                 f"hostgroup format of {device.name}.")
-                else:
-                    logger.debug(f"{device.name} is not linked to a tenant. "
-                                 f"Using HG format '{device.hostgroup}'.")
             # Checks if device is in cleanup state
             if(device.status in zabbix_device_removal):
                 if(device.zabbix_id):
@@ -164,6 +165,10 @@ class ProxyConfigError(SyncError):
     pass
 
 
+class HostgroupError(SyncError):
+    pass
+
+
 class NetworkDevice():
 
     """
@@ -178,16 +183,12 @@ class NetworkDevice():
         self.status = nb.status.label
         self.zabbix = zabbix
         self.tenant = nb.tenant
-        self.hostgroup = None
+        self.hostgroup = ""
         self.zbxproxy = "0"
         self.zabbix_state = 0
-        self.hg_format = [self.nb.site.name,
-                          self.nb.device_type.manufacturer.name,
-                          self.nb.device_role.name]
         self.journal = journal
         self.nb_journals = nb_journal_class
         self._setBasics()
-        self.setHostgroup()
 
     def _setBasics(self):
         """
@@ -220,9 +221,27 @@ class NetworkDevice():
             logger.warning(e)
             raise SyncInventoryError(e)
 
-    def setHostgroup(self):
-        """Sets hostgroup to a string with hg_format parameters."""
-        self.hostgroup = "/".join(self.hg_format)
+    def set_hostgroup(self, format):
+        """Set the hostgroup for this device"""
+        # Get all variables from the NB data
+        site = self.nb.site.name
+        manufacturer = self.nb.device_type.manufacturer.name
+        role = self.nb.device_role.name
+        tenant = self.tenant.name if self.tenant else None
+
+        hostgroup_vars = {"site": site, "manufacturer": manufacturer,
+                          "dev_role": role, "tenant": tenant}
+        items = format.split("/")
+        # Go through all hostgroup items
+        for item in items:
+            # Check if the variable (such as Tenant) is empty
+            if(not hostgroup_vars[item]):
+                continue
+            # Check if this item is not the first in the hostgroup format
+            if(self.hostgroup):
+                self.hostgroup += "/"
+            # Add the item to the hostgroup format
+            self.hostgroup += hostgroup_vars[item]
 
     def isCluster(self):
         """
@@ -706,9 +725,9 @@ if(__name__ == "__main__"):
     parser.add_argument("-H", "--hostgroups",
                         help="Create Zabbix hostgroups if not present",
                         action="store_true")
-    parser.add_argument("-t", "--tenant", action="store_true",
-                        help=("Add Tenant name to the Zabbix "
-                              "hostgroup name scheme."))
+    parser.add_argument("-l", "--layout", type=str,
+                        help="Defines the hostgroup layout",
+                        default='site/manufacturer/dev_role')
     parser.add_argument("-p", "--proxy_power", action="store_true",
                         help=("USE WITH CAUTION. If there is a proxy "
                               "configured in Zabbix but not in Netbox, sync "
