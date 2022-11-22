@@ -72,7 +72,7 @@ def main(arguments):
     # Set Netbox API
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Get all Zabbix and Netbox data
-    netbox_devices = netbox.dcim.devices.all()
+    netbox_devices = netbox.dcim.devices.filter(name__n="null")
     netbox_journals = netbox.extras.journal_entries
     zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
     zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
