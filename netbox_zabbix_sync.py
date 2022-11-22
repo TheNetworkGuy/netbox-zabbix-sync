@@ -45,23 +45,28 @@ def main(arguments):
             e = f"Environment variable {var} has not been defined."
             logger.error(e)
             raise EnvironmentVarError(e)
-    # Check if the provided Hostgroup layout is valid
-    if(arguments.layout):
-        hg_objects = arguments.layout.split("/")
-        allowed_objects = ["site", "manufacturer", "tenant", "dev_role"]
-        for object in hg_objects:
-            if(object not in allowed_objects):
-                e = (f"Hostgroup item {object} is not valid. Make sure you"
-                     " use valid items and seperate them with '/'.")
-                logger.error(e)
-                raise HostgroupError(e)
     # Get all virtual environment variables
     zabbix_host = environ.get("ZABBIX_HOST")
     zabbix_user = environ.get("ZABBIX_USER")
     zabbix_pass = environ.get("ZABBIX_PASS")
     netbox_host = environ.get("NETBOX_HOST")
     netbox_token = environ.get("NETBOX_TOKEN")
-
+    # Set Netbox API
+    netbox = api(netbox_host, token=netbox_token, threading=True)
+    # Check if the provided Hostgroup layout is valid
+    if(arguments.layout):
+        hg_objects = arguments.layout.split("/")
+        allowed_objects = ["site", "manufacturer", "tenant", "dev_role"]
+        # Create API call to get all custom fields which are on the device objects
+        device_cfs = netbox.extras.custom_fields.filter(type="text", content_type_id=23)
+        for cf in device_cfs:
+            allowed_objects.append(cf.name)
+        for object in hg_objects:
+            if(object not in allowed_objects):
+                e = (f"Hostgroup item {object} is not valid. Make sure you"
+                     " use valid items and seperate them with '/'.")
+                logger.error(e)
+                raise HostgroupError(e)
     # Set Zabbix API
     try:
         zabbix = ZabbixAPI(zabbix_host)
@@ -69,8 +74,6 @@ def main(arguments):
     except ZabbixAPIException as e:
         e = f"Zabbix returned the following error: {str(e)}."
         logger.error(e)
-    # Set Netbox API
-    netbox = api(netbox_host, token=netbox_token, threading=True)
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.filter(name__n="null")
     netbox_journals = netbox.extras.journal_entries
@@ -234,14 +237,33 @@ class NetworkDevice():
         items = format.split("/")
         # Go through all hostgroup items
         for item in items:
-            # Check if the variable (such as Tenant) is empty
-            if(not hostgroup_vars[item]):
-                continue
             # Check if this item is not the first in the hostgroup format
             if(self.hostgroup):
                 self.hostgroup += "/"
+            # Check if the item is not a standard item, A.K.A. custom field name
+            if(item not in hostgroup_vars):
+                # check if the item is in the custom fields
+                if(item in self.nb.custom_fields):
+                    cf_value = self.nb.custom_fields[item]
+                    # check if the CF is empty.
+                    if(not cf_value):
+                        # Remove the previously inserted /
+                        self.hostgroup = self.hostgroup[:-1]
+                        continue
+                    else:
+                        self.hostgroup += cf_value
+                        continue
+                else:
+                    continue
+            # Check if the variable (such as Tenant) is empty
+            if(not hostgroup_vars[item]):
+                continue
             # Add the item to the hostgroup format
             self.hostgroup += hostgroup_vars[item]
+        if(not self.hostgroup):
+            e = f"{self.name} has no reliable hostgroup. This is most likely due to the use of custom fields that are empty."
+            logger.error(e)
+            raise SyncInventoryError(e)
 
     def isCluster(self):
         """
