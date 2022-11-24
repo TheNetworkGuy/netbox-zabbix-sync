@@ -209,7 +209,8 @@ class NetworkDevice():
             self.template_name = device_type_cf[template_cf]
         else:
             e = (f"Custom field {template_cf} not "
-                 f"found for {self.nb.device_type.name}.")
+                 f"found for {self.nb.device_type.manufacturer.name}"
+                 f" - {self.nb.device_type.display}.")
             logger.warning(e)
             raise SyncInventoryError(e)
 
@@ -217,7 +218,7 @@ class NetworkDevice():
         if(device_cf in self.nb.custom_fields):
             self.zabbix_id = self.nb.custom_fields[device_cf]
         else:
-            e = f"Custom field {template_cf} not found for {self.name}."
+            e = f"Custom field {device_cf} not found for {self.name}."
             logger.warning(e)
             raise SyncInventoryError(e)
 
