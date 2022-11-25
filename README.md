@@ -44,10 +44,12 @@ You can make the hostID field hidden or read-only to prevent human intervention.
 
 This is optional and there is a use case for leaving it read-write in the UI to manually change the ID. For example to re-run a sync.
 
-### Netbox permissions
-Make sure that the Netbox user has proper permissions for device read and modify (modify to set the Zabbix HostID custom field) operations.
+## Permissions
 
-### Zabbix permissions
+### Netbox
+Make sure that the Netbox user has proper permissions for device read and modify (modify to set the Zabbix HostID custom field) operations. The user should also have read-only access to the device types.
+
+### Zabbix
 Make sure that the Zabbix user has permissions to read hostgroups and proxy servers. The user should have full rights on creating, modifying and deleting hosts.
 
 If you want to automatically create hostgroups then the create permission on host-groups should also be applied.
