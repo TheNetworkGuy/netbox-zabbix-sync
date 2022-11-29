@@ -13,6 +13,9 @@ pyzabbix
 ```
 ### Config file
 First time user? Copy the config.py.example file to config.py. This file is used for modifying filters and setting variables such as custom field names.
+```
+cp config.py.example config.py
+```
 
 ### Cloning the repository
 ```
