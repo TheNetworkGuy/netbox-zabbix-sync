@@ -12,6 +12,8 @@ zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
 # nb_device_filter = {} #No filter
 # nb_device_filter = {"tag": "zabbix"} #Use a tag
 # nb_device_filter = {"site": "HQ-AMS"} #Use a site name
+# nb_device_filter = {"site": ["HQ-AMS", "HQ-FRA"]} #Device must be in either one of these sites
+# nb_device_filter = {"site": "HQ-AMS", "tag": "zabbix", "role__n": ["PDU", "console-server"]} #Device must be in site HQ-AMS, have the tag zabbix and must not be part of the PDU or console-server role
 
 # Default device filter, only get devices which have a name in Netbox.
 nb_device_filter = {"name__n": "null"}
