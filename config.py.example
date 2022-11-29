@@ -1,0 +1,17 @@
+# Set template and device Netbox "custom field" names
+template_cf = "zabbix_template"
+device_cf = "zabbix_hostid"
+
+# Netbox to Zabbix device state convertion
+zabbix_device_removal = ["Decommissioning", "Inventory"]
+zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
+
+# Custom filter for device filtering. Variable must be present but can be left empty with no filtering.
+# A couple of examples are as follows:
+
+# nb_device_filter = {} #No filter
+# nb_device_filter = {"tag": "zabbix"} #Use a tag
+# nb_device_filter = {"site": "HQ-AMS"} #Use a site name
+
+# Default device filter, only get devices which have a name in Netbox.
+nb_device_filter = {"name__n": "null"}

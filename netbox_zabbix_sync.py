@@ -1,11 +1,16 @@
 #!/usr/bin/python3
 """Netbox to Zabbix sync script."""
 
-from os import environ, path
+from os import environ, path, sys
 import logging
 import argparse
 from pynetbox import api
 from pyzabbix import ZabbixAPI, ZabbixAPIException
+try:
+    from config import *
+except ModuleNotFoundError:
+    print(f"Configuration file config.py not found in main directory. Please create the file or rename the config.py.example file to config.py.")
+    sys.exit(0)
 
 # Set logging
 log_format = logging.Formatter('%(asctime)s - %(name)s - '
@@ -23,14 +28,6 @@ logger = logging.getLogger("Netbox-Zabbix-sync")
 logger.addHandler(lgout)
 logger.addHandler(lgfile)
 logger.setLevel(logging.WARNING)
-
-# Set template and device Netbox "custom field" names
-template_cf = "zabbix_template"
-device_cf = "zabbix_hostid"
-
-# Netbox to Zabbix device state convertion
-zabbix_device_removal = ["Decommissioning", "Inventory"]
-zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
 
 
 def main(arguments):
@@ -75,7 +72,7 @@ def main(arguments):
         e = f"Zabbix returned the following error: {str(e)}."
         logger.error(e)
     # Get all Zabbix and Netbox data
-    netbox_devices = netbox.dcim.devices.filter(name__n="null")
+    netbox_devices = netbox.dcim.devices.filter(**nb_device_filter)
     netbox_journals = netbox.extras.journal_entries
     zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
     zabbix_templates = zabbix.template.get(output=['templateid', 'name'])

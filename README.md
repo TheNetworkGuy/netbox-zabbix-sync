@@ -11,6 +11,9 @@ Make sure that you have a python environment with the following packages install
 pynetbox
 pyzabbix
 ```
+### Config file
+First time user? Copy the config.py.example file to config.py. This file is used for modifying filters and setting variables such as custom field names.
+
 ### Cloning the repository
 ```
 git clone https://github.com/TheNetworkGuy/netbox-zabbix-sync.git
