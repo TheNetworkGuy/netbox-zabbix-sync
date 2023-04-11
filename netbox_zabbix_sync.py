@@ -9,7 +9,8 @@ from pyzabbix import ZabbixAPI, ZabbixAPIException
 try:
     from config import *
 except ModuleNotFoundError:
-    print(f"Configuration file config.py not found in main directory. Please create the file or rename the config.py.example file to config.py.")
+    print(f"Configuration file config.py not found in main directory."
+           "Please create the file or rename the config.py.example file to config.py.")
     sys.exit(0)
 
 # Set logging
@@ -183,6 +184,7 @@ class NetworkDevice():
         self.status = nb.status.label
         self.zabbix = zabbix
         self.tenant = nb.tenant
+        self.config_context = nb.config_context
         self.hostgroup = ""
         self.zbxproxy = "0"
         self.zabbix_state = 0
@@ -203,24 +205,31 @@ class NetworkDevice():
             logger.warning(e)
             raise SyncInventoryError(e)
 
-        # Check if device_type has custom field
-        device_type_cf = self.nb.device_type.custom_fields
-        if(template_cf in device_type_cf):
-            self.template_name = device_type_cf[template_cf]
-        else:
-            e = (f"Custom field {template_cf} not "
-                 f"found for {self.nb.device_type.manufacturer.name}"
-                 f" - {self.nb.device_type.display}.")
-            logger.warning(e)
-            raise SyncInventoryError(e)
-
-        # Check if device has custom field
+        # Check if device has custom field for ZBX ID
         if(device_cf in self.nb.custom_fields):
             self.zabbix_id = self.nb.custom_fields[device_cf]
         else:
             e = f"Custom field {device_cf} not found for {self.name}."
             logger.warning(e)
             raise SyncInventoryError(e)
+
+        # Gather device Zabbix templates
+        device_type_cf = self.nb.device_type.custom_fields
+        if(templates_config_context):
+            try:
+                self.zbx_templates = self.config_context["zabbix"]["templates"]
+            except KeyError:
+                e = "Config context for Zabbix template was not found for host {self.name}"
+        else:
+            if(template_cf in device_type_cf):
+                self.template_name = device_type_cf[template_cf]
+                self.zbx_templates = [device_type_cf[template_cf]]
+            else:
+                e = (f"Custom field {template_cf} not "
+                    f"found for {self.nb.device_type.manufacturer.name}"
+                    f" - {self.nb.device_type.display}.")
+                logger.warning(e)
+                raise SyncInventoryError(e)
 
     def set_hostgroup(self, format):
         """Set the hostgroup for this device"""
@@ -309,7 +318,7 @@ class NetworkDevice():
 
     def getZabbixTemplate(self, templates):
         """
-        Returns Zabbix template ID
+        Returns Zabbix template IDs
         INPUT: list of templates
         OUTPUT: True
         """
@@ -682,7 +691,7 @@ class ZabbixInterface():
                 snmp = self.context["zabbix"]["snmp"]
                 self.interface["details"] = {}
                 # Checks if bulk config has been defined
-                if(snmp.get("bulk")):
+                if("bulk" in snmp):
                     self.interface["details"]["bulk"] = str(snmp.pop("bulk"))
                 else:
                     # Fallback to bulk enabled if not specified
@@ -693,15 +702,15 @@ class ZabbixInterface():
                 else:
                     e = "SNMP version option is not defined."
                     raise InterfaceConfigError(e)
-                # If version 2 is used, get community string
-                if(self.interface["details"]["version"] == '2'):
+                # If version 1 or 2 is used, get community string
+                if(self.interface["details"]["version"] in ['1','2']):
                     if("community" in snmp):
+                        # Set SNMP community to confix context value
                         community = snmp["community"]
-                        self.interface["details"]["community"] = str(community)
                     else:
-                        e = ("No SNMP community string "
-                             "defined in custom context.")
-                        raise InterfaceConfigError(e)
+                        # Set SNMP community to default
+                        community = "{$SNMP_COMMUNITY}"
+                    self.interface["details"]["community"] = str(community)
                 # If version 3 has been used, get all
                 # SNMPv3 Netbox related configs
                 elif(self.interface["details"]["version"] == '3'):
