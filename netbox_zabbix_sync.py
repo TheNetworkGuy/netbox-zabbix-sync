@@ -222,7 +222,6 @@ class NetworkDevice():
         device_type_cf = self.nb.device_type.custom_fields
         if(template_cf in device_type_cf):
             self.template_name = device_type_cf[template_cf]
-            self.zbx_templates = [device_type_cf[template_cf]]
         else:
             e = (f"Custom field {template_cf} not "
                 f"found for {self.nb.device_type.manufacturer.name}"
