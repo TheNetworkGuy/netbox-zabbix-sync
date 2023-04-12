@@ -69,7 +69,7 @@ Make sure that the Zabbix user has permissions to read hostgroups and proxy serv
 If you want to automatically create hostgroups then the create permission on host-groups should also be applied.
 
 ### Custom links
-To make the user experience easier you could add a custom link that redirects users to the Zabbix latest data.
+To make the user experience easier you could add a custom link that redirects users to the Zabbix the latest data.
 ```
 * Name: zabbix_latestData
 * Text: {% if obj.cf["zabbix_hostid"] %}Show host in Zabbix{% endif %}
@@ -174,7 +174,7 @@ You can set the proxy for a device using the 'proxy' key in config context.
     }
 }
 ```
-Because of the posible amount of destruction when setting up Netbox but forgetting the proxy command, the sync works a bit different. By default everything is synced except in a situation where the Zabbix host has a proxy configured but nothing is configured in Netbox. To force deletion and a full sync, use the -p flag.
+Because of the posible amount of destruction when setting up Netbox but forgetting the proxy command, the sync works a bit different. By default, everything is synced except in a situation where the Zabbix host has a proxy configured but nothing is configured in Netbox. To force deletion and a full sync, use the -p flag.
 
 ### Set interface parameters within Netbox
 When adding a new device, you can set the interface type with custom context. By default, the following configuration is applied when no config context is provided:
@@ -186,7 +186,7 @@ When adding a new device, you can set the interface type with custom context. By
 
 Due to Zabbix limitations of changing interface type with a linked template, changing the interface type from within Netbox is not supported and the script will generate an error.
 
-For example when changing a SNMP interface to an Agent interface:
+For example when changing an SNMP interface to an Agent interface:
 ```
 Netbox-Zabbix-sync - WARNING - Device: Interface OUT of sync.
 Netbox-Zabbix-sync - ERROR - Device: changing interface type to 1 is not supported.
