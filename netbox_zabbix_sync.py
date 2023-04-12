@@ -220,22 +220,15 @@ class NetworkDevice():
 
         # Gather device Zabbix templates
         device_type_cf = self.nb.device_type.custom_fields
-        if(templates_config_context):
-            try:
-                self.zbx_templates = self.config_context["zabbix"]["templates"]
-            except KeyError:
-                e = "Config context for Zabbix template was not found for host {self.name}"
-                logger.error(e)
+        if(template_cf in device_type_cf):
+            self.template_name = device_type_cf[template_cf]
+            self.zbx_templates = [device_type_cf[template_cf]]
         else:
-            if(template_cf in device_type_cf):
-                self.template_name = device_type_cf[template_cf]
-                self.zbx_templates = [device_type_cf[template_cf]]
-            else:
-                e = (f"Custom field {template_cf} not "
-                    f"found for {self.nb.device_type.manufacturer.name}"
-                    f" - {self.nb.device_type.display}.")
-                logger.warning(e)
-                raise SyncInventoryError(e)
+            e = (f"Custom field {template_cf} not "
+                f"found for {self.nb.device_type.manufacturer.name}"
+                f" - {self.nb.device_type.display}.")
+            logger.warning(e)
+            raise SyncInventoryError(e)
 
     def set_hostgroup(self, format):
         """Set the hostgroup for this device"""
