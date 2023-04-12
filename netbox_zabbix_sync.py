@@ -9,7 +9,7 @@ from pyzabbix import ZabbixAPI, ZabbixAPIException
 try:
     from config import *
 except ModuleNotFoundError:
-    print(f"Configuration file config.py.example not found in main directory."
+    print(f"Configuration file config.py not found in main directory."
            "Please create the file or rename the config.py.example file to config.py.")
     sys.exit(0)
 
