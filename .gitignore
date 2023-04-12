@@ -2,4 +2,5 @@
 config.py
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.idea/
 *.py[cod]

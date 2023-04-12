@@ -1,2 +1,4 @@
-pynetbox
-pyzabbix
+pynetbox~=7.0.1
+pyzabbix~=1.3.0
+
+config~=0.5.1

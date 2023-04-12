@@ -23,6 +23,12 @@ First time user? Copy the config.py.example file to config.py. This file is used
 cp config.py.example config.py
 ```
 
+#### Possible configurations
+SSL check can be disabled for using the script in local environment. (Not recommended for productive systems)
+```
+secured_connections = False
+```
+
 ### Set environment variables
 Set the following environment variables
 ```
@@ -73,15 +79,20 @@ To make the user experience easier you could add a custom link that redirects us
 ```
 python3 netbox_zabbix_sync.py
 ```
+
+## Running the script as Shell Script
+```
+./netbox-zabbix-sync.sh
+```
 ### Flags
-|  Flag | Option  |  Description |
-| ------------ | ------------ | ------------ |
-|  -c | cluster | For clustered devices: only add the primary node of a cluster and use the cluster name as hostname. |
-|  -H | hostgroup | Create non-existing hostgroups in Zabbix. Usefull for a first run to add all required hostgroups. |
-|  -l | layout | Set the hostgroup layout. Default is site/manufacturer/dev_role. Posible options (seperated with '/'): site, manufacturer, dev_role, tenant |
-|  -v | verbose | Log with debugging on. |
-|  -j | journal | Create journal entries in Netbox when a host gets added, modified or deleted in Zabbix |
-|  -p | proxy-power | Force a full proxy sync (includes deleting the proxy in Zabbix if not present in config context in Netbox) |
+| Flag | Option      | Description                                                                                                                                 |
+|------|-------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| -c   | cluster     | For clustered devices: only add the primary node of a cluster and use the cluster name as hostname.                                         |
+| -H   | hostgroup   | Create non-existing hostgroups in Zabbix. Usefull for a first run to add all required hostgroups.                                           |
+| -l   | layout      | Set the hostgroup layout. Default is site/manufacturer/dev_role. Posible options (seperated with '/'): site, manufacturer, dev_role, tenant |
+| -v   | verbose     | Log with debugging on.                                                                                                                      |
+| -j   | journal     | Create journal entries in Netbox when a host gets added, modified or deleted in Zabbix                                                      |
+| -p   | proxy-power | Force a full proxy sync (includes deleting the proxy in Zabbix if not present in config context in Netbox)                                  |
 
 #### Hostgroup
 In case of omitting the -H flag, manual hostgroup creation is required for devices in a new category.

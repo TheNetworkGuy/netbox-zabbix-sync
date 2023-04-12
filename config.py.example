@@ -1,3 +1,6 @@
+# Set Options (Not recommended for productive use)
+secured_connections = True
+
 # Set template and device Netbox "custom field" names
 template_cf = "zabbix_template"
 device_cf = "zabbix_hostid"

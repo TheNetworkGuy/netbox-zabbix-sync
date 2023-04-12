@@ -9,7 +9,7 @@ from pyzabbix import ZabbixAPI, ZabbixAPIException
 try:
     from config import *
 except ModuleNotFoundError:
-    print(f"Configuration file config.py not found in main directory."
+    print(f"Configuration file config.py.example not found in main directory."
            "Please create the file or rename the config.py.example file to config.py.")
     sys.exit(0)
 
@@ -51,6 +51,9 @@ def main(arguments):
     netbox_token = environ.get("NETBOX_TOKEN")
     # Set Netbox API
     netbox = api(netbox_host, token=netbox_token, threading=True)
+    # Set Connection Rules
+    if not secured_connections:
+        netbox.http_session.verify = False
     # Check if the provided Hostgroup layout is valid
     if(arguments.layout):
         hg_objects = arguments.layout.split("/")
@@ -460,7 +463,7 @@ class NetworkDevice():
             # Set Netbox custom field to hostID value.
             self.nb.custom_fields[device_cf] = int(self.zabbix_id)
             self.nb.save()
-            msg = f"Created host {self.name} in Zabbix."
+            msg = f"Created host {self.name} in Zabbix and edited the custom field in the netbox with {self.nb.custom_fields[device_cf]}"
             logger.info(msg)
             self.create_journal_entry("success", msg)
         else:
