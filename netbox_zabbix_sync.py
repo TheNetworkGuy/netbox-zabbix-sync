@@ -1,11 +1,13 @@
 #!/usr/bin/python3
 """Netbox to Zabbix sync script."""
 
-from os import environ, path, sys
 import logging
 import argparse
+import pynetbox
+
 from pynetbox import api
 from pyzabbix import ZabbixAPI, ZabbixAPIException
+from os import environ, path, sys
 try:
     from config import *
 except ModuleNotFoundError:
@@ -657,6 +659,7 @@ class NetworkDevice():
                        }
             try:
                 self.nb_journals.create(journal)
+                logger.debug(f"Crated journal entry in NB for host {self.name}")
                 return True
                 logger.debug(f"Crated journal entry in NB for host {self.name}")
             except pynetbox.RequestError as e:
