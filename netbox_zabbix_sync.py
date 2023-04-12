@@ -661,7 +661,6 @@ class NetworkDevice():
                 self.nb_journals.create(journal)
                 logger.debug(f"Crated journal entry in NB for host {self.name}")
                 return True
-                logger.debug(f"Crated journal entry in NB for host {self.name}")
             except pynetbox.RequestError as e:
                 logger.warning("Unable to create journal entry for "
                                f"{self.name}: NB returned {e}")
