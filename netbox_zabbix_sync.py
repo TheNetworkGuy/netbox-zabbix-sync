@@ -213,7 +213,7 @@ class NetworkDevice():
             logger.warning(e)
             raise SyncInventoryError(e)
 
-        # Gather device Zabbix templates
+        # Gather device Zabbix template
         device_type_cf = self.nb.device_type.custom_fields
         if(template_cf in device_type_cf):
             self.template_name = device_type_cf[template_cf]
