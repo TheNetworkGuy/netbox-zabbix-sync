@@ -225,6 +225,7 @@ class NetworkDevice():
                 self.zbx_templates = self.config_context["zabbix"]["templates"]
             except KeyError:
                 e = "Config context for Zabbix template was not found for host {self.name}"
+                logger.error(e)
         else:
             if(template_cf in device_type_cf):
                 self.template_name = device_type_cf[template_cf]
