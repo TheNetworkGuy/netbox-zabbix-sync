@@ -216,7 +216,7 @@ class NetworkDevice():
         # Gather device Zabbix template
         device_type_cf = self.nb.device_type.custom_fields
         if(template_cf in device_type_cf):
-            self.template_name = device_type_cf[template_cf]
+            self.template_names = device_type_cf[template_cf]
         else:
             e = (f"Custom field {template_cf} not "
                 f"found for {self.nb.device_type.manufacturer.name}"
@@ -315,20 +315,29 @@ class NetworkDevice():
         INPUT: list of templates
         OUTPUT: True
         """
-        if(not self.template_name):
+        if(not self.template_names):
             e = (f"Device template '{self.nb.device_type.display}' "
-                 "has no Zabbix template defined.")
+                 "has no Zabbix templates defined.")
             logger.info(e)
             raise SyncInventoryError()
-        for template in templates:
-            if(template['name'] == self.template_name):
-                self.template_id = template['templateid']
-                e = (f"Found template ID {str(template['templateid'])} "
-                     f"for host {self.name}.")
-                logger.debug(e)
-                return True
-        else:
-            e = (f"Unable to find template {self.template_name} "
+        self.template_ids = list()
+        for nb_template_name in self.template_names:
+            found = False
+            for template in templates:
+                if(template['name'] == nb_template_name):
+                    self.template_ids.append({"templateid": template['templateid']})
+                    e = (f"Found template ID {str(template['templateid'])} "
+                         f"for host {self.name}.")
+                    logger.debug(e)
+                    found = True
+                    continue
+            if not found:
+                e = (f"Unable to find template {nb_template_name} "
+                     f"for host {self.name} in Zabbix.")
+                logger.warning(e)
+                raise SyncInventoryError(e)
+        if len(self.template_ids) == 0:
+            e = (f"Unable to find templates {self.template_names} "
                  f"for host {self.name} in Zabbix.")
             logger.warning(e)
             raise SyncInventoryError(e)
@@ -433,7 +442,7 @@ class NetworkDevice():
             # Set interface, group and template configuration
             interfaces = self.setInterfaceDetails()
             groups = [{"groupid": self.group_id}]
-            templates = [{"templateid": self.template_id}]
+            templates = self.template_ids
             # Set Zabbix proxy if defined
             self.setProxy(proxys)
             # Add host to Zabbix
@@ -523,13 +532,15 @@ class NetworkDevice():
                            f"Received value: {host['host']}")
             self.updateZabbixHost(host=self.name)
 
-        for template in host["parentTemplates"]:
-            if(template["templateid"] == self.template_id):
-                logger.debug(f"Device {self.name}: template in-sync.")
-                break
+        # Making a sorted set of both side's template ids to be able to compare them
+        zbx_template_ids = sorted({x['templateid'] for x in host['parentTemplates']})
+        nb_template_ids = sorted({x['templateid'] for x in self.template_ids})
+
+        if zbx_template_ids == nb_template_ids:
+            logger.debug(f"Device {self.name}: template in-sync.")
         else:
             logger.warning(f"Device {self.name}: template OUT of sync.")
-            self.updateZabbixHost(templates=self.template_id)
+            self.updateZabbixHost(templates=self.template_ids)
 
         for group in host["groups"]:
             if(group["groupid"] == self.group_id):

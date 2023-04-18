@@ -42,11 +42,12 @@ Use the following custom fields in Netbox:
 * Object: dcim > device
 ```
 ```
-* Type: Text
+* Type: Multiple selection
 * Name: zabbix_template
 * Required: False
 * Default: null
 * Object: dcim > device_type
+* Choices: comma separated list of template names
 ```
 You can make the hostID field hidden or read-only to prevent human intervention.
 
