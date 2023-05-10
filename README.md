@@ -33,7 +33,7 @@ NETBOX_HOST="https://netbox.local"
 NETBOX_TOKEN="secrettoken"
 ```
 ### Netbox custom fields
-Use the following custom fields in Netbox:
+Use the following custom fields in Netbox (if you are using config context for the template information then the zabbix_template field is not required):
 ```
 * Type: Integer
 * Name: zabbix_hostid
@@ -51,6 +51,31 @@ Use the following custom fields in Netbox:
 You can make the hostID field hidden or read-only to prevent human intervention.
 
 This is optional and there is a use case for leaving it read-write in the UI to manually change the ID. For example to re-run a sync.
+
+### Template source
+You can either use a Netbox devicce type custom field or Netbox config context for the Zabbix tempplate information.
+
+Using a custom field allows for only one template. You can assign multiple templates to one host using the config context source.
+Should you make use of an advanced templating structure with lots of nesting then i would recommend sticking to the custom field.
+
+You can change the behaviour in the config file. By default this setting is false but you can set it to true to use config context:
+```
+templates_config_context = True
+```
+
+After that make sure that for each host there is at least one template defined in the config context in this format:
+```
+{
+    "zabbix": {
+        "templates": [
+            "TemplateA",
+            "TemplateB",
+            "TemplateC",
+            "Template123"
+        ]
+    }
+}
+```
 
 ## Permissions
 

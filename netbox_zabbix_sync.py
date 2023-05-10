@@ -84,6 +84,7 @@ def main(arguments):
             device = NetworkDevice(nb_device, zabbix, netbox_journals,
                                    arguments.journal)
             device.set_hostgroup(arguments.layout)
+            device.set_template(templates_config_context)
             # Checks if device is part of cluster.
             # Requires the cluster argument.
             if(device.isCluster() and arguments.cluster):
@@ -213,17 +214,6 @@ class NetworkDevice():
             logger.warning(e)
             raise SyncInventoryError(e)
 
-        # Gather device Zabbix template
-        device_type_cf = self.nb.device_type.custom_fields
-        if(template_cf in device_type_cf):
-            self.template_name = device_type_cf[template_cf]
-        else:
-            e = (f"Custom field {template_cf} not "
-                f"found for {self.nb.device_type.manufacturer.name}"
-                f" - {self.nb.device_type.display}.")
-            logger.warning(e)
-            raise SyncInventoryError(e)
-
     def set_hostgroup(self, format):
         """Set the hostgroup for this device"""
         # Get all variables from the NB data
@@ -261,9 +251,39 @@ class NetworkDevice():
             # Add the item to the hostgroup format
             self.hostgroup += hostgroup_vars[item]
         if(not self.hostgroup):
-            e = f"{self.name} has no reliable hostgroup. This is most likely due to the use of custom fields that are empty."
+            e = (f"{self.name} has no reliable hostgroup. This is"
+                 "most likely due to the use of custom fields that are empty.")
             logger.error(e)
             raise SyncInventoryError(e)
+    
+    def set_template(self, templates_config_context):
+        if templates_config_context:
+            # Template lookup using config context
+            if("zabbix" not in self.config_context):
+                e = ("Key 'zabbix' not found in config "
+                     f"context for template host {self.name}")
+                logger.warning(e)
+                raise SyncInventoryError(e)
+            if("templates" not in self.config_context["zabbix"]):
+                e = ("Key 'zabbix' not found in config "
+                     f"context for template host {self.name}")
+                logger.warning(e)
+                raise SyncInventoryError(e)
+            self.zbx_template_names = self.config_context["zabbix"]["templates"]
+        else:
+            # Get device type custom fields
+            device_type_cfs = self.nb.device_type.custom_fields
+            # Check if the ZBX Template CF is present
+            if(template_cf in device_type_cfs):
+                # Set value to template
+                self.zbx_template_names = [device_type_cfs[template_cf]]
+            else:
+                # Custom field not found, return error
+                e = (f"Custom field {template_cf} not "
+                    f"found for {self.nb.device_type.manufacturer.name}"
+                    f" - {self.nb.device_type.display}.")
+                logger.warning(e)
+                raise SyncInventoryError(e)
 
     def isCluster(self):
         """
@@ -309,29 +329,41 @@ class NetworkDevice():
             logger.debug(f"Device {self.name} is non-primary cluster member.")
             return False
 
-    def getZabbixTemplate(self, templates):
+    def zbxTemplatePrepper(self, templates):
         """
         Returns Zabbix template IDs
-        INPUT: list of templates
+        INPUT: list of templates from Zabbix
         OUTPUT: True
         """
-        if(not self.template_name):
+        # Check if there are templates defined
+        if(not self.zbx_template_names):
             e = (f"Device template '{self.nb.device_type.display}' "
-                 "has no Zabbix template defined.")
+                 "has no Zabbix templates defined.")
             logger.info(e)
             raise SyncInventoryError()
-        for template in templates:
-            if(template['name'] == self.template_name):
-                self.template_id = template['templateid']
-                e = (f"Found template ID {str(template['templateid'])} "
-                     f"for host {self.name}.")
-                logger.debug(e)
-                return True
-        else:
-            e = (f"Unable to find template {self.template_name} "
-                 f"for host {self.name} in Zabbix.")
-            logger.warning(e)
-            raise SyncInventoryError(e)
+        # Set variable to empty list
+        self.zbx_templates = []
+        # Go through all templates definded in Netbox
+        for nb_template in self.zbx_template_names:
+            template_match = False
+            # Go through all templates found in Zabbix
+            for zbx_template in templates:
+                # If the template names match
+                if(zbx_template['name'] == nb_template):
+                    # Set match variable to true, add template details
+                    # to class variable and return debug log
+                    template_match = True
+                    self.zbx_templates.append({"templateid": zbx_template['templateid'],
+                                               "name": zbx_template['name']}) 
+                    e = (f"Found template {zbx_template['name']}"
+                        f" for host {self.name}.")
+                    logger.debug(e)
+            # Return error should the template not be found in Zabbix
+            if(not template_match):
+                e = (f"Unable to find template {nb_template} "
+                    f"for host {self.name} in Zabbix. Skipping host...")
+                logger.warning(e)
+                raise SyncInventoryError(e)
 
     def getZabbixGroup(self, groups):
         """
@@ -429,11 +461,10 @@ class NetworkDevice():
             # Get group and template ID's for host
             if(not self.getZabbixGroup(groups)):
                 raise SyncInventoryError()
-            self.getZabbixTemplate(templates)
+            self.zbxTemplatePrepper(templates)
             # Set interface, group and template configuration
             interfaces = self.setInterfaceDetails()
             groups = [{"groupid": self.group_id}]
-            templates = [{"templateid": self.template_id}]
             # Set Zabbix proxy if defined
             self.setProxy(proxys)
             # Add host to Zabbix
@@ -442,7 +473,7 @@ class NetworkDevice():
                                                status=self.zabbix_state,
                                                interfaces=interfaces,
                                                groups=groups,
-                                               templates=templates,
+                                               templates=self.zbx_templates,
                                                proxy_hostid=self.zbxproxy,
                                                description=description)
                 self.zabbix_id = host["hostids"][0]
@@ -494,7 +525,7 @@ class NetworkDevice():
         Checks if Zabbix object is still valid with Netbox parameters.
         """
         self.getZabbixGroup(groups)
-        self.getZabbixTemplate(templates)
+        self.zbxTemplatePrepper(templates)
         self.setProxy(proxys)
         host = self.zabbix.host.get(filter={'hostid': self.zabbix_id},
                                     selectInterfaces=['type', 'ip',
@@ -522,14 +553,14 @@ class NetworkDevice():
             logger.warning(f"Device {self.name}: hostname OUT of sync. "
                            f"Received value: {host['host']}")
             self.updateZabbixHost(host=self.name)
-
-        for template in host["parentTemplates"]:
-            if(template["templateid"] == self.template_id):
-                logger.debug(f"Device {self.name}: template in-sync.")
-                break
+        
+        # Check if the templates are in-sync
+        if(not self.zbx_template_comparer(host["parentTemplates"])):
+            logger.warning(f"Device {self.name}: template(s) OUT of sync.")
+            # Update Zabbix with NB templates and clear any old / lost templates
+            self.updateZabbixHost(templates_clear=host["parentTemplates"], templates=self.zbx_templates)
         else:
-            logger.warning(f"Device {self.name}: template OUT of sync.")
-            self.updateZabbixHost(templates=self.template_id)
+            logger.debug(f"Device {self.name}: template(s) in-sync.")
 
         for group in host["groups"]:
             if(group["groupid"] == self.group_id):
@@ -652,6 +683,37 @@ class NetworkDevice():
             except pynetbox.RequestError as e:
                 logger.warning("Unable to create journal entry for "
                                f"{self.name}: NB returned {e}")
+    
+    def zbx_template_comparer(self, tmpls_from_zabbix):
+        """
+        Compares the Netbox and Zabbix templates with each other.
+        Should there be a mismatch then the function will return false
+
+        INPUT: list of NB and ZBX templates
+        OUTPUT: Boolean True/False
+        """
+        succesfull_templates = []
+        # Go through each Netbox template
+        for nb_tmpl in self.zbx_templates:
+            # Go through each Zabbix template
+            for pos, zbx_tmpl in enumerate(tmpls_from_zabbix):
+                # Check if template IDs match
+                if(nb_tmpl["templateid"] == zbx_tmpl["templateid"]):
+                    # Templates match. Remove this template from the Zabbix templates
+                    # and add this NB template to the list of successfull templates
+                    tmpls_from_zabbix.pop(pos)
+                    succesfull_templates.append(nb_tmpl)
+                    logger.debug(f"Device {self.name}: template {nb_tmpl['name']} is present in Zabbix.")
+                    break
+        if(len(succesfull_templates) == len(self.zbx_templates) and
+           len(tmpls_from_zabbix) == 0):
+            # All of the Netbox templates have been confirmed as successfull
+            # and the ZBX template list is empty. This means that
+            # all of the templates match.
+            return True
+        return False
+
+
 
 
 class ZabbixInterface():

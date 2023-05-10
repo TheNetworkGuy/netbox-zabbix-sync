@@ -1,4 +1,10 @@
+# Template logic.
+# Set to true to enable the template source information
+# coming from config context instead of a custom field.
+templates_config_context = False
+
 # Set template and device Netbox "custom field" names
+# Template_cf is not used when templates_config_context is enabled
 template_cf = "zabbix_template"
 device_cf = "zabbix_hostid"
 
