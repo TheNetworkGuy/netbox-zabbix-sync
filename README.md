@@ -53,7 +53,7 @@ You can make the hostID field hidden or read-only to prevent human intervention.
 This is optional and there is a use case for leaving it read-write in the UI to manually change the ID. For example to re-run a sync.
 
 ### Template source
-You can either use a Netbox device type custom field or Netbox config context for the Zabbix tempplate information.
+You can either use a Netbox device type custom field or Netbox config context for the Zabbix template information.
 
 Using a custom field allows for only one template. You can assign multiple templates to one host using the config context source.
 Should you make use of an advanced templating structure with lots of nesting then i would recommend sticking to the custom field.
