@@ -77,6 +77,11 @@ After that make sure that for each host there is at least one template defined i
 }
 ```
 
+You can also opt for the default device type custom field behaviour but with the added benefit of overwriting the template should a device in Netbox have a device specific context defined. In this case the device specific context template(s) will take priority over the device type custom field template.
+```
+templates_config_context_overrule = True
+```
+
 ## Permissions
 
 ### Netbox

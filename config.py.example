@@ -2,6 +2,9 @@
 # Set to true to enable the template source information
 # coming from config context instead of a custom field.
 templates_config_context = False
+# Set to true to give config context templates a 
+# higher priority then custom field templates
+templates_config_context_overrule = False
 
 # Set template and device Netbox "custom field" names
 # Template_cf is not used when templates_config_context is enabled

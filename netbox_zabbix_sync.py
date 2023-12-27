@@ -84,7 +84,7 @@ def main(arguments):
             device = NetworkDevice(nb_device, zabbix, netbox_journals,
                                    arguments.journal)
             device.set_hostgroup(arguments.layout)
-            device.set_template(templates_config_context)
+            device.set_template(templates_config_context, templates_config_context_overrule)
             # Checks if device is part of cluster.
             # Requires the cluster argument.
             if(device.isCluster() and arguments.cluster):
@@ -170,6 +170,8 @@ class ProxyConfigError(SyncError):
 class HostgroupError(SyncError):
     pass
 
+class TemplateError(SyncError):
+    pass
 
 class NetworkDevice():
 
@@ -256,34 +258,55 @@ class NetworkDevice():
             logger.error(e)
             raise SyncInventoryError(e)
     
-    def set_template(self, templates_config_context):
-        if templates_config_context:
-            # Template lookup using config context
-            if("zabbix" not in self.config_context):
-                e = ("Key 'zabbix' not found in config "
-                     f"context for template host {self.name}")
+    def set_template(self, prefer_config_context, overrule_custom):
+        self.zbx_template_names = None
+        # Gather templates ONLY from the device specific context
+        if prefer_config_context:
+            try:
+                self.zbx_template_names = self.get_templates_context()
+            except TemplateError as e:
                 logger.warning(e)
-                raise SyncInventoryError(e)
-            if("templates" not in self.config_context["zabbix"]):
-                e = ("Key 'zabbix' not found in config "
-                     f"context for template host {self.name}")
-                logger.warning(e)
-                raise SyncInventoryError(e)
-            self.zbx_template_names = self.config_context["zabbix"]["templates"]
+            return True
+        # Gather templates from the custom field but overrule
+        # them should there be any device specific templates
+        if overrule_custom:
+            try:
+                self.zbx_template_names = self.get_templates_context()
+            except TemplateError:
+                pass
+            if not self.zbx_template_names:
+                self.zbx_template_names = self.get_templates_cf()
+            return True
+        # Gather templates ONLY from the custom field
+        self.zbx_template_names = self.get_templates_cf()
+        return True
+
+    def get_templates_cf(self):
+        # Get Zabbix templates from the device type
+        device_type_cfs = self.nb.device_type.custom_fields
+        # Check if the ZBX Template CF is present
+        if(template_cf in device_type_cfs):
+            # Set value to template
+            return [device_type_cfs[template_cf]]
         else:
-            # Get device type custom fields
-            device_type_cfs = self.nb.device_type.custom_fields
-            # Check if the ZBX Template CF is present
-            if(template_cf in device_type_cfs):
-                # Set value to template
-                self.zbx_template_names = [device_type_cfs[template_cf]]
-            else:
-                # Custom field not found, return error
-                e = (f"Custom field {template_cf} not "
-                    f"found for {self.nb.device_type.manufacturer.name}"
-                    f" - {self.nb.device_type.display}.")
-                logger.warning(e)
-                raise SyncInventoryError(e)
+            # Custom field not found, return error
+            e = (f"Custom field {template_cf} not "
+                f"found for {self.nb.device_type.manufacturer.name}"
+                f" - {self.nb.device_type.display}.")
+            
+            raise TemplateError(e)
+
+    def get_templates_context(self):
+        # Get Zabbix templates from the device context
+        if("zabbix" not in self.config_context):
+            e = ("Key 'zabbix' not found in config "
+                    f"context for template host {self.name}")
+            raise TemplateError(e)
+        if("templates" not in self.config_context["zabbix"]):
+            e = ("Key 'zabbix' not found in config "
+                    f"context for template host {self.name}")
+            raise TemplateError(e)
+        return self.config_context["zabbix"]["templates"]
 
     def isCluster(self):
         """
@@ -337,8 +360,7 @@ class NetworkDevice():
         """
         # Check if there are templates defined
         if(not self.zbx_template_names):
-            e = (f"Device template '{self.nb.device_type.display}' "
-                 "has no Zabbix templates defined.")
+            e = (f"No templates found for device {self.name}")
             logger.info(e)
             raise SyncInventoryError()
         # Set variable to empty list
