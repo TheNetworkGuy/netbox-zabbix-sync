@@ -1,0 +1,77 @@
+---
+name: reviewdog
+
+on: [pull_request]
+
+jobs:
+  reviewdog:
+    name: reviewdog
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Python linters
+      run: |
+        pip install yamllint flake8
+
+    - uses: reviewdog/action-setup@v1
+      with:
+        reviewdog_version: latest # Optional. [latest,nightly,v.X.Y.Z]
+
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v40
+
+    - name: Prepare file lists
+      run: |
+        CHANGED_FILES=$(echo '${{ steps.changed-files.outputs.all_changed_files }}' | tr ' ' '\n')
+        echo "All changed files: $CHANGED_FILES"
+
+        CHANGED_YAML_FILES=$(echo "$CHANGED_FILES" | grep -E '\.ya?ml$' | xargs)
+        echo "CHANGED_YAML_FILES: $CHANGED_YAML_FILES"
+        echo "CHANGED_YAML_FILES=$CHANGED_YAML_FILES" >> $GITHUB_ENV
+
+        CHANGED_PY_FILES=$(echo "$CHANGED_FILES" | grep -E '\.py$' | xargs)
+        echo "CHANGED_PY_FILES: $CHANGED_PY_FILES"
+        echo "CHANGED_PY_FILES=$CHANGED_PY_FILES" >> $GITHUB_ENV
+
+        CHANGED_DOCKER_FILES=$(echo "$CHANGED_FILES" | grep -E 'Dockerfile$' | xargs)
+        echo "CHANGED_DOCKER_FILES: $CHANGED_DOCKER_FILES"
+        echo "CHANGED_DOCKER_FILES=$CHANGED_DOCKER_FILES" >> $GITHUB_ENV
+
+    - name: ansible-lint
+      if: env.CHANGED_YAML_FILES != ''
+      uses: reviewdog/action-ansiblelint@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        reporter: github-pr-review
+        level: warning
+        ansiblelint_flags: ${{ env.CHANGED_YAML_FILES }}
+
+    - name: black
+      if: env.CHANGED_PY_FILES != ''
+      run: black --check ${{ env.CHANGED_PY_FILES }}
+
+    - uses: dciborow/action-pylint@0.1.0
+      if: env.CHANGED_PY_FILES != ''
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        reporter: github-pr-review
+        level: warning
+        glob_pattern: ${{ env.CHANGED_PY_FILES }}
+
+    - name: hadolint
+      if: env.CHANGED_DOCKER_FILES != ''
+      uses: reviewdog/action-hadolint@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        reporter: github-pr-review
+        hadolint_flags: ${{ env.CHANGED_DOCKER_FILES }}
