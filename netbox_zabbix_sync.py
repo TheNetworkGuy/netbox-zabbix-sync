@@ -54,7 +54,8 @@ def main(arguments):
     # Check if the provided Hostgroup layout is valid
     if(arguments.layout):
         hg_objects = arguments.layout.split("/")
-        allowed_objects = ["site", "manufacturer", "tenant", "dev_role"]
+        allowed_objects = ["dev_location", "dev_role", "manufacturer", "region",
+                           "site", "site_group", "tenant", "tenant_group"]
         # Create API call to get all custom fields which are on the device objects
         device_cfs = netbox.extras.custom_fields.filter(type="text", content_type_id=23)
         for cf in device_cfs:
@@ -188,7 +189,6 @@ class NetworkDevice():
         self.zabbix = zabbix
         self.tenant = nb.tenant
         self.config_context = nb.config_context
-        self.hostgroup = ""
         self.zbxproxy = "0"
         self.zabbix_state = 0
         self.journal = journal
@@ -219,44 +219,46 @@ class NetworkDevice():
     def set_hostgroup(self, format):
         """Set the hostgroup for this device"""
         # Get all variables from the NB data
-        site = self.nb.site.name
+        dev_location = str(self.nb.location) if self.nb.location else None
+        dev_role = self.nb.device_role.name
         manufacturer = self.nb.device_type.manufacturer.name
-        role = self.nb.device_role.name
-        tenant = self.tenant.name if self.tenant else None
-
-        hostgroup_vars = {"site": site, "manufacturer": manufacturer,
-                          "dev_role": role, "tenant": tenant}
-        items = format.split("/")
+        region = str(self.nb.site.region) if self.nb.site.region else None
+        site = self.nb.site.name
+        site_group = str(self.nb.site.group) if self.nb.site.group else None
+        tenant = str(self.tenant) if self.tenant else None
+        tenant_group = str(self.tenant.group) if tenant else None
+        # Set mapper for string -> variable
+        hostgroup_vars = {"dev_location": dev_location, "dev_role": dev_role,
+                          "manufacturer": manufacturer, "region": region,
+                          "site": site, "site_group": site_group,
+                           "tenant": tenant, "tenant_group": tenant_group}
+        # Generate list based off string input format
+        hg_items = format.split("/")
+        hostgroup = ""
         # Go through all hostgroup items
-        for item in items:
-            # Check if this item is not the first in the hostgroup format
-            if(self.hostgroup):
-                self.hostgroup += "/"
-            # Check if the item is not a standard item, A.K.A. custom field name
-            if(item not in hostgroup_vars):
-                # check if the item is in the custom fields
-                if(item in self.nb.custom_fields):
-                    cf_value = self.nb.custom_fields[item]
-                    # check if the CF is empty.
-                    if(not cf_value):
-                        # Remove the previously inserted /
-                        self.hostgroup = self.hostgroup[:-1]
-                        continue
-                    else:
-                        self.hostgroup += cf_value
-                        continue
-                else:
-                    continue
-            # Check if the variable (such as Tenant) is empty
+        for item in hg_items:
+            # Check if the variable (such as Tenant) is empty.
             if(not hostgroup_vars[item]):
                 continue
-            # Add the item to the hostgroup format
-            self.hostgroup += hostgroup_vars[item]
-        if(not self.hostgroup):
+            # Check if the item is a custom field name
+            if(item not in hostgroup_vars):
+                cf_value = self.nb.custom_fields[item] if item in self.nb.custom_fields else None
+                if(cf_value):
+                    # If there is a cf match, add the value of this cf to the hostgroup
+                    hostgroup += cf_value + "/"
+                # Should there not be a match, this means that
+                # the variable is invalid. Skip regardless.
+                continue
+            # Add value of predefined variable to hostgroup format
+            hostgroup += hostgroup_vars[item] + "/"
+        # If the final hostgroup variable is empty
+        if(not hostgroup):
             e = (f"{self.name} has no reliable hostgroup. This is"
                  "most likely due to the use of custom fields that are empty.")
             logger.error(e)
             raise SyncInventoryError(e)
+        # Remove final inserted "/" and set hostgroup to class var
+        self.hostgroup = hostgroup.rstrip("/")
     
     def set_template(self, prefer_config_context, overrule_custom):
         self.zbx_template_names = None
