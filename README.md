@@ -5,16 +5,17 @@ A script to create, update and delete Zabbix hosts using Netbox device objects.
 
 
 ## Installation
-### Packages
-Make sure that you have a python environment with the following packages installed.
-```
-pynetbox
-pyzabbix
-```
 
 ### Cloning the repository
 ```
 git clone https://github.com/TheNetworkGuy/netbox-zabbix-sync.git
+```
+
+### Packages
+Make sure that you have a python environment with the following packages installed. You can also use the requirements.txt file for installation with pip.
+```
+pynetbox
+pyzabbix
 ```
 
 ### Config file
@@ -51,6 +52,83 @@ Use the following custom fields in Netbox (if you are using config context for t
 You can make the hostID field hidden or read-only to prevent human intervention.
 
 This is optional and there is a use case for leaving it read-write in the UI to manually change the ID. For example to re-run a sync.
+
+## Config file
+
+### Hostgroup
+Setting the create_hostgroups variable to False requires manual hostgroup creation for devices in a new category.
+
+The format can be set with the hostgroup_format variable.
+
+Make sure that the Zabbix user has proper permissions to create hosts.
+The hostgroups are in a nested format. This means that proper permissions only need to be applied to the site name hostgroup and cascaded to any child hostgroups.
+
+#### layout
+The default hostgroup layout is "site/manufacturer/device_role".
+
+**Variables**
+
+You can change this behaviour with the hostgroup_format variable. The following values can be used:
+|  name | description  |
+| ------------ | ------------ |
+|dev_location|The device location name|
+|dev_role|The device role name|
+|manufacturer|Manufacturer name|
+|region|The region name of the device|
+|site|Site name|
+|site_group|Site group name|
+|tenant|Tenant name|
+|tenant_group|Tenant group name|
+
+
+You can specify the value like so, sperated by a "/":
+```
+hostgroup_format = "tenant/site/dev_location/dev_role"
+```
+**custom fields**
+
+You can also use the value of custom fields under the device object.
+
+This allows more freedom and even allows a full static mapping instead of a dynamic rendered hostgroup name.
+```
+hostgroup_format = "site/mycustomfieldname"
+```
+**Empty variables or hostgroups**
+
+Should the content of a variable be empty, then the hostgroup position is skipped.
+
+For example, consider the following scenario with 2 devices, both the same device type and site. One of them is linked to a tenant, the other one does not have a relationship with a tenant.
+- Device_role: PDU
+- Site: HQ-AMS
+```
+hostgroup_format = "site/tenant/device_role"
+```
+When running the script like above, the following hostgroup (HG) will be generated for both hosts:
+ - Device A with no relationship with a tenant: HQ-AMS/PDU
+ - Device B with a relationship to tenant "Fork Industries": HQ-AMS/Fork Industries/PDU
+
+The same logic applies to custom fields being used in the HG format:
+```
+hostgroup_format = "site/mycustomfieldname"
+```
+For device A with the value "ABC123" in the custom field "mycustomfieldname" -> HQ-AMS/ABC123
+For a device which does not have a value in the custom field "mycustomfieldname" -> HQ-AMS
+
+Should there be a scenario where a custom field does not have a value under a device, and the HG format only uses this single variable, then this will result in an error:
+```
+hostgroup_format = "mycustomfieldname"
+
+Netbox-Zabbix-sync - ERROR - ESXI1 has no reliable hostgroup. This is most likely due to the use of custom fields that are empty.
+```
+### Device status
+By setting a status on a Netbox device you determine how the host is added (or updated) in Zabbix. There are, by default, 3 options:
+* Delete the host from Zabbix (triggered by Netbox status "Decommissioning" and "Inventory")
+* Create the host in Zabbix but with a disabled status (Trigger by "Offline", "Planned", "Staged" and "Failed")
+* Create the host in Zabbix with an enabled status (For now only enabled with the "Active" status)
+
+You can modify this behaviour by changing the following list variables in the script:
+ - zabbix_device_removal
+ - zabbix_device_disable
 
 ### Template source
 You can either use a Netbox device type custom field or Netbox config context for the Zabbix template information.
@@ -106,83 +184,9 @@ python3 netbox_zabbix_sync.py
 ### Flags
 |  Flag | Option  |  Description |
 | ------------ | ------------ | ------------ |
-|  -c | cluster | For clustered devices: only add the primary node of a cluster and use the cluster name as hostname. |
-|  -H | hostgroup | Create non-existing hostgroups in Zabbix. Usefull for a first run to add all required hostgroups. |
-|  -l | layout | Set the hostgroup layout. Default is site/manufacturer/dev_role. Posible options (seperated with '/'): site, manufacturer, dev_role, tenant |
 |  -v | verbose | Log with debugging on. |
-|  -j | journal | Create journal entries in Netbox when a host gets added, modified or deleted in Zabbix |
-|  -p | proxy-power | Force a full proxy sync (includes deleting the proxy in Zabbix if not present in config context in Netbox) |
 
-#### Hostgroup
-In case of omitting the -H flag, manual hostgroup creation is required for devices in a new category.
-
-The format can be set with the -l flag. If not provided the default format will be:
-{Site name}/{Manufacturer name}/{Device role name}
-
-Make sure that the Zabbix user has proper permissions to create hosts.
-The hostgroups are in a nested format. This means that proper permissions only need to be applied to the site name hostgroup and cascaded to any child hostgroups.
-
-#### layout
-The default hostgroup layout is "site/manufacturer/device_role".
-
-**Variables**
-
-You can change this behaviour with the --layout flag. The following variables can be used:
-|  name | description  |
-| ------------ | ------------ |
-|tenant|Tenant name|
-|site|Site name|
-|manufacturer|Manufacturer name|
-|device_role|The device role name|
-
-You can specify the variables like so, sperated by a "/":
-```
-python3 netbox_zabbix_sync.py -l tenant/site/device_role
-```
-**custom fields**
-
-You can also use the value of custom fields under the device object.
-
-This allows more freedom and even allows a ful static mapping instead of a dynamic rendered hostgroup name.
-```
-python3 netbox_zabbix_sync.py -l site/mycustomfieldname
-```
-**Empty variables or hostgroups**
-
-Should the content of a variable be empty, then the hostgroup position is skipped.
-
-For example, consider the following scenario with 2 devices, both the same device type and site. One of them is linked to a tenant, the other one does not have a relationship with a tenant.
-- Device_role: PDU
-- Site: HQ-AMS
-```
-python3 netbox_zabbix_sync.py -l site/tenant/device_role
-```
-When running the script like above, the following hostgroup (HG) will be generated for both hosts:
- - Device A with no relationship with a tenant: HQ-AMS/PDU
- - Device B with a relationship to tenant "Fork Industries": HQ-AMS/Fork Industries/PDU
-
-The same logic applies to custom fields being used in the HG format:
-```
-python3 netbox_zabbix_sync.py -l site/mycustomfieldname
-```
-For device A with the value "ABC123" in the custom field "mycustomfieldname" -> HQ-AMS/ABC123
-For a device which does not have a value in the custom field "mycustomfieldname" -> HQ-AMS
-
-Should there be a scenario where a custom field does not have a value under a device, and the HG format only uses this signle variable, then this will result in an error:
-```
-python3 netbox_zabbix_sync.py -l mycustomfieldname
-
-Netbox-Zabbix-sync - ERROR - ESXI1 has no reliable hostgroup. This is most likely due to the use of custom fields that are empty.
-```
-### Device status
-By setting a status on a Netbox device you determine how the host is added (or updated) in Zabbix. There are, by default, 3 options:
-* Delete the host from Zabbix (triggered by Netbox status "Decommissioning" and "Inventory")
-* Create the host in Zabbix but with a disabled status (Trigger by "Offline", "Planned", "Staged" and "Failed")
-* Create the host in Zabbix with an enabled status (For now only enabled with the "Active" status)
-
-You can modify this behaviour by changing the following list variables in the script:
- - zabbix_device_removal
- - zabbix_device_disable
+## Config context
 
 ### Zabbix proxy
 You can set the proxy for a device using the 'proxy' key in config context.
@@ -193,7 +197,7 @@ You can set the proxy for a device using the 'proxy' key in config context.
     }
 }
 ```
-Because of the posible amount of destruction when setting up Netbox but forgetting the proxy command, the sync works a bit different. By default everything is synced except in a situation where the Zabbix host has a proxy configured but nothing is configured in Netbox. To force deletion and a full sync, use the -p flag.
+Because of the posible amount of destruction when setting up Netbox but forgetting the proxy command, the sync works a bit different. By default everything is synced except in a situation where the Zabbix host has a proxy configured but nothing is configured in Netbox. To force deletion and a full sync, set the full_proxy_sync variable in the config file.
 
 ### Set interface parameters within Netbox
 When adding a new device, you can set the interface type with custom context. By default, the following configuration is applied when no config context is provided:
@@ -256,4 +260,7 @@ To configure the interface parameters you'll need to use custom context. Custom 
     }
 }
 ```
+
+I would recommend using macros for sensitive data such as community strings since the data in Netbox is plain-text.
+
 Note: Not all SNMP data is required for a working configuration. [The following parameters are allowed ](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed ")but are not all required, depending on your environment.

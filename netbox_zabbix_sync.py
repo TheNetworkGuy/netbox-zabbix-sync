@@ -7,7 +7,18 @@ import argparse
 from pynetbox import api
 from pyzabbix import ZabbixAPI, ZabbixAPIException
 try:
-    from config import *
+    from config import (
+        templates_config_context,
+        templates_config_context_overrule,
+        clustering, create_hostgroups,
+        create_journal, full_proxy_sync,
+        template_cf, device_cf,
+        zabbix_device_removal,
+        zabbix_device_disable,
+        hostgroup_format,
+        nb_device_filter
+    )
+    
 except ModuleNotFoundError:
     print(f"Configuration file config.py not found in main directory."
            "Please create the file or rename the config.py.example file to config.py.")
@@ -52,20 +63,19 @@ def main(arguments):
     # Set Netbox API
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Check if the provided Hostgroup layout is valid
-    if(arguments.layout):
-        hg_objects = arguments.layout.split("/")
-        allowed_objects = ["dev_location", "dev_role", "manufacturer", "region",
-                           "site", "site_group", "tenant", "tenant_group"]
-        # Create API call to get all custom fields which are on the device objects
-        device_cfs = netbox.extras.custom_fields.filter(type="text", content_type_id=23)
-        for cf in device_cfs:
-            allowed_objects.append(cf.name)
-        for object in hg_objects:
-            if(object not in allowed_objects):
-                e = (f"Hostgroup item {object} is not valid. Make sure you"
-                     " use valid items and seperate them with '/'.")
-                logger.error(e)
-                raise HostgroupError(e)
+    hg_objects = hostgroup_format.split("/")
+    allowed_objects = ["dev_location", "dev_role", "manufacturer", "region",
+                        "site", "site_group", "tenant", "tenant_group"]
+    # Create API call to get all custom fields which are on the device objects
+    device_cfs = netbox.extras.custom_fields.filter(type="text", content_type_id=23)
+    for cf in device_cfs:
+        allowed_objects.append(cf.name)
+    for object in hg_objects:
+        if(object not in allowed_objects):
+            e = (f"Hostgroup item {object} is not valid. Make sure you"
+                    " use valid items and seperate them with '/'.")
+            logger.error(e)
+            raise HostgroupError(e)
     # Set Zabbix API
     try:
         zabbix = ZabbixAPI(zabbix_host)
@@ -83,12 +93,12 @@ def main(arguments):
     for nb_device in netbox_devices:
         try:
             device = NetworkDevice(nb_device, zabbix, netbox_journals,
-                                   arguments.journal)
-            device.set_hostgroup(arguments.layout)
+                                   create_journal)
+            device.set_hostgroup(hostgroup_format)
             device.set_template(templates_config_context, templates_config_context_overrule)
             # Checks if device is part of cluster.
-            # Requires the cluster argument.
-            if(device.isCluster() and arguments.cluster):
+            # Requires clustering variable
+            if(device.isCluster() and clustering):
                 # Check if device is master or slave
                 if(device.promoteMasterDevice()):
                     e = (f"Device {device.name} is "
@@ -117,9 +127,9 @@ def main(arguments):
                 continue
             elif(device.status in zabbix_device_disable):
                 device.zabbix_state = 1
-            # Add hostgroup is flag is true
+            # Add hostgroup is variable is True
             # and Hostgroup is not present in Zabbix
-            if(arguments.hostgroups):
+            if(create_hostgroups):
                 for group in zabbix_groups:
                     # If hostgroup is already present in Zabbix
                     if(group["name"] == device.hostgroup):
@@ -131,7 +141,7 @@ def main(arguments):
             # Device is already present in Zabbix
             if(device.zabbix_id):
                 device.ConsistencyCheck(zabbix_groups, zabbix_templates,
-                                        zabbix_proxys, arguments.proxy_power)
+                                        zabbix_proxys, full_proxy_sync)
             # Add device to Zabbix
             else:
                 device.createInZabbix(zabbix_groups, zabbix_templates,
@@ -612,7 +622,7 @@ class NetworkDevice():
         else:
             if(not host["proxy_hostid"] == "0"):
                 if(proxy_power):
-                    # If the -p flag has been issued,
+                    # Variable full_proxy_sync has been enabled
                     # delete the proxy link in Zabbix
                     self.updateZabbixHost(proxy_hostid=self.zbxproxy)
                 else:
@@ -820,29 +830,10 @@ class ZabbixInterface():
 
 
 if(__name__ == "__main__"):
-    # Arguments parsing
     parser = argparse.ArgumentParser(
         description='A script to sync Zabbix with Netbox device data.'
     )
     parser.add_argument("-v", "--verbose", help="Turn on debugging.",
                         action="store_true")
-    parser.add_argument("-c", "--cluster", action="store_true",
-                        help=("Only add the primary node of a cluster "
-                              "to Zabbix. Usefull when a shared virtual IP is "
-                              "used for the control plane."))
-    parser.add_argument("-H", "--hostgroups",
-                        help="Create Zabbix hostgroups if not present",
-                        action="store_true")
-    parser.add_argument("-l", "--layout", type=str,
-                        help="Defines the hostgroup layout",
-                        default='site/manufacturer/dev_role')
-    parser.add_argument("-p", "--proxy_power", action="store_true",
-                        help=("USE WITH CAUTION. If there is a proxy "
-                              "configured in Zabbix but not in Netbox, sync "
-                              "the device and remove the host - proxy "
-                              "link in Zabbix."))
-    parser.add_argument("-j", "--journal", action="store_true",
-                        help="Create journal entries in Netbox at write actions")
     args = parser.parse_args()
-
     main(args)

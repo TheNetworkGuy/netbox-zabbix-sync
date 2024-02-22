@@ -11,9 +11,28 @@ templates_config_context_overrule = False
 template_cf = "zabbix_template"
 device_cf = "zabbix_hostid"
 
+# Enable clustering of devices with virtual chassis setup
+clustering = False
+
+# Enable hostgroup generation. Requires permissions in Zabbix
+create_hostgroups = True
+
+# Create journal entries
+create_journal = False
+
+# Set to true to enable removal of proxy's under hosts. Use with caution and make sure that you specified
+# all the required proxy's in the device config context before enabeling this option.
+# With this option disabled proxy's will only be added and modified for Zabbix hosts.
+full_proxy_sync = False
+
 # Netbox to Zabbix device state convertion
 zabbix_device_removal = ["Decommissioning", "Inventory"]
 zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
+
+# Hostgroup mapping
+# Available choices: dev_location, dev_role, manufacturer, region, site, site_group, tenant, tenant_group
+# You can also use CF (custom field) names under the device. The CF content will be used for the hostgroup generation.
+hostgroup_format = "site/manufacturer/dev_role"
 
 # Custom filter for device filtering. Variable must be present but can be left empty with no filtering.
 # A couple of examples are as follows:
