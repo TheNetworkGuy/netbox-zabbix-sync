@@ -2,6 +2,7 @@
 """Netbox to Zabbix sync script."""
 
 from os import environ, path, sys
+from packaging import version
 import logging
 import argparse
 from pynetbox import api
@@ -88,7 +89,10 @@ def main(arguments):
     netbox_journals = netbox.extras.journal_entries
     zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
     zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
-    zabbix_proxys = zabbix.proxy.get(output=['proxyid', 'host'])
+    if version.parse(zabbix.api_version()) < version.parse("7.0.0"):
+        zabbix_proxys = zabbix.proxy.get(output=['proxyid', 'host'])
+    else:
+        zabbix_proxys = zabbix.proxy.get(output=['proxyid', 'name'])
     # Go through all Netbox devices
     for nb_device in netbox_devices:
         try:
