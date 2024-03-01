@@ -508,6 +508,9 @@ class NetworkDevice():
             if(not self.getZabbixGroup(groups)):
                 raise SyncInventoryError()
             self.zbxTemplatePrepper(templates)
+            templateids = []
+            for template in self.zbx_templates:
+                templateids.append({'templateid': template['templateid']}) 
             # Set interface, group and template configuration
             interfaces = self.setInterfaceDetails()
             groups = [{"groupid": self.group_id}]
@@ -515,13 +518,22 @@ class NetworkDevice():
             self.setProxy(proxies)
             # Add host to Zabbix
             try:
-                host = self.zabbix.host.create(host=self.name,
-                                               status=self.zabbix_state,
-                                               interfaces=interfaces,
-                                               groups=groups,
-                                               templates=self.zbx_templates,
-                                               proxy_hostid=self.zbxproxy,
-                                               description=description)
+                if version.parse(self.zabbix.api_version()) < version.parse("7.0.0"):
+                    host = self.zabbix.host.create(host=self.name,
+                                                   status=self.zabbix_state,
+                                                   interfaces=interfaces,
+                                                   groups=groups,
+                                                   templates=templateids,
+                                                   proxy_hostid=self.zbxproxy,
+                                                   description=description)
+                else:
+                    host = self.zabbix.host.create(host=self.name,
+                                                   status=self.zabbix_state,
+                                                   interfaces=interfaces,
+                                                   groups=groups,
+                                                   templates=templateids,
+                                                   proxyid=self.zbxproxy,
+                                                   description=description)
                 self.zabbix_id = host["hostids"][0]
             except ZabbixAPIException as e:
                 e = f"Couldn't add {self.name}, Zabbix returned {str(e)}."
@@ -625,18 +637,26 @@ class NetworkDevice():
         # Check if a proxy has been defined
         if(self.zbxproxy != "0"):
             # Check if expected proxyID matches with configured proxy
-            if(host["proxy_hostid"] == self.zbxproxy):
+            if(("proxy_hostid" in host and host["proxy_hostid"] == self.zbxproxy)
+               or ("proxyid" in host and host["proxyid"] == self.zbxproxy)):
                 logger.debug(f"Device {self.name}: proxy in-sync.")
             else:
                 # Proxy diff, update value
                 logger.warning(f"Device {self.name}: proxy OUT of sync.")
-                self.updateZabbixHost(proxy_hostid=self.zbxproxy)
+                if version.parse(self.zabbix.api_version()) < version.parse("7.0.0"):
+                    self.updateZabbixHost(proxy_hostid=self.zbxproxy)
+                else:
+                    self.updateZabbixHost(proxyid=self.zbxproxy)
         else:
-            if(not host["proxy_hostid"] == "0"):
+            if(("proxy_hostid" in host and not host["proxy_hostid"] == "0") 
+                  or ("proxyid" in host and not host["proxyid"] == "0")):
                 if(proxy_power):
                     # Variable full_proxy_sync has been enabled
                     # delete the proxy link in Zabbix
-                    self.updateZabbixHost(proxy_hostid=self.zbxproxy)
+                    if version.parse(self.zabbix.api_version()) < version.parse("7.0.0"):
+                        self.updateZabbixHost(proxy_hostid=self.zbxproxy)
+                    else:
+                        self.updateZabbixHost(proxyid=self.zbxproxy)
                 else:
                     # Instead of deleting the proxy config in zabbix and
                     # forcing potential data loss,
