@@ -12,20 +12,20 @@ git clone https://github.com/TheNetworkGuy/netbox-zabbix-sync.git
 ```
 
 ### Packages
-Make sure that you have a python environment with the following packages installed. You can also use the requirements.txt file for installation with pip.
+Make sure that you have a python environment with the following packages installed. You can also use the `requirements.txt` file for installation with pip.
 ```
 pynetbox
 pyzabbix
 ```
 
 ### Config file
-First time user? Copy the config.py.example file to config.py. This file is used for modifying filters and setting variables such as custom field names.
+First time user? Copy the `config.py.example` file to `config.py`. This file is used for modifying filters and setting variables such as custom field names.
 ```
 cp config.py.example config.py
 ```
 
 ### Set environment variables
-Set the following environment variables
+Set the following environment variables:
 ```
 ZABBIX_HOST="https://zabbix.local"
 ZABBIX_USER="username"
@@ -33,6 +33,14 @@ ZABBIX_PASS="Password"
 NETBOX_HOST="https://netbox.local"
 NETBOX_TOKEN="secrettoken"
 ```
+
+Or, you can use a Zabbix API token to login instead of using a username and password.
+In that case `ZABBIX_USER` and `ZABBIX_PASS` will be ignored.
+
+```
+ZABBIX_TOKEN=othersecrettoken
+```
+
 ### Netbox custom fields
 Use the following custom fields in Netbox (if you are using config context for the template information then the zabbix_template field is not required):
 ```
@@ -49,16 +57,16 @@ Use the following custom fields in Netbox (if you are using config context for t
 * Default: null
 * Object: dcim > device_type
 ```
-You can make the hostID field hidden or read-only to prevent human intervention.
+You can make the `zabbix_hostid` field hidden or read-only to prevent human intervention.
 
 This is optional and there is a use case for leaving it read-write in the UI to manually change the ID. For example to re-run a sync.
 
 ## Config file
 
 ### Hostgroup
-Setting the create_hostgroups variable to False requires manual hostgroup creation for devices in a new category.
+Setting the `create_hostgroups` variable to `False` requires manual hostgroup creation for devices in a new category.
 
-The format can be set with the hostgroup_format variable.
+The format can be set with the `hostgroup_format` variable.
 
 Make sure that the Zabbix user has proper permissions to create hosts.
 The hostgroups are in a nested format. This means that proper permissions only need to be applied to the site name hostgroup and cascaded to any child hostgroups.
@@ -127,8 +135,8 @@ By setting a status on a Netbox device you determine how the host is added (or u
 * Create the host in Zabbix with an enabled status (For now only enabled with the "Active" status)
 
 You can modify this behaviour by changing the following list variables in the script:
- - zabbix_device_removal
- - zabbix_device_disable
+ - `zabbix_device_removal`
+ - `zabbix_device_disable`
 
 ### Template source
 You can either use a Netbox device type custom field or Netbox config context for the Zabbix template information.
@@ -197,7 +205,7 @@ You can set the proxy for a device using the 'proxy' key in config context.
     }
 }
 ```
-Because of the posible amount of destruction when setting up Netbox but forgetting the proxy command, the sync works a bit different. By default everything is synced except in a situation where the Zabbix host has a proxy configured but nothing is configured in Netbox. To force deletion and a full sync, set the full_proxy_sync variable in the config file.
+Because of the possible amount of destruction when setting up Netbox but forgetting the proxy command, the sync works a bit different. By default everything is synced except in a situation where the Zabbix host has a proxy configured but nothing is configured in Netbox. To force deletion and a full sync, set the `full_proxy_sync` variable in the config file.
 
 ### Set interface parameters within Netbox
 When adding a new device, you can set the interface type with custom context. By default, the following configuration is applied when no config context is provided:

@@ -48,17 +48,24 @@ def main(arguments):
     # set environment variables
     if(arguments.verbose):
         logger.setLevel(logging.DEBUG)
-    env_vars = ["ZABBIX_HOST", "ZABBIX_USER", "ZABBIX_PASS",
-                "NETBOX_HOST", "NETBOX_TOKEN"]
+    env_vars = ["ZABBIX_HOST", "NETBOX_HOST", "NETBOX_TOKEN"]
+    if "ZABBIX_TOKEN" in environ:
+        env_vars.append("ZABBIX_TOKEN")
+    else:
+        env_vars.append("ZABBIX_USER")
+        env_vars.append("ZABBIX_PASS")
     for var in env_vars:
         if var not in environ:
             e = f"Environment variable {var} has not been defined."
             logger.error(e)
             raise EnvironmentVarError(e)
     # Get all virtual environment variables
+    if "ZABBIX_TOKEN" in env_vars:
+        zabbix_token = environ.get("ZABBIX_TOKEN")
+    else:    
+        zabbix_user = environ.get("ZABBIX_USER")
+        zabbix_pass = environ.get("ZABBIX_PASS")
     zabbix_host = environ.get("ZABBIX_HOST")
-    zabbix_user = environ.get("ZABBIX_USER")
-    zabbix_pass = environ.get("ZABBIX_PASS")
     netbox_host = environ.get("NETBOX_HOST")
     netbox_token = environ.get("NETBOX_TOKEN")
     # Set Netbox API
@@ -80,7 +87,13 @@ def main(arguments):
     # Set Zabbix API
     try:
         zabbix = ZabbixAPI(zabbix_host)
-        zabbix.login(zabbix_user, zabbix_pass)
+        if "ZABBIX_TOKEN" in env_vars:
+            zabbix.login(api_token=zabbix_token)
+        else:
+            m=(f"Logging in with Zabbix user and password,"
+                    " consider using an API token instead.")
+            logger.warning(m)
+            zabbix.login(zabbix_user, zabbix_pass)
     except ZabbixAPIException as e:
         e = f"Zabbix returned the following error: {str(e)}."
         logger.error(e)
