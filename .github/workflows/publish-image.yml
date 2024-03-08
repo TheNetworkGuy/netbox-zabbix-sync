@@ -1,0 +1,17 @@
+name: Publish Docker image to GHCR
+
+on:
+  push
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GHCR.io
+        run: echo "${{ secret.GHCR_PAT }}" | docker login --username ${{ secret.GHCR_USER }} --password-stdin ghcr.io
+      - name: Build and tag image
+        run: docker build . -t ghcr.io/${{ secret.GHCR_USER }}/netbox-zabbix-sync:latest
+      - name: Push image to GHCR.io
+        run: docker push ghcr.io/${{ secret.GHCR_USER }}/netbox-zabbix-sync:latest
+
