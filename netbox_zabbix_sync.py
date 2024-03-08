@@ -185,6 +185,9 @@ def main(arguments):
 class SyncError(Exception):
     """ Class SyncError """
 
+class JournalError(Exception):
+    """ Class SyncError """
+
 class SyncExternalError(SyncError):
     """ Class SyncExternalError """
 
@@ -759,7 +762,7 @@ class NetworkDevice():
                 self.nb_journals.create(journal)
                 logger.debug(f"Created journal entry in NB for host {self.name}")
                 return True
-            except pynetbox.RequestError as e:
+            except JournalError(e) as e:
                 logger.warning("Unable to create journal entry for "
                                f"{self.name}: NB returned {e}")
             return False
