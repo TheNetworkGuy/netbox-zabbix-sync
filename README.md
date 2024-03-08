@@ -271,4 +271,4 @@ To configure the interface parameters you'll need to use custom context. Custom 
 
 I would recommend using macros for sensitive data such as community strings since the data in Netbox is plain-text.
 
-Note: Not all SNMP data is required for a working configuration. [The following parameters are allowed ](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed ")but are not all required, depending on your environment.
+> **_NOTE:_** Not all SNMP data is required for a working configuration. [The following parameters are allowed ](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed ")but are not all required, depending on your environment.
