@@ -362,13 +362,12 @@ class NetworkDevice():
                  f"not part of a cluster.")
             logger.warning(e)
             raise SyncInventoryError(e)
-        elif not self.nb.virtual_chassis.master:
+        if not self.nb.virtual_chassis.master:
             e = (f"{self.name} is part of a Netbox virtual chassis which does "
                  "not have a master configured. Skipping for this reason.")
             logger.error(e)
             raise SyncInventoryError(e)
-        else:
-            return self.nb.virtual_chassis.master.id
+        return self.nb.virtual_chassis.master.id
 
     def promoteMasterDevice(self):
         """
@@ -419,7 +418,7 @@ class NetworkDevice():
                 e = (f"Unable to find template {nb_template} "
                     f"for host {self.name} in Zabbix. Skipping host...")
                 logger.warning(e)
-                raise SyncInventoryError(e)
+                raise SyncInventoryError(e) from e
 
     def getZabbixGroup(self, groups):
         """
@@ -434,11 +433,10 @@ class NetworkDevice():
                 e = f"Found group {group['name']} for host {self.name}."
                 logger.debug(e)
                 return True
-        else:
-            e = (f"Unable to find group '{self.hostgroup}' "
+        e = (f"Unable to find group '{self.hostgroup}' "
                  f"for host {self.name} in Zabbix.")
-            logger.warning(e)
-            raise SyncInventoryError(e)
+        logger.warning(e)
+        raise SyncInventoryError(e)
 
     def cleanup(self):
         """
@@ -456,7 +454,7 @@ class NetworkDevice():
             except ZabbixAPIException as e:
                 e = f"Zabbix returned the following error: {str(e)}."
                 logger.error(e)
-                raise SyncExternalError(e)
+                raise SyncExternalError(e) from e
 
     def _zabbixHostnameExists(self):
         """
@@ -485,7 +483,7 @@ class NetworkDevice():
         except InterfaceConfigError as e:
             e = f"{self.name}: {e}"
             logger.warning(e)
-            raise SyncInventoryError(e)
+            raise SyncInventoryError(e) from e
 
     def setProxy(self, proxy_list):
         """ check if Zabbix Proxy has been defined in config context """
