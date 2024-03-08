@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# pylint: disable=invalid-name
+
 """Netbox to Zabbix sync script."""
 
 import logging
