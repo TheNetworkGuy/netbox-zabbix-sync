@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation
+
 
 """Netbox to Zabbix sync script."""
 
@@ -46,6 +47,7 @@ logger.setLevel(logging.WARNING)
 
 def main(arguments):
     """Run the sync process."""
+    # pylint: disable=too-many-branches, too-many-statements
     # set environment variables
     if arguments.verbose:
         logger.setLevel(logging.DEBUG)
@@ -208,6 +210,7 @@ class TemplateError(SyncError):
     """ Class TemplateError """
 
 class NetworkDevice():
+    # pylint: disable=too-many-instance-attributes
     """
     Represents Network device.
     INPUT: (Netbox device class, ZabbixAPI class, journal flag, NB journal class)
@@ -332,8 +335,8 @@ class NetworkDevice():
         # Custom field not found, return error
         e = (f"Custom field {template_cf} not "
             f"found for {self.nb.device_type.manufacturer.name}"
-            f" - {self.nb.device_type.display}.") 
-        raise TemplateError(e)
+            f" - {self.nb.device_type.display}.")
+        raise TemplateError(e) from e
 
     def get_templates_context(self):
         """ Get Zabbix templates from the device context """
@@ -544,7 +547,7 @@ class NetworkDevice():
             except ZabbixAPIException as e:
                 e = f"Couldn't add {self.name}, Zabbix returned {str(e)}."
                 logger.error(e)
-                raise SyncExternalError(e)
+                raise SyncExternalError(e) from e
             # Set Netbox custom field to hostID value.
             self.nb.custom_fields[device_cf] = int(self.zabbix_id)
             self.nb.save()
@@ -580,11 +583,12 @@ class NetworkDevice():
         except ZabbixAPIException as e:
             e = f"Zabbix returned the following error: {str(e)}."
             logger.error(e)
-            raise SyncExternalError(e)
+            raise SyncExternalError(e) from e
         logger.info(f"Updated host {self.name} with data {kwargs}.")
-        self.create_journal_entry("info", f"Updated host in Zabbix with latest NB data.")
+        self.create_journal_entry("info", "Updated host in Zabbix with latest NB data.")
 
     def ConsistencyCheck(self, groups, templates, proxies, proxy_power):
+        # pylint: disable=too-many-branches, too-many-statements
         """
         Checks if Zabbix object is still valid with Netbox parameters.
         """
@@ -672,6 +676,7 @@ class NetworkDevice():
                                  " -p flag was ommited: no "
                                  "changes have been made.")
         # If only 1 interface has been found
+        # pylint: disable=too-many-nested-blocks
         if len(host['interfaces']) == 1:
             updates = {}
             # Go through each key / item and check if it matches Zabbix
@@ -812,6 +817,7 @@ class ZabbixInterface():
 
     def set_snmp(self):
         """ Check if interface is type SNMP """
+        # pylint: disable=too-many-branches
         if self.interface["type"] == 2:
             # Checks if SNMP settings are defined in Netbox
             if "snmp" in self.context["zabbix"]:
