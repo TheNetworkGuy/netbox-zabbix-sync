@@ -4,7 +4,33 @@
 A script to create, update and delete Zabbix hosts using Netbox device objects.
 
 
-## Installation
+## Installation via Docker
+
+To pull the latest stable version to your local cache, use the following docker pull command:
+```
+docker pull ghcr.io/TheNetworkGuy/netbox-zabbix-sync:latest
+```
+
+Make sure to specify the needed environment variables for the script to work (see [here](#set-environment-variables))
+on the command line or use an [env file](https://docs.docker.com/reference/cli/docker/container/run/#env).
+
+```
+docker run -d -t -i -e ZABBIX_HOST='https://zabbix.local' \ 
+-e ZABBIX_TOKEN='othersecrettoken' \
+-e NETBOX_HOST='https://netbox.local' \
+-e NETBOX_TOKEN='secrettoken' \
+--name netbox-zabbix-sync ghcr.io/TheNetworkGuy/netbox-zabbix-sync:latest
+```
+
+This should run a one-time sync, you can check the sync with `docker logs netbox-zabbix-sync`.
+
+The image uses the default `config.py` for it's configuration, you can use a volume mount in the docker run command 
+to override with your own config file if needed (see [config file](#config-file)):
+```
+docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ... 
+```  
+
+## Installation from Source
 
 ### Cloning the repository
 ```
