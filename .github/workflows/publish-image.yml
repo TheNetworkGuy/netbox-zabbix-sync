@@ -1,7 +1,16 @@
-name: Publish Docker image to GHCR
+name: Publish Docker image to GHCR on a new version
 
 on:
-  push
+  push:
+    branches:
+      - main
+      - dockertest
+#    tags: 
+#      - [0-9]+.*
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   test_quality:
@@ -10,10 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Login to GHCR.io
-        run: echo "${{ secrets.GHCR_PAT }}" | docker login --username ${{ secrets.GHCR_USER }} --password-stdin ghcr.io
+      - name: Login to ghcr.io
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login --username ${{ github.actor }} --password-stdin ${{ env.REGISTRY }}
       - name: Build and tag image
-        run: docker build . -t ghcr.io/${{ secrets.GHCR_USER }}/netbox-zabbix-sync:latest
-      - name: Push image to GHCR.io
-        run: docker push ghcr.io/${{ secrets.GHCR_USER }}/netbox-zabbix-sync:latest
+        run: docker build . -t ${{ env.REGISTRY}}/${{ env.IMAGE_NAME }}:latest
+      - name: Push image to ghcr.io
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
