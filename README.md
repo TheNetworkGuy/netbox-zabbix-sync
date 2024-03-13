@@ -22,7 +22,7 @@ docker run -d -t -i -e ZABBIX_HOST='https://zabbix.local' \
 --name netbox-zabbix-sync ghcr.io/TheNetworkGuy/netbox-zabbix-sync:latest
 ```
 
-This should run a one-time sync, you can check the sync with `docker logs`.
+This should run a one-time sync, you can check the sync with `docker logs netbox-zabbix-sync`.
 
 The image uses the default `config.py` for it's configuration, you can use a volume mount in the docker run command 
 to override with your own config file if needed (see [config file](#config-file)):
