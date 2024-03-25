@@ -322,11 +322,11 @@ class NetworkDevice():
                 continue
             # Add value of predefined variable to hostgroup format
             if item == "site_group" and nb_site_groups and traverse_site_groups:
-                path = build_path(site_group, nb_site_groups)
-                hostgroup += "/".join(path) + "/"
+                group_path = build_path(site_group, nb_site_groups)
+                hostgroup += "/".join(group_path) + "/"
             elif item == "region" and nb_regions and traverse_regions:
-                path = build_path(region, nb_regions)
-                hostgroup += "/".join(path) + "/"
+                region_path = build_path(region, nb_regions)
+                hostgroup += "/".join(region_path) + "/"
             else:
                 hostgroup += hostgroup_vars[item] + "/"
         # If the final hostgroup variable is empty
