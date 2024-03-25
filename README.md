@@ -119,7 +119,7 @@ You can specify the value like so, sperated by a "/":
 ```
 hostgroup_format = "tenant/site/dev_location/dev_role"
 ```
-** Group traversal **
+**Group traversal**
 The default behaviour for `region` is to only use the directly assigned region in the rendered hostgroup name.
 However, by setting `traverse_region` to `True` in `config.py` the script will render a full region path of all parent regions for the hostgroup name.
 `traverse_site_groups` controls the same behaviour for site_groups.
