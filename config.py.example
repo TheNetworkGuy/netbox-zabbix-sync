@@ -1,7 +1,8 @@
-# Template logic.
+## Template logic.
 # Set to true to enable the template source information
 # coming from config context instead of a custom field.
 templates_config_context = False
+
 # Set to true to give config context templates a 
 # higher priority then custom field templates
 templates_config_context_overrule = False
@@ -11,37 +12,47 @@ templates_config_context_overrule = False
 template_cf = "zabbix_template"
 device_cf = "zabbix_hostid"
 
-# Enable clustering of devices with virtual chassis setup
+## Enable clustering of devices with virtual chassis setup
 clustering = False
 
-# Enable hostgroup generation. Requires permissions in Zabbix
+## Enable hostgroup generation. Requires permissions in Zabbix
 create_hostgroups = True
 
-# Create journal entries
+## Create journal entries
 create_journal = False
 
+## Proxy Sync
 # Set to true to enable removal of proxy's under hosts. Use with caution and make sure that you specified
 # all the required proxy's in the device config context before enabeling this option.
 # With this option disabled proxy's will only be added and modified for Zabbix hosts.
 full_proxy_sync = False
 
-# Netbox to Zabbix device state convertion
+## Netbox to Zabbix device state convertion
 zabbix_device_removal = ["Decommissioning", "Inventory"]
 zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
 
-# Hostgroup mapping
+## Hostgroup mapping
 # Available choices: dev_location, dev_role, manufacturer, region, site, site_group, tenant, tenant_group
 # You can also use CF (custom field) names under the device. The CF content will be used for the hostgroup generation.
+#
+# When using region in the group name, the default behaviour is to use name of the directly assigned region.
+# By setting traverse_regions to True the full path of all parent regions will be used in the hostgroup, e.g.:
+#
+# 'Global/Europe/Netherlands/Amsterdam' instead of just 'Amsterdam'.
+#
+# traverse_site_groups controls the same behaviour for any assigned site_groups.   
 hostgroup_format = "site/manufacturer/dev_role"
+traverse_regions = False
+traverse_site_groups = False
 
-# Custom filter for device filtering. Variable must be present but can be left empty with no filtering.
-# A couple of examples are as follows:
+## Filtering
+# Custom device filter, variable must be present but can be left empty with no filtering.
+# A couple of examples:
+#  nb_device_filter = {} #No filter
+#  nb_device_filter = {"tag": "zabbix"} #Use a tag
+#  nb_device_filter = {"site": "HQ-AMS"} #Use a site name
+#  nb_device_filter = {"site": ["HQ-AMS", "HQ-FRA"]} #Device must be in either one of these sites
+#  nb_device_filter = {"site": "HQ-AMS", "tag": "zabbix", "role__n": ["PDU", "console-server"]} #Device must be in site HQ-AMS, have the tag zabbix and must not be part of the PDU or console-server role
 
-# nb_device_filter = {} #No filter
-# nb_device_filter = {"tag": "zabbix"} #Use a tag
-# nb_device_filter = {"site": "HQ-AMS"} #Use a site name
-# nb_device_filter = {"site": ["HQ-AMS", "HQ-FRA"]} #Device must be in either one of these sites
-# nb_device_filter = {"site": "HQ-AMS", "tag": "zabbix", "role__n": ["PDU", "console-server"]} #Device must be in site HQ-AMS, have the tag zabbix and must not be part of the PDU or console-server role
-
-# Default device filter, only get devices which have a name in Netbox.
+# Default device filter, only get devices which have a name in Netbox:
 nb_device_filter = {"name__n": "null"}
