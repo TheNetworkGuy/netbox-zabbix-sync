@@ -406,7 +406,7 @@ class NetworkDevice():
                     fieldstr += "['" + field + "']"
                 try:
                     nb_value = eval(fieldstr)
-                except:
+                except Exception:
                     nb_value = None
                 if nb_value and isinstance(nb_value, int | float | str ):
                     self.inventory[zbx_inv_field] = str(nb_value)
@@ -415,7 +415,7 @@ class NetworkDevice():
                     self.inventory[zbx_inv_field] = ""
                 else:
                     # Value is not a string or numeral, probably not what the user expected.
-                    logger.error(f"Inventory lookup for '{nb_inv_field}' returned" 
+                    logger.error(f"Inventory lookup for '{nb_inv_field}' returned"
                                  f" an unexpected type: it will be skipped.")
         return True
 
