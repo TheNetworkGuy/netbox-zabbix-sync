@@ -20,8 +20,6 @@ try:
         zabbix_device_removal,
         zabbix_device_disable,
         hostgroup_format,
-        traverse_site_groups,
-        traverse_regions,
         nb_device_filter
     )
 except ModuleNotFoundError:
@@ -46,30 +44,6 @@ logger.addHandler(lgout)
 logger.addHandler(lgfile)
 logger.setLevel(logging.WARNING)
 
-
-def convert_recordset(recordset):
-    """ Converts netbox RedcordSet to list of dicts. """
-    recordlist = []
-    for record in recordset:
-        recordlist.append(record.__dict__)
-    return recordlist
-
-def build_path(endpoint, list_of_dicts):
-    """
-    Builds a path list of related parent/child items.
-    This can be used to generate a joinable list to
-    be used in hostgroups.
-    """
-    item_path = []
-    itemlist = [i for i in list_of_dicts if i['name'] == endpoint]
-    item = itemlist[0] if len(itemlist) == 1 else None
-    item_path.append(item['name'])
-    while item['_depth'] > 0:
-        itemlist = [i for i in list_of_dicts if i['name'] == str(item['parent'])]
-        item = itemlist[0] if len(itemlist) == 1 else None
-        item_path.append(item['name'])
-    item_path.reverse()
-    return item_path
 
 def main(arguments):
     """Run the sync process."""
@@ -136,8 +110,6 @@ def main(arguments):
         proxy_name = "name"
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.filter(**nb_device_filter)
-    netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
-    netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
     zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
     zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
@@ -153,7 +125,7 @@ def main(arguments):
         try:
             device = NetworkDevice(nb_device, zabbix, netbox_journals,
                                    create_journal)
-            device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
+            device.set_hostgroup(hostgroup_format)
             device.set_template(templates_config_context, templates_config_context_overrule)
             # Checks if device is part of cluster.
             # Requires clustering variable
@@ -287,7 +259,7 @@ class NetworkDevice():
             logger.warning(e)
             raise SyncInventoryError(e)
 
-    def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
+    def set_hostgroup(self, hg_format):
         """Set the hostgroup for this device"""
         # Get all variables from the NB data
         dev_location = str(self.nb.location) if self.nb.location else None
@@ -321,14 +293,7 @@ class NetworkDevice():
                 # the variable is invalid. Skip regardless.
                 continue
             # Add value of predefined variable to hostgroup format
-            if item == "site_group" and nb_site_groups and traverse_site_groups:
-                group_path = build_path(site_group, nb_site_groups)
-                hostgroup += "/".join(group_path) + "/"
-            elif item == "region" and nb_regions and traverse_regions:
-                region_path = build_path(region, nb_regions)
-                hostgroup += "/".join(region_path) + "/"
-            else:
-                hostgroup += hostgroup_vars[item] + "/"
+            hostgroup += hostgroup_vars[item] + "/"
         # If the final hostgroup variable is empty
         if not hostgroup:
             e = (f"{self.name} has no reliable hostgroup. This is"
@@ -450,7 +415,7 @@ class NetworkDevice():
                     # to class variable and return debug log
                     template_match = True
                     self.zbx_templates.append({"templateid": zbx_template['templateid'],
-                                               "name": zbx_template['name']})
+                                               "name": zbx_template['name']}) 
                     e = (f"Found template {zbx_template['name']}"
                         f" for host {self.name}.")
                     logger.debug(e)
