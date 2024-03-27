@@ -62,16 +62,16 @@ def build_path(endpoint, list_of_dicts):
     This can be used to generate a joinable list to
     be used in hostgroups.
     """
-    path = []
+    item_path = []
     itemlist = [i for i in list_of_dicts if i['name'] == endpoint]
     item = itemlist[0] if len(itemlist) == 1 else None
-    path.append(item['name'])
+    item_path.append(item['name'])
     while item['_depth'] > 0:
         itemlist = [i for i in list_of_dicts if i['name'] == str(item['parent'])]
         item = itemlist[0] if len(itemlist) == 1 else None
-        path.append(item['name'])
-    path.reverse()
-    return(path)
+        item_path.append(item['name'])
+    item_path.reverse()
+    return item_path
 
 def main(arguments):
     """Run the sync process."""
@@ -327,11 +327,11 @@ class NetworkDevice():
                 continue
             # Add value of predefined variable to hostgroup format
             if item == "site_group" and nb_site_groups and traverse_site_groups:
-                path = build_path(site_group, nb_site_groups)
-                hostgroup += "/".join(path) + "/"
+                group_path = build_path(site_group, nb_site_groups)
+                hostgroup += "/".join(group_path) + "/"
             elif item == "region" and nb_regions and traverse_regions:
-                path = build_path(region, nb_regions)
-                hostgroup += "/".join(path) + "/"
+                region_path = build_path(region, nb_regions)
+                hostgroup += "/".join(region_path) + "/"
             else:
                 hostgroup += hostgroup_vars[item] + "/"
         # If the final hostgroup variable is empty
@@ -388,8 +388,8 @@ class NetworkDevice():
                     f"context for template host {self.name}")
             raise TemplateError(e)
         if "templates" not in self.config_context["zabbix"]:
-            e = ("Key 'zabbix' not found in config "
-                    f"context for template host {self.name}")
+            e = ("Key 'templates' not found in config "
+                    f"context 'zabbix' for template host {self.name}")
             raise TemplateError(e)
         return self.config_context["zabbix"]["templates"]
 
@@ -411,12 +411,12 @@ class NetworkDevice():
                 if nb_value and isinstance(nb_value, int | float | str ):
                     self.inventory[zbx_inv_field] = str(nb_value)
                 elif not nb_value:
-                    logger.debug('Inventory lookup for "%s" returned an empty value' % nb_inv_field)
+                    logger.debug(f"Inventory lookup for '{nb_inv_field}' returned an empty value")
                     self.inventory[zbx_inv_field] = ""
                 else:
                     # Value is not a string or numeral, probably not what the user expected.
-                    logger.error('Inventory lookup for "%s" returned an unexpected type,'
-                                 ' it will be skipped.' % nb_inv_field)
+                    logger.error(f"Inventory lookup for '{nb_inv_field}' returned an unexpected type: "
+                                 f"it will be skipped.")
         return True
 
     def isCluster(self):
