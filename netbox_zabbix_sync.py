@@ -400,12 +400,12 @@ class NetworkDevice():
         if inventory_sync:
             # Set inventory mode to automatic or manual
             self.inventory_mode = 1 if inventory_automatic else 0
-            
-            # Let's build an inventory dict for each property in the inventory_map 
+
+            # Let's build an inventory dict for each property in the inventory_map
             for nb_inv_field, zbx_inv_field in inventory_map.items():
                 field_list = nb_inv_field.split("/") # convert str to list based on delimiter
                 # start at the base of the dict...
-                value = nbdevice 
+                value = nbdevice
                 # ... and step through the dict till we find the needed value
                 for item in field_list:
                     value = value[item]
