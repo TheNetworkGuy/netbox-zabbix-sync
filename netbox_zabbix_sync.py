@@ -398,19 +398,22 @@ class NetworkDevice():
         self.inventory_mode = -1
         self.inventory = {}
         if inventory_sync:
+            # Set inventory mode to automatic or manual
             self.inventory_mode = 1 if inventory_automatic else 0
+            
+            # Let's build an inventory dict for each property in the inventory_map 
             for nb_inv_field, zbx_inv_field in inventory_map.items():
-                field_list = nb_inv_field.split("/")
-                fieldstr = "nbdevice"
-                for field in field_list:
-                    fieldstr += "['" + field + "']"
-                try:
-                    nb_value = eval(fieldstr)
-                except Exception:
-                    nb_value = None
-                if nb_value and isinstance(nb_value, int | float | str ):
-                    self.inventory[zbx_inv_field] = str(nb_value)
-                elif not nb_value:
+                field_list = nb_inv_field.split("/") # convert str to list based on delimiter
+                # start at the base of the dict...
+                value = nbdevice 
+                # ... and step through the dict till we find the needed value
+                for item in field_list:
+                    value = value[item]
+                # Check if the result is usable and expected
+                if value and isinstance(value, int | float | str ):
+                    self.inventory[zbx_inv_field] = str(value)
+                elif not value:
+                    # empty value should just be an empty string for API compatibility
                     logger.debug(f"Inventory lookup for '{nb_inv_field}' returned an empty value")
                     self.inventory[zbx_inv_field] = ""
                 else:
@@ -569,11 +572,10 @@ class NetworkDevice():
                         logger.debug(f"Found proxy {proxy}"
                                      f" for {self.name}.")
                         return True
+                e = f"{self.name}: Defined proxy {proxy} not found."
+                logger.warning(e)
                 return False
-            e = f"{self.name}: Defined proxy {proxy} not found."
-            logger.warning(e)
-            return False
-        return False
+        return True
 
     def createInZabbix(self, groups, templates, proxies,
                        description="Host added by Netbox sync script."):
@@ -748,13 +750,17 @@ class NetworkDevice():
                                  f"with proxy in Zabbix but not in Netbox. The"
                                  " -p flag was ommited: no "
                                  "changes have been made.")
+
         # Check host inventory
         if inventory_sync:
+            # check inventory mode first, as we need it set to parse
+            # actual inventory values
             if str(host['inventory_mode']) == str(self.inventory_mode):
                 logger.debug(f"Device {self.name}: inventory_mode in-sync.")
             else:
                 logger.warning(f"Device {self.name}: inventory_mode OUT of sync.")
                 self.updateZabbixHost(inventory_mode=str(self.inventory_mode))
+            # Now we can check if inventory is in-sync.
             if host['inventory'] == self.inventory:
                 logger.debug(f"Device {self.name}: inventory in-sync.")
             else:
