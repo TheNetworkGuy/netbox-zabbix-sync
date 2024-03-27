@@ -3,7 +3,6 @@
 
 
 """Netbox to Zabbix sync script."""
-
 import logging
 import argparse
 from os import environ, path, sys
@@ -20,6 +19,11 @@ try:
         zabbix_device_removal,
         zabbix_device_disable,
         hostgroup_format,
+        traverse_site_groups,
+        traverse_regions,
+        inventory_sync,
+        inventory_automatic,
+        inventory_map,
         nb_device_filter
     )
 except ModuleNotFoundError:
@@ -44,6 +48,30 @@ logger.addHandler(lgout)
 logger.addHandler(lgfile)
 logger.setLevel(logging.WARNING)
 
+
+def convert_recordset(recordset):
+    """ Converts netbox RedcordSet to list of dicts. """
+    recordlist = []
+    for record in recordset:
+        recordlist.append(record.__dict__)
+    return recordlist
+
+def build_path(endpoint, list_of_dicts):
+    """
+    Builds a path list of related parent/child items.
+    This can be used to generate a joinable list to
+    be used in hostgroups.
+    """
+    path = []
+    itemlist = [i for i in list_of_dicts if i['name'] == endpoint]
+    item = itemlist[0] if len(itemlist) == 1 else None
+    path.append(item['name'])
+    while item['_depth'] > 0:
+        itemlist = [i for i in list_of_dicts if i['name'] == str(item['parent'])]
+        item = itemlist[0] if len(itemlist) == 1 else None
+        path.append(item['name'])
+    path.reverse()
+    return(path)
 
 def main(arguments):
     """Run the sync process."""
@@ -110,6 +138,8 @@ def main(arguments):
         proxy_name = "name"
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.filter(**nb_device_filter)
+    netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
+    netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
     zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
     zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
@@ -125,8 +155,9 @@ def main(arguments):
         try:
             device = NetworkDevice(nb_device, zabbix, netbox_journals,
                                    create_journal)
-            device.set_hostgroup(hostgroup_format)
+            device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
             device.set_template(templates_config_context, templates_config_context_overrule)
+            device.set_inventory(nb_device)
             # Checks if device is part of cluster.
             # Requires clustering variable
             if device.isCluster() and clustering:
@@ -236,6 +267,8 @@ class NetworkDevice():
         self.zabbix_state = 0
         self.journal = journal
         self.nb_journals = nb_journal_class
+        self.inventory_mode = -1
+        self.inventory = {}
         self._setBasics()
 
     def _setBasics(self):
@@ -248,7 +281,7 @@ class NetworkDevice():
             self.ip = self.cidr.split("/")[0]
         else:
             e = f"Device {self.name}: no primary IP."
-            logger.warning(e)
+            logger.info(e)
             raise SyncInventoryError(e)
 
         # Check if device has custom field for ZBX ID
@@ -259,7 +292,7 @@ class NetworkDevice():
             logger.warning(e)
             raise SyncInventoryError(e)
 
-    def set_hostgroup(self, hg_format):
+    def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
         # Get all variables from the NB data
         dev_location = str(self.nb.location) if self.nb.location else None
@@ -274,7 +307,7 @@ class NetworkDevice():
         hostgroup_vars = {"dev_location": dev_location, "dev_role": dev_role,
                           "manufacturer": manufacturer, "region": region,
                           "site": site, "site_group": site_group,
-                           "tenant": tenant, "tenant_group": tenant_group}
+                          "tenant": tenant, "tenant_group": tenant_group}
         # Generate list based off string input format
         hg_items = hg_format.split("/")
         hostgroup = ""
@@ -293,7 +326,14 @@ class NetworkDevice():
                 # the variable is invalid. Skip regardless.
                 continue
             # Add value of predefined variable to hostgroup format
-            hostgroup += hostgroup_vars[item] + "/"
+            if item == "site_group" and nb_site_groups and traverse_site_groups:
+                path = build_path(site_group, nb_site_groups)
+                hostgroup += "/".join(path) + "/"
+            elif item == "region" and nb_regions and traverse_regions:
+                path = build_path(region, nb_regions)
+                hostgroup += "/".join(path) + "/"
+            else:
+                hostgroup += hostgroup_vars[item] + "/"
         # If the final hostgroup variable is empty
         if not hostgroup:
             e = (f"{self.name} has no reliable hostgroup. This is"
@@ -352,6 +392,32 @@ class NetworkDevice():
                     f"context for template host {self.name}")
             raise TemplateError(e)
         return self.config_context["zabbix"]["templates"]
+
+    def set_inventory(self, nbdevice):
+        """ Set host inventory """
+        self.inventory_mode = -1
+        self.inventory = {}
+        if inventory_sync:
+            self.inventory_mode = 1 if inventory_automatic else 0
+            for nb_inv_field, zbx_inv_field in inventory_map.items():
+                field_list = nb_inv_field.split("/")
+                fieldstr = "nbdevice"
+                for field in field_list:
+                    fieldstr += "['" + field + "']"
+                try:
+                    nb_value = eval(fieldstr)
+                except:
+                    nb_value = None
+                if nb_value and isinstance(nb_value, int | float | str ):
+                    self.inventory[zbx_inv_field] = str(nb_value)
+                elif not nb_value:
+                    logger.debug('Inventory lookup for "%s" returned an empty value' % nb_inv_field)
+                    self.inventory[zbx_inv_field] = ""
+                else:
+                    # Value is not a string or numeral, probably not what the user expected.
+                    logger.error('Inventory lookup for "%s" returned an unexpected type,'
+                                 ' it will be skipped.' % nb_inv_field)
+        return True
 
     def isCluster(self):
         """
@@ -415,7 +481,7 @@ class NetworkDevice():
                     # to class variable and return debug log
                     template_match = True
                     self.zbx_templates.append({"templateid": zbx_template['templateid'],
-                                               "name": zbx_template['name']}) 
+                                               "name": zbx_template['name']})
                     e = (f"Found template {zbx_template['name']}"
                         f" for host {self.name}.")
                     logger.debug(e)
@@ -537,7 +603,9 @@ class NetworkDevice():
                                                    groups=groups,
                                                    templates=templateids,
                                                    proxy_hostid=self.zbxproxy,
-                                                   description=description)
+                                                   description=description,
+                                                   inventory_mode=self.inventory_mode,
+                                                   inventory=self.inventory)
                 else:
                     host = self.zabbix.host.create(host=self.name,
                                                    status=self.zabbix_state,
@@ -545,7 +613,9 @@ class NetworkDevice():
                                                    groups=groups,
                                                    templates=templateids,
                                                    proxyid=self.zbxproxy,
-                                                   description=description)
+                                                   description=description,
+                                                   inventory_mode=self.inventory_mode,
+                                                   inventory=self.inventory)
                 self.zabbix_id = host["hostids"][0]
             except ZabbixAPIException as e:
                 e = f"Couldn't add {self.name}, Zabbix returned {str(e)}."
@@ -603,7 +673,8 @@ class NetworkDevice():
                                                       'port', 'details',
                                                       'interfaceid'],
                                     selectGroups=["groupid"],
-                                    selectParentTemplates=["templateid"])
+                                    selectParentTemplates=["templateid"],
+                                    selectInventory=list(inventory_map.values()))
         if len(host) > 1:
             e = (f"Got {len(host)} results for Zabbix hosts "
                  f"with ID {self.zabbix_id} - hostname {self.name}.")
@@ -616,7 +687,6 @@ class NetworkDevice():
             logger.error(e)
             raise SyncInventoryError(e)
         host = host[0]
-
         if host["host"] == self.name:
             logger.debug(f"Device {self.name}: hostname in-sync.")
         else:
@@ -678,6 +748,19 @@ class NetworkDevice():
                                  f"with proxy in Zabbix but not in Netbox. The"
                                  " -p flag was ommited: no "
                                  "changes have been made.")
+        # Check host inventory
+        if inventory_sync:
+            if str(host['inventory_mode']) == str(self.inventory_mode):
+                logger.debug(f"Device {self.name}: inventory_mode in-sync.")
+            else:
+                logger.warning(f"Device {self.name}: inventory_mode OUT of sync.")
+                self.updateZabbixHost(inventory_mode=str(self.inventory_mode))
+            if host['inventory'] == self.inventory:
+                logger.debug(f"Device {self.name}: inventory in-sync.")
+            else:
+                logger.warning(f"Device {self.name}: inventory OUT of sync.")
+                self.updateZabbixHost(inventory=self.inventory)
+
         # If only 1 interface has been found
         # pylint: disable=too-many-nested-blocks
         if len(host['interfaces']) == 1:

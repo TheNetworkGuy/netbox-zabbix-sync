@@ -56,3 +56,32 @@ traverse_site_groups = False
 
 # Default device filter, only get devices which have a name in Netbox:
 nb_device_filter = {"name__n": "null"}
+
+## Inventory
+# To allow syncing of NetBox device properties, set inventory_sync to True
+inventory_sync = False
+
+# Set inventory_automatic to False to use manual inventory, True for automatic
+# See https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory 
+inventory_automatic = True
+
+# inventory_map is used to map NetBox properties to Zabbix Inventory fields.
+# For nested properties, you can use the '/' seperator.
+# For example, the following map will assign the custom field 'mycustomfield' to the 'alias' Zabbix inventory field:
+#
+# inventory_map = { "custom_fields/mycustomfield/name": "alias"}
+#
+# The following map should provide some nice defaults:
+inventory_map = { "asset_tag": "asset_tag",
+                  "virtual_chassis/name": "chassis",
+                  "status/label": "deployment_status",
+                  "location/name": "location",
+                  "latitude": "location_lat",
+                  "longitude": "location_lon",
+                  "comments": "notes",
+                  "name": "name",
+                  "rack/name": "site_rack",
+                  "serial": "serialno_a",
+                  "device_type/model": "type",
+                  "device_type/manufacturer/name": "vendor",
+                  "oob_ip/address": "oob_ip" }

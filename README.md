@@ -170,6 +170,24 @@ You can modify this behaviour by changing the following list variables in the sc
  - `zabbix_device_removal`
  - `zabbix_device_disable`
 
+### Zabbix Inventory
+This script allows you to enable the inventory on managed Zabbix hosts and sync NetBox device properties to the specified inventory fields.
+To enable, set `inventory_sync` to `True`.
+Set `inventory_automatic` to `False` to use manual inventory, or `True` for automatic.
+See [Zabix Manual](https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory) for more information about the modes.
+
+Use the `inventory_map` variable to map which NetBox properties are used in which Zabbix Inventory fields.
+For nested properties, you can use the '/' seperator.
+For example, the following map will assign the custom field 'mycustomfield' to the 'alias' Zabbix inventory field:
+```
+inventory_sync = True
+inventory_automatic = True
+inventory_map = { "custom_fields/mycustomfield/name": "alias"}
+```
+See `config.py.example` for an extensive example map.
+Any Zabix Inventory fields that are not included in the map will not be touched by the script, 
+so you can safely add manual values or use items to automatically add values to other fields.
+
 ### Template source
 You can either use a Netbox device type custom field or Netbox config context for the Zabbix template information.
 
