@@ -4,7 +4,33 @@
 A script to create, update and delete Zabbix hosts using Netbox device objects.
 
 
-## Installation
+## Installation via Docker
+
+To pull the latest stable version to your local cache, use the following docker pull command:
+```
+docker pull ghcr.io/TheNetworkGuy/netbox-zabbix-sync:latest
+```
+
+Make sure to specify the needed environment variables for the script to work (see [here](#set-environment-variables))
+on the command line or use an [env file](https://docs.docker.com/reference/cli/docker/container/run/#env).
+
+```
+docker run -d -t -i -e ZABBIX_HOST='https://zabbix.local' \ 
+-e ZABBIX_TOKEN='othersecrettoken' \
+-e NETBOX_HOST='https://netbox.local' \
+-e NETBOX_TOKEN='secrettoken' \
+--name netbox-zabbix-sync ghcr.io/TheNetworkGuy/netbox-zabbix-sync:latest
+```
+
+This should run a one-time sync, you can check the sync with `docker logs netbox-zabbix-sync`.
+
+The image uses the default `config.py` for it's configuration, you can use a volume mount in the docker run command 
+to override with your own config file if needed (see [config file](#config-file)):
+```
+docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ... 
+```  
+
+## Installation from Source
 
 ### Cloning the repository
 ```
@@ -71,7 +97,7 @@ The format can be set with the `hostgroup_format` variable.
 Make sure that the Zabbix user has proper permissions to create hosts.
 The hostgroups are in a nested format. This means that proper permissions only need to be applied to the site name hostgroup and cascaded to any child hostgroups.
 
-#### layout
+#### Layout
 The default hostgroup layout is "site/manufacturer/device_role".
 
 **Variables**
@@ -93,7 +119,13 @@ You can specify the value like so, sperated by a "/":
 ```
 hostgroup_format = "tenant/site/dev_location/dev_role"
 ```
-**custom fields**
+**Group traversal**
+
+The default behaviour for `region` is to only use the directly assigned region in the rendered hostgroup name.
+However, by setting `traverse_region` to `True` in `config.py` the script will render a full region path of all parent regions for the hostgroup name.
+`traverse_site_groups` controls the same behaviour for site_groups.
+
+**Custom fields**
 
 You can also use the value of custom fields under the device object.
 
@@ -137,6 +169,24 @@ By setting a status on a Netbox device you determine how the host is added (or u
 You can modify this behaviour by changing the following list variables in the script:
  - `zabbix_device_removal`
  - `zabbix_device_disable`
+
+### Zabbix Inventory
+This script allows you to enable the inventory on managed Zabbix hosts and sync NetBox device properties to the specified inventory fields.
+To enable, set `inventory_sync` to `True`.
+Set `inventory_automatic` to `False` to use manual inventory, or `True` for automatic.
+See [Zabix Manual](https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory) for more information about the modes.
+
+Use the `inventory_map` variable to map which NetBox properties are used in which Zabbix Inventory fields.
+For nested properties, you can use the '/' seperator.
+For example, the following map will assign the custom field 'mycustomfield' to the 'alias' Zabbix inventory field:
+```
+inventory_sync = True
+inventory_automatic = True
+inventory_map = { "custom_fields/mycustomfield/name": "alias"}
+```
+See `config.py.example` for an extensive example map.
+Any Zabix Inventory fields that are not included in the map will not be touched by the script, 
+so you can safely add manual values or use items to automatically add values to other fields.
 
 ### Template source
 You can either use a Netbox device type custom field or Netbox config context for the Zabbix template information.
@@ -271,4 +321,4 @@ To configure the interface parameters you'll need to use custom context. Custom 
 
 I would recommend using macros for sensitive data such as community strings since the data in Netbox is plain-text.
 
-Note: Not all SNMP data is required for a working configuration. [The following parameters are allowed ](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed ")but are not all required, depending on your environment.
+> **_NOTE:_** Not all SNMP data is required for a working configuration. [The following parameters are allowed ](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed ")but are not all required, depending on your environment.
