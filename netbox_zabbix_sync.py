@@ -379,7 +379,7 @@ class NetworkDevice():
         e = (f"Custom field {template_cf} not "
             f"found for {self.nb.device_type.manufacturer.name}"
             f" - {self.nb.device_type.display}.")
-        raise TemplateError(e) from e
+        raise TemplateError(e)
 
     def get_templates_context(self):
         """ Get Zabbix templates from the device context """
@@ -493,7 +493,7 @@ class NetworkDevice():
                 e = (f"Unable to find template {nb_template} "
                     f"for host {self.name} in Zabbix. Skipping host...")
                 logger.warning(e)
-                raise SyncInventoryError(e) from e
+                raise SyncInventoryError(e)
 
     def getZabbixGroup(self, groups):
         """
