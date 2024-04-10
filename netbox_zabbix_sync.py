@@ -408,7 +408,7 @@ class NetworkDevice():
                 value = nbdevice
                 # ... and step through the dict till we find the needed value
                 for item in field_list:
-                    value = value[item]
+                    value = value[item] if value else None
                 # Check if the result is usable and expected
                 if value and isinstance(value, int | float | str ):
                     self.inventory[zbx_inv_field] = str(value)
