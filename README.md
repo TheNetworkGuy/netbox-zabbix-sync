@@ -8,7 +8,7 @@ A script to create, update and delete Zabbix hosts using Netbox device objects.
 
 To pull the latest stable version to your local cache, use the following docker pull command:
 ```
-docker pull ghcr.io/TheNetworkGuy/netbox-zabbix-sync:latest
+docker pull ghcr.io/thenetworkguy/netbox-zabbix-sync:latest
 ```
 
 Make sure to specify the needed environment variables for the script to work (see [here](#set-environment-variables))
