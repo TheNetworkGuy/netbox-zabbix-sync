@@ -144,7 +144,8 @@ def main(arguments):
     zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
     zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
     zabbix_proxies = zabbix.proxy.get(output=['proxyid', proxy_name])
-
+    # Get Netbox API version
+    nb_version = netbox.version
     # Sanitize data
     if proxy_name == "host":
         for proxy in zabbix_proxies:
@@ -153,7 +154,7 @@ def main(arguments):
     # Go through all Netbox devices
     for nb_device in netbox_devices:
         try:
-            device = NetworkDevice(nb_device, zabbix, netbox_journals,
+            device = NetworkDevice(nb_device, zabbix, netbox_journals, nb_version,
                                    create_journal)
             device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
             device.set_template(templates_config_context, templates_config_context_overrule)
@@ -250,7 +251,7 @@ class NetworkDevice():
     INPUT: (Netbox device class, ZabbixAPI class, journal flag, NB journal class)
     """
 
-    def __init__(self, nb, zabbix, nb_journal_class, journal=None):
+    def __init__(self, nb, zabbix, nb_journal_class, nb_version, journal=None):
         self.nb = nb
         self.id = nb.id
         self.name = nb.name
@@ -258,6 +259,7 @@ class NetworkDevice():
         self.zabbix = zabbix
         self.zabbix_id = None
         self.group_id = None
+        self.nb_api_version = nb_version
         self.zbx_template_names = []
         self.zbx_templates = []
         self.hostgroup = None
@@ -296,7 +298,11 @@ class NetworkDevice():
         """Set the hostgroup for this device"""
         # Get all variables from the NB data
         dev_location = str(self.nb.location) if self.nb.location else None
-        dev_role = self.nb.device_role.name
+        # Check the Netbox version. Use backwards compatibility for versions 2 and 3.
+        if self.nb_api_version.startswith(("2", "3")):
+            dev_role = self.nb.device_role.name
+        else:
+            dev_role = self.nb.role.name
         manufacturer = self.nb.device_type.manufacturer.name
         region = str(self.nb.site.region) if self.nb.site.region else None
         site = self.nb.site.name
