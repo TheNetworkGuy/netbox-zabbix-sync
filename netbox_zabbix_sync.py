@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation
+# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines
 
 
 """Netbox to Zabbix sync script."""
@@ -255,6 +255,7 @@ class NetworkDevice():
         self.nb = nb
         self.id = nb.id
         self.name = nb.name
+        self.visible_name = None
         self.status = nb.status.label
         self.zabbix = zabbix
         self.zabbix_id = None
@@ -293,6 +294,19 @@ class NetworkDevice():
             e = f"Custom field {device_cf} not found for {self.name}."
             logger.warning(e)
             raise SyncInventoryError(e)
+
+        # Validate hostname format.
+        odd_character_list = ["ä", "ö", "ü", "Ä", "Ö", "Ü", "ß"]
+        self.use_visible_name = False
+        if any(letter in self.name for letter in odd_character_list):
+            self.name = f"NETBOX_ID{self.id}"
+            self.visible_name = self.nb.name
+            self.use_visible_name = True
+            logger.info(f"Device {self.visible_name} contains special characters. "
+                        f"Using {self.name} as name for the Netbox object "
+                        f"and using {self.visible_name} as visible name in Zabbix.")
+        else:
+            pass
 
     def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
@@ -544,7 +558,12 @@ class NetworkDevice():
         """
         Checks if hostname exists in Zabbix.
         """
-        host = self.zabbix.host.get(filter={'name': self.name}, output=[])
+        # Validate the hostname or visible name field
+        if not self.use_visible_name:
+            zbx_filter = {'host': self.name}
+        else:
+            zbx_filter = {'name': self.visible_name}
+        host = self.zabbix.host.get(filter=zbx_filter, output=[])
         return bool(host)
 
     def setInterfaceDetails(self):
@@ -609,6 +628,7 @@ class NetworkDevice():
             try:
                 if version.parse(self.zabbix.api_version()) < version.parse("7.0.0"):
                     host = self.zabbix.host.create(host=self.name,
+                                                   name=self.visible_name,
                                                    status=self.zabbix_state,
                                                    interfaces=interfaces,
                                                    groups=groups,
@@ -619,6 +639,7 @@ class NetworkDevice():
                                                    inventory=self.inventory)
                 else:
                     host = self.zabbix.host.create(host=self.name,
+                                                   name=self.visible_name,
                                                    status=self.zabbix_state,
                                                    interfaces=interfaces,
                                                    groups=groups,
@@ -704,6 +725,14 @@ class NetworkDevice():
             logger.warning(f"Device {self.name}: hostname OUT of sync. "
                            f"Received value: {host['host']}")
             self.updateZabbixHost(host=self.name)
+        # Execute check depending on wether the name is special or not
+        if self.use_visible_name:
+            if host["name"] == self.visible_name:
+                logger.debug(f"Device {self.name}: visible name in-sync.")
+            else:
+                logger.warning(f"Device {self.name}: visible name OUT of sync."
+                            f" Received value: {host['name']}")
+                self.updateZabbixHost(name=self.visible_name)
 
         # Check if the templates are in-sync
         if not self.zbx_template_comparer(host["parentTemplates"]):
