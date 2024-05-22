@@ -416,7 +416,7 @@ class NetworkDevice():
                 for item in field_list:
                     value = value[item] if value else None
                 # Check if the result is usable and expected
-                # We want to apply any int or float 0 values, 
+                # We want to apply any int or float 0 values,
                 # even if python thinks those are empty.
                 if ((value and isinstance(value, int | float | str )) or
                      (isinstance(value, int | float) and int(value) ==0)):
