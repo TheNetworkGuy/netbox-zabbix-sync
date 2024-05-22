@@ -245,7 +245,7 @@ class TemplateError(SyncError):
     """ Class TemplateError """
 
 class NetworkDevice():
-    # pylint: disable=too-many-instance-attributes
+    # pylint: disable=too-many-instance-attributes, too-many-arguments
     """
     Represents Network device.
     INPUT: (Netbox device class, ZabbixAPI class, journal flag, NB journal class)
