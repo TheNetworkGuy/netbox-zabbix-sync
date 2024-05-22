@@ -416,7 +416,10 @@ class NetworkDevice():
                 for item in field_list:
                     value = value[item] if value else None
                 # Check if the result is usable and expected
-                if value and isinstance(value, int | float | str ):
+                # We want to apply any int or float 0 values, 
+                # even if python thinks those are empty.
+                if ((value and isinstance(value, int | float | str )) or
+                     (isinstance(value, int | float) and int(value) ==0)):
                     self.inventory[zbx_inv_field] = str(value)
                 elif not value:
                     # empty value should just be an empty string for API compatibility
