@@ -181,12 +181,13 @@ def main(arguments):
                     # and remove hostID from Netbox.
                     device.cleanup()
                     logger.info(f"Cleaned up host {device.name}.")
-
+                    continue
                 else:
                     # Device has been added to Netbox
                     # but is not in Activate state
                     logger.info(f"Skipping host {device.name} since its "
                                 f"not in the active state.")
+                    continue
             elif device.status in zabbix_device_disable:
                 device.zabbix_state = 1
             else:
