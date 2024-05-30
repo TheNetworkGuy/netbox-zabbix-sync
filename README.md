@@ -232,8 +232,8 @@ If you want to automatically create hostgroups then the create permission on hos
 To make the user experience easier you could add a custom link that redirects users to the Zabbix latest data.
 ```
 * Name: zabbix_latestData
-* Text: {% if obj.cf["zabbix_hostid"] %}Show host in Zabbix{% endif %}
-* URL: http://myzabbixserver.local/zabbix.php?action=latest.view&hostids[]={{ obj.cf["zabbix_hostid"] }}
+* Text: {% if object.cf["zabbix_hostid"] %}Show host in Zabbix{% endif %}
+* URL: http://myzabbixserver.local/zabbix.php?action=latest.view&hostids[]={{ object.cf["zabbix_hostid"] }}
 ```
 ## Running the script
 ```
