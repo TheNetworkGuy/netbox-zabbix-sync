@@ -3,7 +3,6 @@
 """
 Device specific handeling for Netbox to Zabbix
 """
-
 from os import sys
 from logging import getLogger
 from pyzabbix import ZabbixAPIException
@@ -48,7 +47,7 @@ class NetworkDevice():
         self.hostgroup = None
         self.tenant = nb.tenant
         self.config_context = nb.config_context
-        self.zbxproxy = "0"
+        self.zbxproxy = None
         self.zabbix_state = 0
         self.journal = journal
         self.nb_journals = nb_journal_class
@@ -372,22 +371,49 @@ class NetworkDevice():
             self.logger.warning(e)
             raise SyncInventoryError(e) from e
 
-    def setProxy(self, proxy_list):
-        """ check if Zabbix Proxy has been defined in config context """
-        if "zabbix" in self.nb.config_context:
-            if "proxy" in self.nb.config_context["zabbix"]:
-                proxy = self.nb.config_context["zabbix"]["proxy"]
-                # Try matching proxy
-                for px in proxy_list:
-                    if px["name"] == proxy:
-                        self.zbxproxy = px["proxyid"]
-                        self.logger.debug(f"Found proxy {proxy}"
-                                          f" for {self.name}.")
-                        return True
-                e = f"{self.name}: Defined proxy {proxy} not found."
-                self.logger.warning(e)
-                return False
+    # def setProxy(self, proxy_list):
+    #     """ check if Zabbix Proxy has been defined in config context """
+    #     if "zabbix" in self.nb.config_context:
+    #         if "proxy" in self.nb.config_context["zabbix"]:
+    #             proxy = self.nb.config_context["zabbix"]["proxy"]
+    #             # Try matching proxy
+    #             for px in proxy_list:
+    #                 if px["name"] == proxy:
+    #                     self.zbxproxy = px["proxyid"]
+    #                     self.logger.debug(f"Found proxy {proxy}"
+    #                                       f" for {self.name}.")
+    #                     return True
+    #             e = f"{self.name}: Defined proxy {proxy} not found."
+    #             self.logger.warning(e)
+    #             return False
         return True
+
+    def setProxy(self, proxy_list):
+        """
+        Sets proxy or proxy group if this
+        value has been defined in config context
+
+        input: List of all proxies and proxy gorups in standardized format
+        """
+        # check if the key Zabbix is defined in the config context
+        if not "zabbix" in self.nb.config_context:
+            return False
+        # Proxy group takes priority over a proxy due
+        # to it being HA and therefore being more reliable
+        for proxy_type in ('proxy_group', 'proxy'):
+            # Check if the key exists in Netbox CC
+            if proxy_type in self.nb.config_context["zabbix"]:
+                proxy_name = self.nb.config_context["zabbix"][proxy_type]
+                # go through all proxies
+                for proxy in proxy_list:
+                    # If the proxy does not match the type, ignore and continue
+                    if not proxy["type"] == proxy_type:
+                        continue
+                    # If the proxy name matches
+                    if proxy["name"] == proxy_name:
+                        self.zbxproxy = proxy
+                        return True
+        return False
 
     def createInZabbix(self, groups, templates, proxies,
                        description="Host added by Netbox sync script."):
@@ -408,30 +434,30 @@ class NetworkDevice():
             groups = [{"groupid": self.group_id}]
             # Set Zabbix proxy if defined
             self.setProxy(proxies)
+            # Set basic data for host creation
+            create_data = {"host": self.name,
+                            "name": self.visible_name,
+                            "status": self.zabbix_state,
+                            "interfaces": interfaces,
+                            "groups": groups,
+                            "templates": templateids,
+                            "description": description,
+                            "inventory_mode": self.inventory_mode,
+                            "inventory": self.inventory
+                            }
+            # If a Zabbix proxy or Zabbix Proxy group has been defined
+            if self.zbxproxy:
+                # If a lower version than 7 is used, we can assume that
+                # the proxy is a normal proxy and not a proxy group
+                if version.parse(self.zabbix.version) < version.parse("7.0.0"):
+                    create_data["proxy_hostid"] = self.zbxproxy["id"]
+                else:
+                    # Configure either a proxy or proxy group
+                    create_data[self.zbxproxy["idtype"]] = self.zbxproxy["id"]
+                    create_data["monitored_by"] = self.zbxproxy["monitored_by"]
             # Add host to Zabbix
             try:
-                if version.parse(self.zabbix.api_version()) < version.parse("7.0.0"):
-                    host = self.zabbix.host.create(host=self.name,
-                                                   name=self.visible_name,
-                                                   status=self.zabbix_state,
-                                                   interfaces=interfaces,
-                                                   groups=groups,
-                                                   templates=templateids,
-                                                   proxy_hostid=self.zbxproxy,
-                                                   description=description,
-                                                   inventory_mode=self.inventory_mode,
-                                                   inventory=self.inventory)
-                else:
-                    host = self.zabbix.host.create(host=self.name,
-                                                   name=self.visible_name,
-                                                   status=self.zabbix_state,
-                                                   interfaces=interfaces,
-                                                   groups=groups,
-                                                   templates=templateids,
-                                                   proxyid=self.zbxproxy,
-                                                   description=description,
-                                                   inventory_mode=self.inventory_mode,
-                                                   inventory=self.inventory)
+                host = self.zabbix.host.create(**create_data)
                 self.zabbix_id = host["hostids"][0]
             except ZabbixAPIException as e:
                 e = f"Couldn't add {self.name}, Zabbix returned {str(e)}."
@@ -540,9 +566,9 @@ class NetworkDevice():
         else:
             self.logger.warning(f"Device {self.name}: status OUT of sync.")
             self.updateZabbixHost(status=str(self.zabbix_state))
-
+            ### CHANGE THIS
         # Check if a proxy has been defined
-        if self.zbxproxy != "0":
+        if self.zbxproxy:
             # Check if expected proxyID matches with configured proxy
             if (("proxy_hostid" in host and host["proxy_hostid"] == self.zbxproxy) or
                    ("proxyid" in host and host["proxyid"] == self.zbxproxy)):

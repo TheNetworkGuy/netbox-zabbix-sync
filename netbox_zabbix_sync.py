@@ -10,7 +10,7 @@ from pynetbox import api
 #from pyzabbix import ZabbixAPI, ZabbixAPIException
 from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
 from modules.device import NetworkDevice
-from modules.tools import convert_recordset
+from modules.tools import convert_recordset, proxy_prepper
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
 try:
     from config import (
@@ -117,12 +117,15 @@ def main(arguments):
     zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
     zabbix_proxies = zabbix.proxy.get(output=['proxyid', proxy_name])
     zabbix_proxygroups = zabbix.proxygroup.get(output=["proxy_groupid", "name"])
-    # Get Netbox API version
-    nb_version = netbox.version
     # Sanitize proxy data
     if proxy_name == "host":
         for proxy in zabbix_proxies:
             proxy['name'] = proxy.pop('host')
+    # Prepare list of all proxy and proxy_groups
+    zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
+
+    # Get Netbox API version
+    nb_version = netbox.version
 
     # Go through all Netbox devices
     for nb_device in netbox_devices:
@@ -167,7 +170,7 @@ def main(arguments):
             # Check if device is already in Zabbix
             if device.zabbix_id:
                 device.ConsistencyCheck(zabbix_groups, zabbix_templates,
-                                        zabbix_proxies, full_proxy_sync)
+                                        zabbix_proxy_list, full_proxy_sync)
                 continue
             # Add hostgroup is config is set
             # and Hostgroup is not present in Zabbix
@@ -182,7 +185,7 @@ def main(arguments):
                     zabbix_groups.append(hostgroup)
             # Add device to Zabbix
             device.createInZabbix(zabbix_groups, zabbix_templates,
-                                    zabbix_proxies)
+                                    zabbix_proxy_list)
         except SyncError:
             pass
 
