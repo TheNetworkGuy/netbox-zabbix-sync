@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines
-
+# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation
 
 """Netbox to Zabbix sync script."""
 import logging
@@ -8,7 +7,8 @@ import argparse
 from os import environ, path, sys
 from packaging import version
 from pynetbox import api
-from pyzabbix import ZabbixAPI, ZabbixAPIException
+#from pyzabbix import ZabbixAPI, ZabbixAPIException
+from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
 from modules.device import NetworkDevice
 from modules.tools import convert_recordset
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
@@ -94,17 +94,17 @@ def main(arguments):
     try:
         zabbix = ZabbixAPI(zabbix_host)
         if "ZABBIX_TOKEN" in env_vars:
-            zabbix.login(api_token=zabbix_token)
+            zabbix.login(token=zabbix_token)
         else:
             m=("Logging in with Zabbix user and password,"
                     " consider using an API token instead.")
             logger.warning(m)
-            zabbix.login(zabbix_user, zabbix_pass)
-    except ZabbixAPIException as e:
+            zabbix.login(user=zabbix_user, password=zabbix_pass)
+    except APIRequestError as e:
         e = f"Zabbix returned the following error: {str(e)}."
         logger.error(e)
     # Set API parameter mapping based on API version
-    if version.parse(zabbix.api_version()) < version.parse("7.0.0"):
+    if version.parse(zabbix.version) < version.parse("7.0.0"):
         proxy_name = "host"
     else:
         proxy_name = "name"
@@ -116,9 +116,10 @@ def main(arguments):
     zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
     zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
     zabbix_proxies = zabbix.proxy.get(output=['proxyid', proxy_name])
+    zabbix_proxygroups = zabbix.proxygroup.get(output=["proxy_groupid", "name"])
     # Get Netbox API version
     nb_version = netbox.version
-    # Sanitize data
+    # Sanitize proxy data
     if proxy_name == "host":
         for proxy in zabbix_proxies:
             proxy['name'] = proxy.pop('host')
@@ -126,6 +127,7 @@ def main(arguments):
     # Go through all Netbox devices
     for nb_device in netbox_devices:
         try:
+            # Set device instance set data such as hostgroup and template information.
             device = NetworkDevice(nb_device, zabbix, netbox_journals, nb_version,
                                    create_journal, logger)
             device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
@@ -134,7 +136,7 @@ def main(arguments):
             # Checks if device is part of cluster.
             # Requires clustering variable
             if device.isCluster() and clustering:
-                # Check if device is master or slave
+                # Check if device is primary or secondary
                 if device.promoteMasterDevice():
                     e = (f"Device {device.name} is "
                          f"part of cluster and primary.")
@@ -159,11 +161,15 @@ def main(arguments):
                 logger.info(f"Skipping host {device.name} since its "
                             f"not in the active state.")
                 continue
+            # Check if the device is in the disabled state
             if device.status in zabbix_device_disable:
                 device.zabbix_state = 1
-            else:
-                device.zabbix_state = 0
-            # Add hostgroup is variable is True
+            # Check if device is already in Zabbix
+            if device.zabbix_id:
+                device.ConsistencyCheck(zabbix_groups, zabbix_templates,
+                                        zabbix_proxies, full_proxy_sync)
+                continue
+            # Add hostgroup is config is set
             # and Hostgroup is not present in Zabbix
             if create_hostgroups:
                 for group in zabbix_groups:
@@ -174,14 +180,9 @@ def main(arguments):
                     # Create new hostgroup
                     hostgroup = device.createZabbixHostgroup()
                     zabbix_groups.append(hostgroup)
-            # Device is already present in Zabbix
-            if device.zabbix_id:
-                device.ConsistencyCheck(zabbix_groups, zabbix_templates,
-                                        zabbix_proxies, full_proxy_sync)
             # Add device to Zabbix
-            else:
-                device.createInZabbix(zabbix_groups, zabbix_templates,
-                                      zabbix_proxies)
+            device.createInZabbix(zabbix_groups, zabbix_templates,
+                                    zabbix_proxies)
         except SyncError:
             pass
 
