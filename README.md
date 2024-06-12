@@ -255,6 +255,28 @@ You can set the proxy for a device using the 'proxy' key in config context.
     }
 }
 ```
+It is now posible to specify proxy groups with the introduction of Proxy groups in Zabbix 7. Specifying a group in the config context on older Zabbix releases will have no impact and the script will ignore the statement.
+
+```json
+{
+    "zabbix": {
+        "proxy_group": "yourawesomeproxygroup.local"
+    }
+}
+```
+
+The script will prefer groups when specifying both a proxy and group. This is done with the assumption that groups are more resiliant and HA ready, making it a more logical choice to use for proxy linkage. This also makes migrating from a proxy to proxy group easier since the group take priority over the invidivual proxy.
+
+```json
+{
+    "zabbix": {
+        "proxy": "yourawesomeproxy.local",
+        "proxy_group": "yourawesomeproxygroup.local"
+    }
+}
+```
+In the example above the host will use the group on Zabbix 7. On Zabbix 6 and below the host will use the proxy. Zabbix 7 will use the proxy value when ommiting the proxy_group value.
+
 Because of the possible amount of destruction when setting up Netbox but forgetting the proxy command, the sync works a bit different. By default everything is synced except in a situation where the Zabbix host has a proxy configured but nothing is configured in Netbox. To force deletion and a full sync, set the `full_proxy_sync` variable in the config file.
 
 ### Set interface parameters within Netbox
