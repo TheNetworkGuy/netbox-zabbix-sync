@@ -5,10 +5,8 @@
 import logging
 import argparse
 from os import environ, path, sys
-from packaging import version
 from pynetbox import api
-#from pyzabbix import ZabbixAPI, ZabbixAPIException
-from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
+from zabbix_utils import ZabbixAPI, APIRequestError
 from modules.device import NetworkDevice
 from modules.tools import convert_recordset, proxy_prepper
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
@@ -92,7 +90,7 @@ def main(arguments):
             raise HostgroupError(e)
     # Set Zabbix API
     try:
-        zabbix = ZabbixAPI(zabbix_host)
+        zabbix = ZabbixAPI(zabbix_host, password=zabbix_pass)
         if "ZABBIX_TOKEN" in env_vars:
             zabbix.login(token=zabbix_token)
         else:
@@ -104,7 +102,7 @@ def main(arguments):
         e = f"Zabbix returned the following error: {str(e)}."
         logger.error(e)
     # Set API parameter mapping based on API version
-    if version.parse(zabbix.version) < version.parse("7.0.0"):
+    if not str(zabbix.version).startswith('7'):
         proxy_name = "host"
     else:
         proxy_name = "name"
@@ -116,7 +114,10 @@ def main(arguments):
     zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
     zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
     zabbix_proxies = zabbix.proxy.get(output=['proxyid', proxy_name])
-    zabbix_proxygroups = zabbix.proxygroup.get(output=["proxy_groupid", "name"])
+    # Set empty list for proxy processing Zabbix <= 6
+    zabbix_proxygroups = []
+    if str(zabbix.version).startswith('7'):
+        zabbix_proxygroups = zabbix.proxygroup.get(output=["proxy_groupid", "name"])
     # Sanitize proxy data
     if proxy_name == "host":
         for proxy in zabbix_proxies:
@@ -170,7 +171,8 @@ def main(arguments):
             # Check if device is already in Zabbix
             if device.zabbix_id:
                 device.ConsistencyCheck(zabbix_groups, zabbix_templates,
-                                        zabbix_proxy_list, full_proxy_sync)
+                                        zabbix_proxy_list, full_proxy_sync,
+                                        create_hostgroups)
                 continue
             # Add hostgroup is config is set
             # and Hostgroup is not present in Zabbix

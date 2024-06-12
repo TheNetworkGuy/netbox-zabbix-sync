@@ -5,8 +5,7 @@ Device specific handeling for Netbox to Zabbix
 """
 from os import sys
 from logging import getLogger
-from pyzabbix import ZabbixAPIException
-from packaging import version
+from zabbix_utils import APIRequestError
 from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalError,
                                 InterfaceConfigError, JournalError)
 from modules.interface import ZabbixInterface
@@ -314,10 +313,7 @@ class NetworkDevice():
                 e = f"Found group {group['name']} for host {self.name}."
                 self.logger.debug(e)
                 return True
-        e = (f"Unable to find group '{self.hostgroup}' "
-                 f"for host {self.name} in Zabbix.")
-        self.logger.warning(e)
-        raise SyncInventoryError(e)
+        return False
 
     def cleanup(self):
         """
@@ -332,7 +328,7 @@ class NetworkDevice():
                 e = f"Deleted host {self.name} from Zabbix."
                 self.logger.info(e)
                 self.create_journal_entry("warning", "Deleted host from Zabbix")
-            except ZabbixAPIException as e:
+            except APIRequestError as e:
                 e = f"Zabbix returned the following error: {str(e)}."
                 self.logger.error(e)
                 raise SyncExternalError(e) from e
@@ -371,23 +367,6 @@ class NetworkDevice():
             self.logger.warning(e)
             raise SyncInventoryError(e) from e
 
-    # def setProxy(self, proxy_list):
-    #     """ check if Zabbix Proxy has been defined in config context """
-    #     if "zabbix" in self.nb.config_context:
-    #         if "proxy" in self.nb.config_context["zabbix"]:
-    #             proxy = self.nb.config_context["zabbix"]["proxy"]
-    #             # Try matching proxy
-    #             for px in proxy_list:
-    #                 if px["name"] == proxy:
-    #                     self.zbxproxy = px["proxyid"]
-    #                     self.logger.debug(f"Found proxy {proxy}"
-    #                                       f" for {self.name}.")
-    #                     return True
-    #             e = f"{self.name}: Defined proxy {proxy} not found."
-    #             self.logger.warning(e)
-    #             return False
-        return True
-
     def setProxy(self, proxy_list):
         """
         Sets proxy or proxy group if this
@@ -400,7 +379,12 @@ class NetworkDevice():
             return False
         # Proxy group takes priority over a proxy due
         # to it being HA and therefore being more reliable
-        for proxy_type in ('proxy_group', 'proxy'):
+        # Includes proxy group fix since Zabbix <= 6 should ignore this
+        proxy_types = ["proxy"]
+        if str(self.zabbix.version).startswith('7'):
+            # Only insert groups in front of list for Zabbix7
+            proxy_types.insert(0, "proxy_group")
+        for proxy_type in proxy_types:
             # Check if the key exists in Netbox CC
             if proxy_type in self.nb.config_context["zabbix"]:
                 proxy_name = self.nb.config_context["zabbix"][proxy_type]
@@ -413,6 +397,9 @@ class NetworkDevice():
                     if proxy["name"] == proxy_name:
                         self.zbxproxy = proxy
                         return True
+                else:
+                    self.logger.warning(f"Device {self.name}: unable to find proxy {proxy_name}")
+                    break
         return False
 
     def createInZabbix(self, groups, templates, proxies,
@@ -424,7 +411,10 @@ class NetworkDevice():
         if not self._zabbixHostnameExists():
             # Get group and template ID's for host
             if not self.getZabbixGroup(groups):
-                raise SyncInventoryError()
+                e = (f"Unable to find group '{self.hostgroup}' "
+                     f"for host {self.name} in Zabbix.")
+                self.logger.warning(e)
+                raise SyncInventoryError(e)
             self.zbxTemplatePrepper(templates)
             templateids = []
             for template in self.zbx_templates:
@@ -449,7 +439,7 @@ class NetworkDevice():
             if self.zbxproxy:
                 # If a lower version than 7 is used, we can assume that
                 # the proxy is a normal proxy and not a proxy group
-                if version.parse(self.zabbix.version) < version.parse("7.0.0"):
+                if not str(self.zabbix.version).startswith('7'):
                     create_data["proxy_hostid"] = self.zbxproxy["id"]
                 else:
                     # Configure either a proxy or proxy group
@@ -459,7 +449,7 @@ class NetworkDevice():
             try:
                 host = self.zabbix.host.create(**create_data)
                 self.zabbix_id = host["hostids"][0]
-            except ZabbixAPIException as e:
+            except APIRequestError as e:
                 e = f"Couldn't add {self.name}, Zabbix returned {str(e)}."
                 self.logger.error(e)
                 raise SyncExternalError(e) from e
@@ -483,7 +473,7 @@ class NetworkDevice():
             self.logger.info(e)
             data = {'groupid': groupid["groupids"][0], 'name': self.hostgroup}
             return data
-        except ZabbixAPIException as e:
+        except APIRequestError as e:
             e = f"Couldn't add hostgroup, Zabbix returned {str(e)}."
             self.logger.error(e)
             raise SyncExternalError(e) from e
@@ -495,19 +485,30 @@ class NetworkDevice():
         """
         try:
             self.zabbix.host.update(hostid=self.zabbix_id, **kwargs)
-        except ZabbixAPIException as e:
+        except APIRequestError as e:
             e = f"Zabbix returned the following error: {str(e)}."
             self.logger.error(e)
-            raise SyncExternalError(e) from e
+            raise SyncExternalError(e) from None
         self.logger.info(f"Updated host {self.name} with data {kwargs}.")
         self.create_journal_entry("info", "Updated host in Zabbix with latest NB data.")
 
-    def ConsistencyCheck(self, groups, templates, proxies, proxy_power):
+    def ConsistencyCheck(self, groups, templates, proxies, proxy_power, create_hostgroups):
         # pylint: disable=too-many-branches, too-many-statements
         """
         Checks if Zabbix object is still valid with Netbox parameters.
         """
-        self.getZabbixGroup(groups)
+        # Check if the hostgroup exists.
+        # If not, create the hostgroup and try finding the group again
+        if not self.getZabbixGroup(groups):
+            if create_hostgroups:
+                new_group = self.createZabbixHostgroup()
+                groups.append(new_group)
+                self.getZabbixGroup(groups)
+            else:
+                e = (f"Device {self.name}: different hostgroup is required but "
+                     "unable to create hostgroup without generation permission.")
+                self.logger.warning(e)
+                raise SyncInventoryError(e)
         self.zbxTemplatePrepper(templates)
         self.setProxy(proxies)
         host = self.zabbix.host.get(filter={'hostid': self.zabbix_id},
@@ -566,39 +567,56 @@ class NetworkDevice():
         else:
             self.logger.warning(f"Device {self.name}: status OUT of sync.")
             self.updateZabbixHost(status=str(self.zabbix_state))
-            ### CHANGE THIS
         # Check if a proxy has been defined
         if self.zbxproxy:
-            # Check if expected proxyID matches with configured proxy
-            if (("proxy_hostid" in host and host["proxy_hostid"] == self.zbxproxy) or
-                   ("proxyid" in host and host["proxyid"] == self.zbxproxy)):
+            # Check if proxy or proxy group is defined
+            if (self.zbxproxy["idtype"] in host and
+                host[self.zbxproxy["idtype"]] == self.zbxproxy["id"]):
                 self.logger.debug(f"Device {self.name}: proxy in-sync.")
+            # Backwards compatibility for Zabbix <= 6
+            elif "proxy_hostid" in host and host["proxy_hostid"] == self.zbxproxy["id"]:
+                self.logger.debug(f"Device {self.name}: proxy in-sync.")
+            # Proxy does not match, update Zabbix
             else:
-                # Proxy diff, update value
                 self.logger.warning(f"Device {self.name}: proxy OUT of sync.")
-                if version.parse(self.zabbix.api_version()) < version.parse("7.0.0"):
-                    self.updateZabbixHost(proxy_hostid=self.zbxproxy)
+                # Zabbix <= 6 patch
+                if not str(self.zabbix.version).startswith('7'):
+                    self.updateZabbixHost(proxy_hostid=self.zbxproxy['id'])
+                # Zabbix 7+
                 else:
-                    self.updateZabbixHost(proxyid=self.zbxproxy)
+                    # Prepare data structure for updating either proxy or group
+                    update_data = {self.zbxproxy["idtype"]: self.zbxproxy["id"],
+                                   "monitored_by": self.zbxproxy['monitored_by']}
+                    self.updateZabbixHost(**update_data)
         else:
-            if (("proxy_hostid" in host and not host["proxy_hostid"] == "0")
-                  or ("proxyid" in host and not host["proxyid"] == "0")):
-                if proxy_power:
-                    # Variable full_proxy_sync has been enabled
-                    # delete the proxy link in Zabbix
-                    if version.parse(self.zabbix.api_version()) < version.parse("7.0.0"):
-                        self.updateZabbixHost(proxy_hostid=self.zbxproxy)
-                    else:
-                        self.updateZabbixHost(proxyid=self.zbxproxy)
-                else:
-                    # Instead of deleting the proxy config in zabbix and
-                    # forcing potential data loss,
-                    # an error message is displayed.
-                    self.logger.error(f"Device {self.name} is configured "
-                                      f"with proxy in Zabbix but not in Netbox. The"
-                                       " -p flag was ommited: no "
-                                       "changes have been made.")
-
+            # No proxy is defined in Netbox
+            proxy_set = False
+            # Check if a proxy is defined. Uses the proxy_hostid key for backwards compatibility
+            for key in ("proxy_hostid", "proxyid", "proxy_groupid"):
+                if key in host:
+                    if bool(int(host[key])):
+                        proxy_set = True
+            if proxy_power and proxy_set:
+                # Zabbix <= 6 fix
+                self.logger.warning(f"Device {self.name}: no proxy is configured in Netbox "
+                                    "but is configured in Zabbix. Removing proxy config in Zabbix")
+                if "proxy_hostid" in host and bool(host["proxy_hostid"]):
+                    self.updateZabbixHost(proxy_hostid=0)
+                # Zabbix 7 proxy
+                elif "proxyid" in host and bool(host["proxyid"]):
+                    self.updateZabbixHost(proxyid=0, monitored_by=0)
+                # Zabbix 7 proxy group
+                elif "proxy_groupid" in host and bool(host["proxy_groupid"]):
+                    self.updateZabbixHost(proxy_groupid=0, monitored_by=0)
+            # Checks if a proxy has been defined in Zabbix and if proxy_power config has been set
+            if proxy_set and not proxy_power:
+                # Display error message
+                self.logger.error(f"Device {self.name} is configured "
+                                    f"with proxy in Zabbix but not in Netbox. The"
+                                    " -p flag was ommited: no "
+                                    "changes have been made.")
+            if not proxy_set:
+                self.logger.debug(f"Device {self.name}: proxy in-sync.")
         # Check host inventory
         if inventory_sync:
             # check inventory mode first, as we need it set to parse
@@ -665,7 +683,7 @@ class NetworkDevice():
                     e = f"Solved {self.name} interface conflict."
                     self.logger.info(e)
                     self.create_journal_entry("info", e)
-                except ZabbixAPIException as e:
+                except APIRequestError as e:
                     e = f"Zabbix returned the following error: {str(e)}."
                     self.logger.error(e)
                     raise SyncExternalError(e) from e
