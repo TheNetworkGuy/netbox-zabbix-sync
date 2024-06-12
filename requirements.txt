@@ -1,2 +1,2 @@
 pynetbox
-pyzabbix
+zabbix_utils
