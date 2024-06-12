@@ -6,7 +6,7 @@ import logging
 import argparse
 from os import environ, path, sys
 from pynetbox import api
-from zabbix_utils import ZabbixAPI, APIRequestError
+from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
 from modules.device import NetworkDevice
 from modules.tools import convert_recordset, proxy_prepper
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
@@ -24,7 +24,7 @@ try:
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
            "Please create the file or rename the config.py.example file to config.py.")
-    sys.exit(0)
+    sys.exit(1)
 
 # Set logging
 log_format = logging.Formatter('%(asctime)s - %(name)s - '
@@ -90,17 +90,15 @@ def main(arguments):
             raise HostgroupError(e)
     # Set Zabbix API
     try:
-        zabbix = ZabbixAPI(zabbix_host, password=zabbix_pass)
-        if "ZABBIX_TOKEN" in env_vars:
-            zabbix.login(token=zabbix_token)
+        if not zabbix_token:
+            zabbix = ZabbixAPI(zabbix_host, user=zabbix_user, password=zabbix_pass)
         else:
-            m=("Logging in with Zabbix user and password,"
-                    " consider using an API token instead.")
-            logger.warning(m)
-            zabbix.login(user=zabbix_user, password=zabbix_pass)
-    except APIRequestError as e:
-        e = f"Zabbix returned the following error: {str(e)}."
+            zabbix = ZabbixAPI(zabbix_host, token=zabbix_token)
+        zabbix.check_auth()
+    except (APIRequestError, ProcessingError)  as e:
+        e = f"Zabbix returned the following error: {str(e)}"
         logger.error(e)
+        sys.exit(1)
     # Set API parameter mapping based on API version
     if not str(zabbix.version).startswith('7'):
         proxy_name = "host"
