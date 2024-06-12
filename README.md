@@ -48,10 +48,10 @@ services:
     volumes:
       - /etc/netbox-zabbix-sync/config.py:/opt/netbox-zabbix/config.py
     environment:
-      - ZABBIX_HOST=http://yourawesomezabbixserver.local:8080
-      - ZABBIX_TOKEN=<zabbix_api_token>
-      - NETBOX_HOST=http://yourawesomenetboxserver.local
-      - NETBOX_TOKEN=<netbox_api_token>
+      - ZABBIX_HOST=https://zabbix.local
+      - ZABBIX_TOKEN=<othersecrettoken>
+      - NETBOX_HOST=https://netbox.local
+      - NETBOX_TOKEN=<secrettoken>
 ```
 
 
