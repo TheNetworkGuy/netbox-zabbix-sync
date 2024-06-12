@@ -140,13 +140,13 @@ def main(arguments):
             if device.isCluster() and clustering:
                 # Check if device is primary or secondary
                 if device.promoteMasterDevice():
-                    e = (f"Device {device.name} is "
+                    e = (f"Device {device.name}: is "
                          f"part of cluster and primary.")
                     logger.info(e)
                 else:
                     # Device is secondary in cluster.
                     # Don't continue with this device.
-                    e = (f"Device {device.name} is part of cluster "
+                    e = (f"Device {device.name}: is part of cluster "
                          f"but not primary. Skipping this host...")
                     logger.info(e)
                     continue
@@ -156,11 +156,11 @@ def main(arguments):
                     # Delete device from Zabbix
                     # and remove hostID from Netbox.
                     device.cleanup()
-                    logger.info(f"Cleaned up host {device.name}.")
+                    logger.info(f"Device {device.name}: cleanup complete")
                     continue
                 # Device has been added to Netbox
                 # but is not in Activate state
-                logger.info(f"Skipping host {device.name} since its "
+                logger.info(f"Device {device.name}: skipping since this device is "
                             f"not in the active state.")
                 continue
             # Check if the device is in the disabled state

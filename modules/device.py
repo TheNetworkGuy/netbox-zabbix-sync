@@ -72,7 +72,7 @@ class NetworkDevice():
         if device_cf in self.nb.custom_fields:
             self.zabbix_id = self.nb.custom_fields[device_cf]
         else:
-            e = f"Custom field {device_cf} not found for {self.name}."
+            e = f"Device {self.name}: Custom field {device_cf} not present"
             self.logger.warning(e)
             raise SyncInventoryError(e)
 
@@ -273,7 +273,7 @@ class NetworkDevice():
         """
         # Check if there are templates defined
         if not self.zbx_template_names:
-            e = f"No templates found for device {self.name}"
+            e = f"Device {self.name}: No templates found"
             self.logger.info(e)
             raise SyncInventoryError()
         # Set variable to empty list
@@ -290,8 +290,7 @@ class NetworkDevice():
                     template_match = True
                     self.zbx_templates.append({"templateid": zbx_template['templateid'],
                                                "name": zbx_template['name']})
-                    e = (f"Found template {zbx_template['name']}"
-                        f" for host {self.name}.")
+                    e = f"Device {self.name}: found template {zbx_template['name']}"
                     self.logger.debug(e)
             # Return error should the template not be found in Zabbix
             if not template_match:
@@ -310,7 +309,7 @@ class NetworkDevice():
         for group in groups:
             if group['name'] == self.hostgroup:
                 self.group_id = group['groupid']
-                e = f"Found group {group['name']} for host {self.name}."
+                e = f"Device {self.name}: matched group {group['name']}"
                 self.logger.debug(e)
                 return True
         return False
@@ -325,7 +324,7 @@ class NetworkDevice():
                 self.zabbix.host.delete(self.zabbix_id)
                 self.nb.custom_fields[device_cf] = None
                 self.nb.save()
-                e = f"Deleted host {self.name} from Zabbix."
+                e = f"Device {self.name}: Deleted host from Zabbix."
                 self.logger.info(e)
                 self.create_journal_entry("warning", "Deleted host from Zabbix")
             except APIRequestError as e:
@@ -395,11 +394,11 @@ class NetworkDevice():
                         continue
                     # If the proxy name matches
                     if proxy["name"] == proxy_name:
+                        self.logger.debug(f"Device {self.name}: using {proxy['type']}"
+                                          f" {proxy_name}")
                         self.zbxproxy = proxy
                         return True
-                else:
-                    self.logger.warning(f"Device {self.name}: unable to find proxy {proxy_name}")
-                    break
+                self.logger.warning(f"Device {self.name}: unable to find proxy {proxy_name}")
         return False
 
     def createInZabbix(self, groups, templates, proxies,
@@ -450,17 +449,17 @@ class NetworkDevice():
                 host = self.zabbix.host.create(**create_data)
                 self.zabbix_id = host["hostids"][0]
             except APIRequestError as e:
-                e = f"Couldn't add {self.name}, Zabbix returned {str(e)}."
+                e = f"Device {self.name}: Couldn't create. Zabbix returned {str(e)}."
                 self.logger.error(e)
-                raise SyncExternalError(e) from e
+                raise SyncExternalError(e) from None
             # Set Netbox custom field to hostID value.
             self.nb.custom_fields[device_cf] = int(self.zabbix_id)
             self.nb.save()
-            msg = f"Created host {self.name} in Zabbix."
+            msg = f"Device {self.name}: Created host in Zabbix."
             self.logger.info(msg)
             self.create_journal_entry("success", msg)
         else:
-            e = f"Unable to add {self.name} to Zabbix: host already present."
+            e = f"Device {self.name}: Unable to add to Zabbix. Host already present."
             self.logger.warning(e)
 
     def createZabbixHostgroup(self):
@@ -474,7 +473,7 @@ class NetworkDevice():
             data = {'groupid': groupid["groupids"][0], 'name': self.hostgroup}
             return data
         except APIRequestError as e:
-            e = f"Couldn't add hostgroup, Zabbix returned {str(e)}."
+            e = f"Couldn't add hostgroup {self.hostgroup}, Zabbix returned {str(e)}."
             self.logger.error(e)
             raise SyncExternalError(e) from e
 
@@ -486,7 +485,8 @@ class NetworkDevice():
         try:
             self.zabbix.host.update(hostid=self.zabbix_id, **kwargs)
         except APIRequestError as e:
-            e = f"Zabbix returned the following error: {str(e)}."
+            e = (f"Device {self.name}: Unable to update. "
+                 f"Zabbix returned the following error: {str(e)}.")
             self.logger.error(e)
             raise SyncExternalError(e) from None
         self.logger.info(f"Updated host {self.name} with data {kwargs}.")
@@ -524,7 +524,7 @@ class NetworkDevice():
             self.logger.error(e)
             raise SyncInventoryError(e)
         if len(host) == 0:
-            e = (f"No Zabbix host found for {self.name}. "
+            e = (f"Device {self.name}: No Zabbix host found. "
                  f"This is likely the result of a deleted Zabbix host "
                  f"without zeroing the ID field in Netbox.")
             self.logger.error(e)
@@ -680,7 +680,7 @@ class NetworkDevice():
                 try:
                     # API call to Zabbix
                     self.zabbix.hostinterface.update(updates)
-                    e = f"Solved {self.name} interface conflict."
+                    e = f"Device {self.name}: solved interface conflict."
                     self.logger.info(e)
                     self.create_journal_entry("info", e)
                 except APIRequestError as e:
@@ -715,7 +715,7 @@ class NetworkDevice():
                        }
             try:
                 self.nb_journals.create(journal)
-                self.logger.debug(f"Created journal entry in NB for host {self.name}")
+                self.logger.debug(f"Device {self.name}: Created journal entry in Netbox")
                 return True
             except JournalError(e) as e:
                 self.logger.warning("Unable to create journal entry for "

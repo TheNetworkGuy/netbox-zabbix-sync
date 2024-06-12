@@ -13,12 +13,30 @@ class ZabbixInterface():
         self.skelet = {"main": "1", "useip": "1", "dns": "", "ip": self.ip}
         self.interface = self.skelet
 
+    def _set_default_port(self):
+        """Sets default TCP / UDP port for different interface types"""
+        interface_mapping = {
+            1: 10050,
+            2: 161,
+            3: 623,
+            4: 12345
+        }
+        # Check if interface type is listed in mapper.
+        if self.interface['type'] not in interface_mapping:
+            return False
+        # Set default port to interface
+        self.interface["port"] = str(interface_mapping[self.interface['type']])
+        return True
+
     def get_context(self):
         """ check if Netbox custom context has been defined. """
         if "zabbix" in self.context:
             zabbix = self.context["zabbix"]
-            if("interface_type" in zabbix and "interface_port" in zabbix):
+            if "interface_type" in zabbix:
                 self.interface["type"] = zabbix["interface_type"]
+                if not "interface_port" in zabbix:
+                    self._set_default_port()
+                    return True
                 self.interface["port"] = zabbix["interface_port"]
                 return True
             return False
