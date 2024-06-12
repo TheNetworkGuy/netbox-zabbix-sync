@@ -29,6 +29,31 @@ to override with your own config file if needed (see [config file](#config-file)
 ```
 docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ... 
 ```  
+### Docker Compose Example
+For users wanting to use docker compose for running the sync the example below can be used as a starting point.
+
+* Verify volume map matches your location
+* Update the environment variables to match your install
+  * Note: Do not wrap the vars in quotes
+
+```
+# example docker compose file for netbox to zabbix sync
+#
+
+services:
+  nbx-zbx-sync:
+    container_name: netbox-zabbix-sync
+    restart: no
+    image: ghcr.io/thenetworkguy/netbox-zabbix-sync:main
+    volumes:
+      - /etc/netbox-zabbix-sync/config.py:/opt/netbox-zabbix/config.py
+    environment:
+      - ZABBIX_HOST=http://yourawesomezabbixserver.local:8080
+      - ZABBIX_TOKEN=<zabbix_api_token>
+      - NETBOX_HOST=http://yourawesomenetboxserver.local
+      - NETBOX_TOKEN=<netbox_api_token>
+```
+
 
 ## Installation from Source
 
