@@ -29,6 +29,19 @@ to override with your own config file if needed (see [config file](#config-file)
 ```
 docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ... 
 ```  
+### Running via Docker Compose
+For users wanting to use docker compose for running the sync, utilize the docker-compose.yml file in the main repo as a starting point.
+
+* Verify volume map matches your actual location of the config file
+* Update the environment variables to match your install
+  * Note: Do not wrap the vars in quotes
+
+Once the compose file has been filled out run a one-time sync with:
+```
+docker compose up
+```
+The script, by design, runs on demand so it will need to be scheduled to run by the users prefered method.
+Successful completion of the script is noted by: ```exited with code 0```
 
 ## Installation from Source
 
