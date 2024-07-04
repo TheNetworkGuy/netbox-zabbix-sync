@@ -174,7 +174,7 @@ You can modify this behaviour by changing the following list variables in the sc
 This script allows you to enable the inventory on managed Zabbix hosts and sync NetBox device properties to the specified inventory fields.
 To enable, set `inventory_sync` to `True`.
 Set `inventory_automatic` to `False` to use manual inventory, or `True` for automatic.
-See [Zabix Manual](https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory) for more information about the modes.
+See [Zabbix Manual](https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory) for more information about the modes.
 
 Use the `inventory_map` variable to map which NetBox properties are used in which Zabbix Inventory fields.
 For nested properties, you can use the '/' seperator.
