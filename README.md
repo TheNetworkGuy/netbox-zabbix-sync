@@ -19,7 +19,7 @@ docker run -d -t -i -e ZABBIX_HOST='https://zabbix.local' \
 -e ZABBIX_TOKEN='othersecrettoken' \
 -e NETBOX_HOST='https://netbox.local' \
 -e NETBOX_TOKEN='secrettoken' \
---name netbox-zabbix-sync ghcr.io/TheNetworkGuy/netbox-zabbix-sync:latest
+--name netbox-zabbix-sync ghcr.io/thenetworkguy/netbox-zabbix-sync:main
 ```
 
 This should run a one-time sync, you can check the sync with `docker logs netbox-zabbix-sync`.
