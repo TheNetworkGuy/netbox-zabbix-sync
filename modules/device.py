@@ -371,10 +371,13 @@ class NetworkDevice():
         Sets proxy or proxy group if this
         value has been defined in config context
 
-        input: List of all proxies and proxy gorups in standardized format
+        input: List of all proxies and proxy groups in standardized format
         """
         # check if the key Zabbix is defined in the config context
         if not "zabbix" in self.nb.config_context:
+            return False
+        if ("proxy" in self.nb.config_context["zabbix"] and
+               not self.nb.config_context["zabbix"]["proxy"]):
             return False
         # Proxy group takes priority over a proxy due
         # to it being HA and therefore being more reliable
