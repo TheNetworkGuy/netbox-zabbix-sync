@@ -236,8 +236,8 @@ class NetworkDevice():
                     # Value is not a string or numeral, probably not what the user expected.
                     self.logger.error(f"Device {self.name}: Inventory lookup for '{nb_inv_field}'"
                                       " returned an unexpected type: it will be skipped.")
-        self.logger.debug(f"Device {self.name}: Inventory mapping complete. "
-                          f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
+            self.logger.debug(f"Device {self.name}: Inventory mapping complete. "
+                            f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
         return True
 
     def isCluster(self):
