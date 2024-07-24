@@ -16,7 +16,7 @@ try:
         traverse_site_groups,
         traverse_regions,
         inventory_sync,
-        inventory_automatic,
+        inventory_mode,
         inventory_map
     )
 except ModuleNotFoundError:
@@ -196,12 +196,23 @@ class NetworkDevice():
 
     def set_inventory(self, nbdevice):
         """ Set host inventory """
-        self.inventory_mode = -1
+        # Set inventory mode. Default is disabled (see class init function).
+        if inventory_mode == "disabled":
+            if inventory_sync:
+                self.logger.error(f"Device {self.name}: Unable to map Netbox inventory to Zabbix. "
+                              "Inventory sync is enabled in config but inventory mode is disabled.")
+            return True
+        if inventory_mode == "manual":
+            self.inventory_mode = 0
+        elif inventory_mode == "automatic":
+            self.inventory_mode = 1
+        else:
+            self.logger.error(f"Device {self.name}: Specified value for inventory mode in"
+                              f" config is not valid. Got value {inventory_mode}")
+            return False
         self.inventory = {}
-        if inventory_sync:
-            # Set inventory mode to automatic or manual
-            self.inventory_mode = 1 if inventory_automatic else 0
-
+        if inventory_sync and self.inventory_mode in [0,1]:
+            self.logger.debug(f"Device {self.name}: Starting inventory mapper")
             # Let's build an inventory dict for each property in the inventory_map
             for nb_inv_field, zbx_inv_field in inventory_map.items():
                 field_list = nb_inv_field.split("/") # convert str to list based on delimiter
@@ -218,13 +229,15 @@ class NetworkDevice():
                     self.inventory[zbx_inv_field] = str(value)
                 elif not value:
                     # empty value should just be an empty string for API compatibility
-                    self.logger.debug(f"Inventory lookup for '{nb_inv_field}'"
-                                      " returned an empty value")
+                    self.logger.debug(f"Device {self.name}: Netbox inventory lookup for "
+                                      f"'{nb_inv_field}' returned an empty value")
                     self.inventory[zbx_inv_field] = ""
                 else:
                     # Value is not a string or numeral, probably not what the user expected.
-                    self.logger.error(f"Inventory lookup for '{nb_inv_field}' returned"
-                                      " an unexpected type: it will be skipped.")
+                    self.logger.error(f"Device {self.name}: Inventory lookup for '{nb_inv_field}'"
+                                      " returned an unexpected type: it will be skipped.")
+        self.logger.debug(f"Device {self.name}: Inventory mapping complete. "
+                          f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
         return True
 
     def isCluster(self):
@@ -617,16 +630,14 @@ class NetworkDevice():
                                     "changes have been made.")
             if not proxy_set:
                 self.logger.debug(f"Device {self.name}: proxy in-sync.")
-        # Check host inventory
-        if inventory_sync:
-            # check inventory mode first, as we need it set to parse
-            # actual inventory values
-            if str(host['inventory_mode']) == str(self.inventory_mode):
-                self.logger.debug(f"Device {self.name}: inventory_mode in-sync.")
-            else:
-                self.logger.warning(f"Device {self.name}: inventory_mode OUT of sync.")
-                self.updateZabbixHost(inventory_mode=str(self.inventory_mode))
-            # Now we can check if inventory is in-sync.
+        # Check host inventory mode
+        if str(host['inventory_mode']) == str(self.inventory_mode):
+            self.logger.debug(f"Device {self.name}: inventory_mode in-sync.")
+        else:
+            self.logger.warning(f"Device {self.name}: inventory_mode OUT of sync.")
+            self.updateZabbixHost(inventory_mode=str(self.inventory_mode))
+        if inventory_sync and self.inventory_mode in [0,1]:
+            # Check host inventory mapping
             if host['inventory'] == self.inventory:
                 self.logger.debug(f"Device {self.name}: inventory in-sync.")
             else:

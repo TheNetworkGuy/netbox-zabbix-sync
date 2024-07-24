@@ -58,12 +58,13 @@ traverse_site_groups = False
 nb_device_filter = {"name__n": "null"}
 
 ## Inventory
+# See https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory
+# Choice between disabled, manual or automatic.
+# Make sure to select at least manual or automatic in use with the inventory_sync function.
+inventory_mode = "disabled"
+
 # To allow syncing of NetBox device properties, set inventory_sync to True
 inventory_sync = False
-
-# Set inventory_automatic to False to use manual inventory, True for automatic
-# See https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory 
-inventory_automatic = True
 
 # inventory_map is used to map NetBox properties to Zabbix Inventory fields.
 # For nested properties, you can use the '/' seperator.
