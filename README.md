@@ -174,7 +174,7 @@ You can modify this behaviour by changing the following list variables in the sc
 This script allows you to enable the inventory on managed Zabbix hosts and sync NetBox device properties to the specified inventory fields.
 To map Netbox information to Netbox inventory fields, set `inventory_sync` to `True`.
 
-You can set the inventory mode to "disabled", "manual" or "automatic" with the inventory_mode variable.
+You can set the inventory mode to "disabled", "manual" or "automatic" with the `inventory_mode` variable.
 See [Zabbix Manual](https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory) for more information about the modes.
 
 Use the `inventory_map` variable to map which NetBox properties are used in which Zabbix Inventory fields.
@@ -182,7 +182,7 @@ For nested properties, you can use the '/' seperator.
 For example, the following map will assign the custom field 'mycustomfield' to the 'alias' Zabbix inventory field:
 ```
 inventory_sync = True
-inventory_automatic = True
+inventory_mode = "manual"
 inventory_map = { "custom_fields/mycustomfield/name": "alias"}
 ```
 See `config.py.example` for an extensive example map.
