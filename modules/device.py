@@ -376,7 +376,7 @@ class NetworkDevice():
         # check if the key Zabbix is defined in the config context
         if not "zabbix" in self.nb.config_context:
             return False
-        if ("proxy" in self.nb.config_context["zabbix"] and 
+        if ("proxy" in self.nb.config_context["zabbix"] and
                not self.nb.config_context["zabbix"]["proxy"]):
             return False
         # Proxy group takes priority over a proxy due
