@@ -561,9 +561,13 @@ class NetworkDevice():
         # Check if the templates are in-sync
         if not self.zbx_template_comparer(host["parentTemplates"]):
             self.logger.warning(f"Device {self.name}: template(s) OUT of sync.")
+            # Prepare Templates for API parsing
+            templateids = []
+            for template in self.zbx_templates:
+                templateids.append({'templateid': template['templateid']})
             # Update Zabbix with NB templates and clear any old / lost templates
             self.updateZabbixHost(templates_clear=host["parentTemplates"],
-                                      templates=self.zbx_templates)
+                                      templates=templateids)
         else:
             self.logger.debug(f"Device {self.name}: template(s) in-sync.")
 
