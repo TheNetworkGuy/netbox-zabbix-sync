@@ -94,6 +94,8 @@ Setting the `create_hostgroups` variable to `False` requires manual hostgroup cr
 
 The format can be set with the `hostgroup_format` variable.
 
+Any nested parent hostgroups will also be created automatically.
+
 Make sure that the Zabbix user has proper permissions to create hosts.
 The hostgroups are in a nested format. This means that proper permissions only need to be applied to the site name hostgroup and cascaded to any child hostgroups.
 

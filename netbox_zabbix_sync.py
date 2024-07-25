@@ -173,16 +173,13 @@ def main(arguments):
                                         create_hostgroups)
                 continue
             # Add hostgroup is config is set
-            # and Hostgroup is not present in Zabbix
             if create_hostgroups:
-                for group in zabbix_groups:
-                    # If hostgroup is already present in Zabbix
-                    if group["name"] == device.hostgroup:
-                        break
-                else:
-                    # Create new hostgroup
-                    hostgroup = device.createZabbixHostgroup()
-                    zabbix_groups.append(hostgroup)
+                # Create new hostgroup. Potentially multiple groups if nested
+                hostgroups = device.createZabbixHostgroup(zabbix_groups)
+                # go through all newly created hostgroups
+                for group in hostgroups:
+                    # Add new hostgroups to zabbix group list
+                    zabbix_groups.append(group)
             # Add device to Zabbix
             device.createInZabbix(zabbix_groups, zabbix_templates,
                                     zabbix_proxy_list)

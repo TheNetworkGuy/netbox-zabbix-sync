@@ -312,9 +312,9 @@ class NetworkDevice():
                 self.logger.warning(e)
                 raise SyncInventoryError(e)
 
-    def getZabbixGroup(self, groups):
+    def setZabbixGroupID(self, groups):
         """
-        Returns Zabbix group ID
+        Sets Zabbix group ID as instance variable
         INPUT: list of hostgroups
         OUTPUT: True / False
         """
@@ -424,8 +424,8 @@ class NetworkDevice():
         """
         # Check if hostname is already present in Zabbix
         if not self._zabbixHostnameExists():
-            # Get group and template ID's for host
-            if not self.getZabbixGroup(groups):
+            # Set group and template ID's for host
+            if not self.setZabbixGroupID(groups):
                 e = (f"Unable to find group '{self.hostgroup}' "
                      f"for host {self.name} in Zabbix.")
                 self.logger.warning(e)
@@ -478,20 +478,43 @@ class NetworkDevice():
             e = f"Device {self.name}: Unable to add to Zabbix. Host already present."
             self.logger.warning(e)
 
-    def createZabbixHostgroup(self):
+    def createZabbixHostgroup(self, hostgroups):
         """
         Creates Zabbix host group based on hostgroup format.
+        Creates multiple when using a nested format.
         """
-        try:
-            groupid = self.zabbix.hostgroup.create(name=self.hostgroup)
-            e = f"Added hostgroup '{self.hostgroup}'."
-            self.logger.info(e)
-            data = {'groupid': groupid["groupids"][0], 'name': self.hostgroup}
-            return data
-        except APIRequestError as e:
-            e = f"Couldn't add hostgroup {self.hostgroup}, Zabbix returned {str(e)}."
-            self.logger.error(e)
-            raise SyncExternalError(e) from e
+        final_data = []
+        # Check if the hostgroup is in a nested format and check each parent
+        for pos in range(len(self.hostgroup.split('/'))):
+            zabbix_hg = self.hostgroup.rsplit('/', pos)[0]
+            if self.lookupZabbixHostgroup(hostgroups, zabbix_hg):
+                # Hostgroup already exists
+                continue
+            # Create new group
+            try:
+                # API call to Zabbix
+                groupid = self.zabbix.hostgroup.create(name=zabbix_hg)
+                e = f"Hostgroup '{zabbix_hg}': created in Zabbix."
+                self.logger.info(e)
+                # Add group to final data
+                final_data.append({'groupid': groupid["groupids"][0], 'name': zabbix_hg})
+            except APIRequestError as e:
+                e = f"Hostgroup '{zabbix_hg}': unable to create. Zabbix returned {str(e)}."
+                self.logger.error(e)
+                raise SyncExternalError(e) from e
+        return final_data
+
+    def lookupZabbixHostgroup(self, group_list, lookup_group):
+        """
+        Function to check if a hostgroup
+        exists in a list of Zabbix hostgroups
+        INPUT: Group list and group lookup
+        OUTPUT: Boolean
+        """
+        for group in group_list:
+            if group["name"] == lookup_group:
+                return True
+        return False
 
     def updateZabbixHost(self, **kwargs):
         """
@@ -513,13 +536,17 @@ class NetworkDevice():
         """
         Checks if Zabbix object is still valid with Netbox parameters.
         """
-        # Check if the hostgroup exists.
+        # Set Hostgroup ID
         # If not, create the hostgroup and try finding the group again
-        if not self.getZabbixGroup(groups):
+        if not self.setZabbixGroupID(groups):
+            # No hostgroup was found
             if create_hostgroups:
-                new_group = self.createZabbixHostgroup()
-                groups.append(new_group)
-                self.getZabbixGroup(groups)
+                # Script is allowed to create a new hostgroup
+                new_groups = self.createZabbixHostgroup(groups)
+                for group in new_groups:
+                    # Go through all newly created groups
+                    groups.append(group)
+                    self.setZabbixGroupID(groups)
             else:
                 e = (f"Device {self.name}: different hostgroup is required but "
                      "unable to create hostgroup without generation permission.")
