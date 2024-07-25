@@ -536,24 +536,26 @@ class NetworkDevice():
         """
         Checks if Zabbix object is still valid with Netbox parameters.
         """
-        # Set Hostgroup ID
-        # If not, create the hostgroup and try finding the group again
-        if not self.setZabbixGroupID(groups):
-            # No hostgroup was found
+        # If group is found or if the hostgroup is nested
+        if not self.setZabbixGroupID(groups) or len(self.hostgroup.split('/')) > 1:
             if create_hostgroups:
                 # Script is allowed to create a new hostgroup
                 new_groups = self.createZabbixHostgroup(groups)
                 for group in new_groups:
-                    # Go through all newly created groups
+                    # Add all new groups to the list of groups
                     groups.append(group)
-                    self.setZabbixGroupID(groups)
-            else:
-                e = (f"Device {self.name}: different hostgroup is required but "
-                     "unable to create hostgroup without generation permission.")
-                self.logger.warning(e)
-                raise SyncInventoryError(e)
+            # check if the initial group was not already found (and this is a nested folder check)
+            if not self.group_id:
+                # Function returns true / false but also sets GroupID
+                if not self.setZabbixGroupID(groups) and not create_hostgroups:
+                    e = (f"Device {self.name}: different hostgroup is required but "
+                        "unable to create hostgroup without generation permission.")
+                    self.logger.warning(e)
+                    raise SyncInventoryError(e)
+        # Prepare templates and proxy config
         self.zbxTemplatePrepper(templates)
         self.setProxy(proxies)
+        # Get host object from Zabbix
         host = self.zabbix.host.get(filter={'hostid': self.zabbix_id},
                                     selectInterfaces=['type', 'ip',
                                                       'port', 'details',
