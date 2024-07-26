@@ -19,7 +19,8 @@ try:
         zabbix_device_removal,
         zabbix_device_disable,
         hostgroup_format,
-        nb_device_filter
+        nb_device_filter,
+        device_cf
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -107,6 +108,7 @@ def main(arguments):
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.filter(**nb_device_filter)
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
+    netbox_virtual_chassis = convert_recordset((netbox.dcim.virtual_chassis.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
     zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
@@ -130,21 +132,44 @@ def main(arguments):
     for nb_device in netbox_devices:
         try:
             # Set device instance set data such as hostgroup and template information.
+            vcobj = None
             device = NetworkDevice(nb_device, zabbix, netbox_journals, nb_version,
-                                   create_journal, logger)
+                                   netbox_virtual_chassis, create_journal, logger)
             device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
             device.set_template(templates_config_context, templates_config_context_overrule)
             device.set_inventory(nb_device)
             # Checks if device is part of cluster.
             # Requires clustering variable
             if device.isCluster() and clustering:
+                vcobj = netbox.dcim.virtual_chassis.get(id=device.nb.virtual_chassis.id)
                 # Check if device is primary or secondary
-                if device.promoteMasterDevice():
+                if device.promoteMasterDevice(netbox_virtual_chassis):
                     e = (f"Device {device.name}: is "
                          f"part of cluster and primary.")
                     logger.info(e)
+                    # If the device has a Zabbix host ID, make sure to assign it
+                    # to the Virtual Chassis if that is not yet the case.
+                    if device.zabbix_id and not vcobj.custom_fields[device_cf]:
+                        logger.debug(f"Assigning Zabbix host id {device.zabbix_id}"
+                                        f" to Virtual Chassis {device.nb.virtual_chassis['name']}.")
+                        vcobj.custom_fields[device_cf] = int(device.zabbix_id)
+                        vcobj.save()
+                    # If the device does not have a Zabbix host ID, use the Virtual Cluster Zabbix ID
+                    elif vcobj.custom_fields[device_cf] and not device.zabbix_id:
+                        logger.debug(f"Assigning Zabbix host id {vcobj.custom_fields[device_cf]}"
+                                        f" to device {device.nb.name} based on cluster membership.")
+                        device.zabbix_id = int(vcobj.custom_fields[device_cf])
+                        device.nb.custom_fields[device_cf] = device.zabbix_id
+                        device.nb.save()
                 else:
-                    # Device is secondary in cluster.
+                    # if the device has a Zabbix host ID but is no longer master of the Virtual Chassis,
+                    # make sure to cleanup the host ID.
+                    if vcobj.custom_fields[device_cf] and device.zabbix_id:
+                        logger.debug(f"Device {device.name} cleanup old Zabbix host ID"
+                                        "{device.zabbix_id} artefact in NetBox.")
+                        device.nb.custom_fields[device_cf] = None
+                        device.nb.save()
+                    # Device is not primary in cluster.
                     # Don't continue with this device.
                     e = (f"Device {device.name}: is part of cluster "
                          f"but not primary. Skipping this host...")
@@ -183,6 +208,12 @@ def main(arguments):
             # Add device to Zabbix
             device.createInZabbix(zabbix_groups, zabbix_templates,
                                     zabbix_proxy_list)
+            # Make sure to save hostid in Virtual Chassis as well
+            if device.isCluster() and clustering and device.zabbix_id:
+                logger.debug(f"Assigning Zabbix host id {device.zabbix_id}"
+                                f" to Virtual Cluster {vcobj.name}")
+                vcobj.custom_fields[device_cf] = int(device.zabbix_id)
+                vcobj.save()
         except SyncError:
             pass
 
