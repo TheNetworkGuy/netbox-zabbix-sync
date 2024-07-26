@@ -13,6 +13,7 @@ from modules.tools import build_path
 try:
     from config import (
         template_cf, device_cf,
+        clustering, clusterip, clusterip_cf,
         traverse_site_groups,
         traverse_regions,
         inventory_sync,
@@ -31,7 +32,7 @@ class NetworkDevice():
     INPUT: (Netbox device class, ZabbixAPI class, journal flag, NB journal class)
     """
 
-    def __init__(self, nb, zabbix, nb_journal_class, nb_version, journal=None, logger=None):
+    def __init__(self, nb, zabbix, nb_journal_class, nb_version, nb_vcs, journal=None, logger=None):
         self.nb = nb
         self.id = nb.id
         self.name = nb.name
@@ -53,18 +54,27 @@ class NetworkDevice():
         self.inventory_mode = -1
         self.inventory = {}
         self.logger = logger if logger else getLogger(__name__)
-        self._setBasics()
+        self._setBasics(nb_vcs)
 
-    def _setBasics(self):
+    def _setBasics(self,nb_vcs):
         """
         Sets basic information like IP address.
         """
-        # Return error if device does not have primary IP.
+        self.ip = None
         if self.nb.primary_ip:
             self.cidr = self.nb.primary_ip.address
             self.ip = self.cidr.split("/")[0]
-        else:
-            e = f"Device {self.name}: no primary IP."
+        elif bool(self.nb.virtual_chassis) and clustering and clusterip:
+            devcluster = next((vc for vc in nb_vcs if vc['id'] == self.nb.virtual_chassis.id), None)
+            if (devcluster and clusterip_cf in devcluster['custom_fields'] and
+                      devcluster['custom_fields'][clusterip_cf]):
+                self.ip = devcluster['custom_fields'][clusterip_cf]['address'].split("/")[0]
+                self.logger.debug(f"Device {self.name} is cluster member, "
+                                      f"using primary cluster ip address {self.ip}.")
+
+        if not self.ip:
+            # Return error if device does not have primary IP.
+            e = f"Device {self.name} no primary IP, skipping this device."
             self.logger.info(e)
             raise SyncInventoryError(e)
 
@@ -262,7 +272,7 @@ class NetworkDevice():
             raise SyncInventoryError(e)
         return self.nb.virtual_chassis.master.id
 
-    def promoteMasterDevice(self):
+    def promoteMasterDevice(self,vcs):
         """
         If device is Primary in cluster,
         promote device name to the cluster name.

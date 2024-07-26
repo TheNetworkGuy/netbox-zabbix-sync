@@ -70,18 +70,26 @@ ZABBIX_TOKEN=othersecrettoken
 ### Netbox custom fields
 Use the following custom fields in Netbox (if you are using config context for the template information then the zabbix_template field is not required):
 ```
-* Type: Integer
 * Name: zabbix_hostid
+* Type: Integer
 * Required: False
 * Default: null
-* Object: dcim > device
+* Content types: DCIM > Device, DCIM > Virtual Chassis (optional)
 ```
 ```
-* Type: Text
 * Name: zabbix_template
+* Type: Text
 * Required: False
 * Default: null
-* Object: dcim > device_type
+* Content types: DCIM > Device Type
+```
+```
+* Name: primary_ip
+* Type: Object
+* Object type: IPAM > IP Address
+* Required: False
+* Default: null
+* Content types: DCIM > Virtual Chassis
 ```
 You can make the `zabbix_hostid` field hidden or read-only to prevent human intervention.
 
@@ -190,6 +198,13 @@ inventory_map = { "custom_fields/mycustomfield/name": "alias"}
 See `config.py.example` for an extensive example map.
 Any Zabix Inventory fields that are not included in the map will not be touched by the script, 
 so you can safely add manual values or use items to automatically add values to other fields.
+
+### Clustering 
+When `clustering` is set to `True`, the script will monitor devices within a a Virtual Chassis through the master device.
+If needed, when `clusterip` is set to `True`, the script will try to use the custom field name defined in `clusterip_cf` on the Virtual Chassis
+as the primary IP for the Master device. This is only true when the master device has no primary ip set.
+
+Setting this up allows you to use FHRP group assigned floating IPs to monitor your clusters which can be useful for a variety of vendors.
 
 ### Template source
 You can either use a Netbox device type custom field or Netbox config context for the Zabbix template information.

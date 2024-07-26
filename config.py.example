@@ -15,6 +15,11 @@ device_cf = "zabbix_hostid"
 ## Enable clustering of devices with virtual chassis setup
 clustering = False
 
+# Allow monitoring on shared cluster IP if no primary IP has been set on the master device.
+# clusterip_cf specifies which custom field contains the IP address object in the Virtual Chassis.
+clusterip = False
+clusterip_cf = "primary_ip"
+
 ## Enable hostgroup generation. Requires permissions in Zabbix
 create_hostgroups = True
 
