@@ -8,6 +8,7 @@ from os import environ, path, sys
 from pynetbox import api
 from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
 from modules.device import NetworkDevice
+from modules.virtualmachine import VirtualMachine
 from modules.tools import convert_recordset, proxy_prepper
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
 try:
@@ -19,7 +20,9 @@ try:
         zabbix_device_removal,
         zabbix_device_disable,
         hostgroup_format,
-        nb_device_filter
+        nb_device_filter,
+        sync_netbox_devices,
+        sync_virtual_machines
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -106,6 +109,7 @@ def main(arguments):
         proxy_name = "name"
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.filter(**nb_device_filter)
+    virtual_machines = netbox.virtualization.virtual_machines.all()
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
@@ -126,65 +130,51 @@ def main(arguments):
     # Get Netbox API version
     nb_version = netbox.version
 
-    # Go through all Netbox devices
-    for nb_device in netbox_devices:
-        try:
-            # Set device instance set data such as hostgroup and template information.
-            device = NetworkDevice(nb_device, zabbix, netbox_journals, nb_version,
-                                   create_journal, logger)
-            device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
-            device.set_template(templates_config_context, templates_config_context_overrule)
-            device.set_inventory(nb_device)
-            # Checks if device is part of cluster.
-            # Requires clustering variable
-            if device.isCluster() and clustering:
-                # Check if device is primary or secondary
-                if device.promoteMasterDevice():
-                    e = (f"Device {device.name}: is "
-                         f"part of cluster and primary.")
-                    logger.info(e)
-                else:
-                    # Device is secondary in cluster.
-                    # Don't continue with this device.
-                    e = (f"Device {device.name}: is part of cluster "
-                         f"but not primary. Skipping this host...")
-                    logger.info(e)
+    if sync_netbox_devices or sync_virtual_machines:
+        sync_entities(netbox_devices if sync_netbox_devices else [],
+                      virtual_machines if sync_virtual_machines else [],
+                      zabbix, netbox_journals, nb_version, create_journal, logger,
+                      hostgroup_format, netbox_site_groups, netbox_regions, templates_config_context,
+                      templates_config_context_overrule, clustering, zabbix_device_removal, zabbix_device_disable,
+                      zabbix_groups, zabbix_templates, zabbix_proxy_list, full_proxy_sync, create_hostgroups)
+
+def sync_entities(netbox_devices, virtual_machines, zabbix, netbox_journals, nb_version,
+                  create_journal, logger, hostgroup_format, netbox_site_groups,
+                  netbox_regions, templates_config_context, templates_config_context_overrule,
+                  clustering, zabbix_device_removal, zabbix_device_disable, zabbix_groups,
+                  zabbix_templates, zabbix_proxy_list, full_proxy_sync, create_hostgroups):
+    for entity_data, entity_class in [(netbox_devices, NetworkDevice), (virtual_machines, VirtualMachine)]:
+        for entity in entity_data:
+            try:
+                device = entity_class(entity, zabbix, netbox_journals, nb_version, create_journal, logger)
+                device.set_hostgroup(hostgroup_format, netbox_site_groups, netbox_regions)
+                device.set_template(templates_config_context, templates_config_context_overrule)
+                device.set_inventory(entity)
+                if device.isCluster() and clustering:
+                    if device.promoteMasterDevice():
+                        logger.info(f"{entity_class.__name__} {device.name}: is part of cluster and primary.")
+                    else:
+                        logger.info(f"{entity_class.__name__} {device.name}: is part of cluster but not primary. Skipping this host...")
+                        continue
+                if device.status in zabbix_device_removal:
+                    if device.zabbix_id:
+                        device.cleanup()
+                        logger.info(f"{entity_class.__name__} {device.name}: cleanup complete")
+                        continue
+                    logger.info(f"{entity_class.__name__} {device.name}: skipping since this device is not in the active state.")
                     continue
-            # Checks if device is in cleanup state
-            if device.status in zabbix_device_removal:
+                if device.status in zabbix_device_disable:
+                    device.zabbix_state = 1
                 if device.zabbix_id:
-                    # Delete device from Zabbix
-                    # and remove hostID from Netbox.
-                    device.cleanup()
-                    logger.info(f"Device {device.name}: cleanup complete")
+                    device.ConsistencyCheck(zabbix_groups, zabbix_templates, zabbix_proxy_list, full_proxy_sync, create_hostgroups)
                     continue
-                # Device has been added to Netbox
-                # but is not in Activate state
-                logger.info(f"Device {device.name}: skipping since this device is "
-                            f"not in the active state.")
-                continue
-            # Check if the device is in the disabled state
-            if device.status in zabbix_device_disable:
-                device.zabbix_state = 1
-            # Check if device is already in Zabbix
-            if device.zabbix_id:
-                device.ConsistencyCheck(zabbix_groups, zabbix_templates,
-                                        zabbix_proxy_list, full_proxy_sync,
-                                        create_hostgroups)
-                continue
-            # Add hostgroup is config is set
-            if create_hostgroups:
-                # Create new hostgroup. Potentially multiple groups if nested
-                hostgroups = device.createZabbixHostgroup(zabbix_groups)
-                # go through all newly created hostgroups
-                for group in hostgroups:
-                    # Add new hostgroups to zabbix group list
-                    zabbix_groups.append(group)
-            # Add device to Zabbix
-            device.createInZabbix(zabbix_groups, zabbix_templates,
-                                    zabbix_proxy_list)
-        except SyncError:
-            pass
+                if create_hostgroups:
+                    hostgroups = device.createZabbixHostgroup(zabbix_groups)
+                    for group in hostgroups:
+                        zabbix_groups.append(group)
+                device.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
+            except SyncError:
+                pass
 
 
 if __name__ == "__main__":

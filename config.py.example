@@ -27,6 +27,10 @@ create_journal = False
 # With this option disabled proxy's will only be added and modified for Zabbix hosts.
 full_proxy_sync = False
 
+## Enable/Disable syncing of devices and virtual machines. Choose if you only want to sync devices, virtual machines or both.
+sync_netbox_devices = True
+sync_virtual_machines = True
+
 ## Netbox to Zabbix device state convertion
 zabbix_device_removal = ["Decommissioning", "Inventory"]
 zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
