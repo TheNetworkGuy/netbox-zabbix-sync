@@ -21,6 +21,13 @@ create_hostgroups = True
 ## Create journal entries
 create_journal = False
 
+## Virtual machine sync
+# Set sync_vms to True in order to use this new feature
+# Use the hostgroup vm_hostgroup_format mapper for specific
+# hostgroup atributes of VM's such as cluster_type and cluster
+sync_vms = False
+vm_hostgroup_format = "cluster_type/cluster/role"
+
 ## Proxy Sync
 # Set to true to enable removal of proxy's under hosts. Use with caution and make sure that you specified
 # all the required proxy's in the device config context before enabeling this option.

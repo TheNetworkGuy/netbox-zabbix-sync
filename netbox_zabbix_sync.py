@@ -7,7 +7,8 @@ import argparse
 from os import environ, path, sys
 from pynetbox import api
 from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
-from modules.device import NetworkDevice
+from modules.device import PhysicalDevice
+from modules.virtualMachine import VirtualMachine
 from modules.tools import convert_recordset, proxy_prepper
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
 try:
@@ -19,7 +20,9 @@ try:
         zabbix_device_removal,
         zabbix_device_disable,
         hostgroup_format,
-        nb_device_filter
+        vm_hostgroup_format,
+        nb_device_filter,
+        sync_vms
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -106,6 +109,7 @@ def main(arguments):
         proxy_name = "name"
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.filter(**nb_device_filter)
+    netbox_vms = netbox.virtualization.virtual_machines.all() if sync_vms else list()
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
@@ -127,11 +131,53 @@ def main(arguments):
     nb_version = netbox.version
 
     # Go through all Netbox devices
-    for nb_device in netbox_devices:
-        try:
+    try:
+        for nb_vm in netbox_vms:
+            vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
+                                create_journal, logger)
+            vm.set_hostgroup(vm_hostgroup_format,netbox_site_groups,netbox_regions)
+            vm.set_vm_template()
+            vm.set_inventory(nb_vm)
+            print(f"Templates: {vm.zbx_template_names}")
+
+            # Checks if device is in cleanup state
+            if vm.status in zabbix_device_removal:
+                if vm.zabbix_id:
+                    # Delete device from Zabbix
+                    # and remove hostID from Netbox.
+                    vm.cleanup()
+                    logger.info(f"VM {vm.name}: cleanup complete")
+                    continue
+                # Device has been added to Netbox
+                # but is not in Activate state
+                logger.info(f"VM {vm.name}: skipping since this VM is "
+                            f"not in the active state.")
+                continue
+            # Check if the VM is in the disabled state
+            if vm.status in zabbix_device_disable:
+                vm.zabbix_state = 1
+            # Check if VM is already in Zabbix
+            if vm.zabbix_id:
+                vm.ConsistencyCheck(zabbix_groups, zabbix_templates,
+                                        zabbix_proxy_list, full_proxy_sync,
+                                        create_hostgroups)
+                continue
+            # Add hostgroup is config is set
+            if create_hostgroups:
+                # Create new hostgroup. Potentially multiple groups if nested
+                hostgroups = vm.createZabbixHostgroup(zabbix_groups)
+                # go through all newly created hostgroups
+                for group in hostgroups:
+                    # Add new hostgroups to zabbix group list
+                    zabbix_groups.append(group)
+            # Add VM to Zabbix
+            vm.createInZabbix(zabbix_groups, zabbix_templates,
+                                    zabbix_proxy_list)
+
+        for nb_device in netbox_devices:
             # Set device instance set data such as hostgroup and template information.
-            device = NetworkDevice(nb_device, zabbix, netbox_journals, nb_version,
-                                   create_journal, logger)
+            device = PhysicalDevice(nb_device, zabbix, netbox_journals, nb_version,
+                                    create_journal, logger)
             device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
             device.set_template(templates_config_context, templates_config_context_overrule)
             device.set_inventory(nb_device)
@@ -183,8 +229,8 @@ def main(arguments):
             # Add device to Zabbix
             device.createInZabbix(zabbix_groups, zabbix_templates,
                                     zabbix_proxy_list)
-        except SyncError:
-            pass
+    except SyncError:
+        pass
 
 
 if __name__ == "__main__":

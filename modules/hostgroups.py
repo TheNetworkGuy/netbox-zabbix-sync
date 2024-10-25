@@ -63,7 +63,9 @@ class Hostgroup():
             format_options["manufacturer"] = self.nb.device_type.manufacturer.name
         # Variables only applicable for VM's
         if self.type == "vm":
-            format_options["cluster"] = str(self.nb.cluster.name) if self.nb.cluster else None
+            format_options["cluster"] = self.nb.cluster.name
+            format_options["cluster_type"] = self.nb.cluster.type.name
+            
         self.format_options = format_options
 
     def generate(self, hg_format=None):
