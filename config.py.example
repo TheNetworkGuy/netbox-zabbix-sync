@@ -3,7 +3,7 @@
 # coming from config context instead of a custom field.
 templates_config_context = False
 
-# Set to true to give config context templates a 
+# Set to true to give config context templates a
 # higher priority then custom field templates
 templates_config_context_overrule = False
 
@@ -41,7 +41,7 @@ zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
 # 'Global/Europe/Netherlands/Amsterdam' instead of just 'Amsterdam'.
 #
 # traverse_site_groups controls the same behaviour for any assigned site_groups.   
-hostgroup_format = "site/manufacturer/dev_role"
+hostgroup_format = "site/manufacturer/role"
 traverse_regions = False
 traverse_site_groups = False
 
