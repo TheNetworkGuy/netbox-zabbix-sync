@@ -113,7 +113,7 @@ You can change this behaviour with the hostgroup_format variable. The following 
 |  name | description  |
 | ------------ | ------------ |
 |dev_location|The device location name|
-|dev_role|The device role name|
+|role|The device role name|
 |manufacturer|Manufacturer name|
 |region|The region name of the device|
 |site|Site name|
@@ -124,7 +124,7 @@ You can change this behaviour with the hostgroup_format variable. The following 
 
 You can specify the value like so, sperated by a "/":
 ```
-hostgroup_format = "tenant/site/dev_location/dev_role"
+hostgroup_format = "tenant/site/dev_location/role"
 ```
 **Group traversal**
 
