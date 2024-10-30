@@ -189,13 +189,13 @@ def main(arguments):
                 # Check if device is primary or secondary
                 if device.promoteMasterDevice():
                     e = (f"Device {device.name}: is "
-                            f"part of cluster and primary.")
+                         f"part of cluster and primary.")
                     logger.info(e)
                 else:
                     # Device is secondary in cluster.
                     # Don't continue with this device.
                     e = (f"Device {device.name}: is part of cluster "
-                            f"but not primary. Skipping this host...")
+                         f"but not primary. Skipping this host...")
                     logger.info(e)
                     continue
             # Checks if device is in cleanup state
