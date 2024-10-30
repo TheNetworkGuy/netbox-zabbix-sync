@@ -8,7 +8,7 @@ from os import environ, path, sys
 from pynetbox import api
 from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
 from modules.device import PhysicalDevice
-from modules.virtualMachine import VirtualMachine
+from modules.virtual_machine import VirtualMachine
 from modules.tools import convert_recordset, proxy_prepper
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
 try:

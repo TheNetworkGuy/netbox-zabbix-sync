@@ -42,14 +42,11 @@ class Hostgroup():
             # Add default formatting options
             # Check if a site is configured. A site is optional for VMs
             format_options["region"] = None
-            format_options["location"] = None
             format_options["site_group"] = None
             if self.nb.site:
                 if self.nb.site.region:
                     format_options["region"] = self.generate_parents("region",
                                                                      str(self.nb.site.region))
-                if self.nb.location:
-                    format_options["location"] = str(self.nb.location)
                 if self.nb.site.group:
                     format_options["site_group"] = self.generate_parents("site_group",
                                                                          str(self.nb.site.group))
@@ -61,11 +58,14 @@ class Hostgroup():
         # Variables only applicable for devices
         if self.type == "dev":
             format_options["manufacturer"] = self.nb.device_type.manufacturer.name
+            format_options["location"] = str(self.nb.location) if self.nb.location else None
         # Variables only applicable for VM's
         if self.type == "vm":
-            format_options["cluster"] = self.nb.cluster.name
-            format_options["cluster_type"] = self.nb.cluster.type.name
-            
+            # Check if a cluster is configured. Could also be configured in a site.
+            if self.nb.cluster:
+                format_options["cluster"] = self.nb.cluster.name
+                format_options["cluster_type"] = self.nb.cluster.type.name
+
         self.format_options = format_options
 
     def generate(self, hg_format=None):

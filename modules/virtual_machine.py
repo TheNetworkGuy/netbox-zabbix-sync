@@ -1,13 +1,13 @@
 """Module that hosts all functions for virtual machine processing"""
 
+from os import sys
 from modules.device import PhysicalDevice
 from modules.hostgroups import Hostgroup
 from modules.exceptions import TemplateError
 try:
     from config import (
         traverse_site_groups,
-        traverse_regions,
-        template_cf
+        traverse_regions
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -35,7 +35,12 @@ class VirtualMachine(PhysicalDevice):
         except TemplateError as e:
             self.logger.warning(e)
         return True
-    
-    def set_template(self, **kwargs):
-        """Simple wrapper fur underlying functions"""
+
+    def set_template(self, prefer_config_context=None, overrule_custom=None):
+        """
+        This wrapper takes the original function and
+        overwrites it with the set_vm_template function.
+        This function (set_template) is used by several
+        other functions such as the consistency check in the parent class.
+        """
         self.set_vm_template()
