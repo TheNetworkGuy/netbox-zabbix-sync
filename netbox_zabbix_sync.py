@@ -109,7 +109,7 @@ def main(arguments):
         proxy_name = "name"
     # Get all Zabbix and Netbox data
     netbox_devices = netbox.dcim.devices.filter(**nb_device_filter)
-    netbox_vms = netbox.virtualization.virtual_machines.all() if sync_vms else list()
+    netbox_vms = netbox.virtualization.virtual_machines.all() if sync_vms else []
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
@@ -138,7 +138,6 @@ def main(arguments):
             vm.set_hostgroup(vm_hostgroup_format,netbox_site_groups,netbox_regions)
             vm.set_vm_template()
             vm.set_inventory(nb_vm)
-            print(f"Templates: {vm.zbx_template_names}")
 
             # Checks if device is in cleanup state
             if vm.status in zabbix_device_removal:

@@ -5,9 +5,7 @@ from modules.tools import build_path
 class Hostgroup():
     """Hostgroup class for devices and VM's
     Takes type (vm or dev) and NB object"""
-    def __init__(self, obj_type, nb_obj, version,
-                 nested_sitegroup_flag, nested_region_flag,
-                 nb_groups, nb_regions):
+    def __init__(self, obj_type, nb_obj, version):
         if obj_type not in ("vm", "dev"):
             raise HostgroupError(f"Unable to create hostgroup with type {type}")
         self.type = str(obj_type)
@@ -15,8 +13,7 @@ class Hostgroup():
         self.name = self.nb.name
         self.nb_version = version
         # Used for nested data objects
-        self.nested_objects = {"site_group": {"flag": nested_sitegroup_flag, "data": nb_groups},
-                               "region": {"flag": nested_region_flag, "data": nb_regions}}
+        self.nested_objects = {}
         self._set_format_options()
 
     def __str__(self):
@@ -68,13 +65,19 @@ class Hostgroup():
 
         self.format_options = format_options
 
+    def set_nesting(self, nested_sitegroup_flag, nested_region_flag,
+                    nb_groups, nb_regions):
+        """Set nesting options for this Hostgroup"""
+        self.nested_objects = {"site_group": {"flag": nested_sitegroup_flag, "data": nb_groups},
+                               "region": {"flag": nested_region_flag, "data": nb_regions}}
+
     def generate(self, hg_format=None):
         """Generate hostgroup based on a provided format"""
         # Set format to default in case its not specified
         if not hg_format:
             hg_format = "site/manufacturer/role" if self.type == "dev" else "cluster/role"
         # Split all given names
-        hg_output = list()
+        hg_output = []
         hg_items = hg_format.split("/")
         for hg_item in hg_items:
             # Check if requested data is available as option for this host

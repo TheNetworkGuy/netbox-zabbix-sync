@@ -90,7 +90,7 @@ class ZabbixInterface():
             e = "Interface type is not SNMP, unable to set SNMP details"
             raise InterfaceConfigError(e)
 
-    def set_default(self):
+    def set_default_snmp(self):
         """ Set default config to SNMPv2, port 161 and community macro. """
         self.interface = self.skelet
         self.interface["type"] = "2"
@@ -98,3 +98,8 @@ class ZabbixInterface():
         self.interface["details"] = {"version": "2",
                                      "community": "{$SNMP_COMMUNITY}",
                                      "bulk": "1"}
+
+    def set_default_agent(self):
+        """Sets interface to Zabbix agent defaults"""
+        self.interface["type"] = "1"
+        self.interface["port"] = "10050"

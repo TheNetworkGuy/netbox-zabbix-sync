@@ -25,7 +25,7 @@ except ModuleNotFoundError:
     sys.exit(0)
 
 class PhysicalDevice():
-    # pylint: disable=too-many-instance-attributes, too-many-arguments
+    # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments
     """
     Represents Network device.
     INPUT: (Netbox device class, ZabbixAPI class, journal flag, NB journal class)
@@ -98,9 +98,9 @@ class PhysicalDevice():
     def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
         # Create new Hostgroup instance
-        hg = Hostgroup("dev", self.nb, self.nb_api_version,
-                       traverse_site_groups, traverse_regions,
-                       nb_site_groups, nb_regions)
+        hg = Hostgroup("dev", self.nb, self.nb_api_version)
+        # Set Hostgroup nesting options
+        hg.set_nesting(traverse_site_groups, traverse_regions, nb_site_groups, nb_regions)
         # Generate hostgroup based on hostgroup format
         self.hostgroup = hg.generate(hg_format)
 
@@ -301,9 +301,9 @@ class PhysicalDevice():
                 self.logger.info(e)
                 self.create_journal_entry("warning", "Deleted host from Zabbix")
             except APIRequestError as e:
-                e = f"Zabbix returned the following error: {str(e)}."
-                self.logger.error(e)
-                raise SyncExternalError(e) from e
+                message = f"Zabbix returned the following error: {str(e)}."
+                self.logger.error(message)
+                raise SyncExternalError(message) from e
 
     def _zabbixHostnameExists(self):
         """
@@ -332,12 +332,12 @@ class PhysicalDevice():
                 if interface.interface["type"] == 2:
                     interface.set_snmp()
             else:
-                interface.set_default()
+                interface.set_default_snmp()
             return [interface.interface]
         except InterfaceConfigError as e:
-            e = f"{self.name}: {e}"
-            self.logger.warning(e)
-            raise SyncInventoryError(e) from e
+            message = f"{self.name}: {e}"
+            self.logger.warning(message)
+            raise SyncInventoryError(message) from e
 
     def setProxy(self, proxy_list):
         """
@@ -459,9 +459,9 @@ class PhysicalDevice():
                 # Add group to final data
                 final_data.append({'groupid': groupid["groupids"][0], 'name': zabbix_hg})
             except APIRequestError as e:
-                e = f"Hostgroup '{zabbix_hg}': unable to create. Zabbix returned {str(e)}."
-                self.logger.error(e)
-                raise SyncExternalError(e) from e
+                msg = f"Hostgroup '{zabbix_hg}': unable to create. Zabbix returned {str(e)}."
+                self.logger.error(msg)
+                raise SyncExternalError(msg) from e
         return final_data
 
     def lookupZabbixHostgroup(self, group_list, lookup_group):
@@ -691,9 +691,9 @@ class PhysicalDevice():
                     self.logger.info(e)
                     self.create_journal_entry("info", e)
                 except APIRequestError as e:
-                    e = f"Zabbix returned the following error: {str(e)}."
-                    self.logger.error(e)
-                    raise SyncExternalError(e) from e
+                    msg = f"Zabbix returned the following error: {str(e)}."
+                    self.logger.error(msg)
+                    raise SyncExternalError(msg) from e
             else:
                 # If no updates are found, Zabbix interface is in-sync
                 e = f"Host {self.name}: interface in-sync."
