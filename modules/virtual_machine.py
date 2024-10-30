@@ -3,6 +3,7 @@
 """Module that hosts all functions for virtual machine processing"""
 
 from os import sys
+from logging import getLogger
 from modules.device import PhysicalDevice
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
@@ -23,11 +24,13 @@ class VirtualMachine(PhysicalDevice):
         super().__init__(*args, **kwargs)
         self.hostgroup = None
         self.zbx_template_names = None
+        if "logger" not in kwargs:
+            self.logger = getLogger(__name__)
 
     def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
         # Create new Hostgroup instance
-        hg = Hostgroup("vm", self.nb, self.nb_api_version)
+        hg = Hostgroup("vm", self.nb, self.nb_api_version, logger=self.logger)
         hg.set_nesting(traverse_site_groups, traverse_regions, nb_site_groups, nb_regions)
         # Generate hostgroup based on hostgroup format
         self.hostgroup = hg.generate(hg_format)
@@ -35,7 +38,6 @@ class VirtualMachine(PhysicalDevice):
     def set_vm_template(self):
         """ Set Template for VMs. Overwrites default class
         to skip a lookup of custom fields."""
-        self.zbx_template_names = None
         # Gather templates ONLY from the device specific context
         try:
             self.zbx_template_names = self.get_templates_context()

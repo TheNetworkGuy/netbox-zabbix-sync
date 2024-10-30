@@ -135,6 +135,7 @@ def main(arguments):
         try:
             vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
                                 create_journal, logger)
+            logger.debug(f"Host {vm.name}: started operations on VM.")
             vm.set_hostgroup(vm_hostgroup_format,netbox_site_groups,netbox_regions)
             vm.set_vm_template()
             vm.set_inventory(nb_vm)
@@ -180,6 +181,7 @@ def main(arguments):
             # Set device instance set data such as hostgroup and template information.
             device = PhysicalDevice(nb_device, zabbix, netbox_journals, nb_version,
                                     create_journal, logger)
+            logger.debug(f"Host {device.name}: started operations on device.")
             device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
             device.set_template(templates_config_context, templates_config_context_overrule)
             device.set_inventory(nb_device)

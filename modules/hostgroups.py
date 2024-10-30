@@ -1,13 +1,17 @@
 """Module for all hostgroup related code"""
+from logging import getLogger
 from modules.exceptions import HostgroupError
 from modules.tools import build_path
 
 class Hostgroup():
     """Hostgroup class for devices and VM's
     Takes type (vm or dev) and NB object"""
-    def __init__(self, obj_type, nb_obj, version):
+    def __init__(self, obj_type, nb_obj, version, logger=None):
+        self.logger = logger if logger else getLogger(__name__)
         if obj_type not in ("vm", "dev"):
-            raise HostgroupError(f"Unable to create hostgroup with type {type}")
+            msg = f"Unable to create hostgroup with type {type}"
+            self.logger.error()
+            raise HostgroupError(msg)
         self.type = str(obj_type)
         self.nb = nb_obj
         self.name = self.nb.name
@@ -33,9 +37,9 @@ class Hostgroup():
             # Role fix for Netbox <=3
             role = None
             if self.nb_version.startswith(("2", "3")) and self.type == "dev":
-                role = self.nb.device_role.name
+                role = self.nb.device_role.name if self.nb.device_role else None
             else:
-                role = self.nb.role.name
+                role = self.nb.role.name if self.nb.role else None
             # Add default formatting options
             # Check if a site is configured. A site is optional for VMs
             format_options["region"] = None
@@ -86,8 +90,10 @@ class Hostgroup():
                 cf_data = self.custom_field_lookup(hg_item)
                 # CF does not exist
                 if not cf_data["result"]:
-                    raise HostgroupError(f"Unable to generate hostgroup for host {self.name}. "
-                                         f"Item type {hg_item} not supported.")
+                    msg = (f"Unable to generate hostgroup for host {self.name}. "
+                           f"Item type {hg_item} not supported.")
+                    self.logger.error(msg)
+                    raise HostgroupError(msg)
                 # CF data is populated
                 if cf_data["cf"]:
                     hg_output.append(cf_data["cf"])
@@ -100,9 +106,12 @@ class Hostgroup():
         # Check if the hostgroup is populated with at least one item.
         if bool(hg_output):
             return "/".join(hg_output)
-        raise HostgroupError(f"Unable to generate hostgroup for host {self.name}."
-                             "Not enough valid items. This is most likely"
-                             "due to the use of custom fields that are empty.")
+        msg = (f"Unable to generate hostgroup for host {self.name}."
+               " Not enough valid items. This is most likely"
+               " due to the use of custom fields that are empty"
+               " or an invalid hostgroup format.")
+        self.logger.error(msg)
+        raise HostgroupError(msg)
 
     def list_formatoptions(self):
         """
