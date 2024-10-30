@@ -131,8 +131,8 @@ def main(arguments):
     nb_version = netbox.version
 
     # Go through all Netbox devices
-    try:
-        for nb_vm in netbox_vms:
+    for nb_vm in netbox_vms:
+        try:
             vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
                                 create_journal, logger)
             vm.set_hostgroup(vm_hostgroup_format,netbox_site_groups,netbox_regions)
@@ -172,8 +172,11 @@ def main(arguments):
             # Add VM to Zabbix
             vm.createInZabbix(zabbix_groups, zabbix_templates,
                                     zabbix_proxy_list)
+        except SyncError:
+            pass
 
-        for nb_device in netbox_devices:
+    for nb_device in netbox_devices:
+        try:
             # Set device instance set data such as hostgroup and template information.
             device = PhysicalDevice(nb_device, zabbix, netbox_journals, nb_version,
                                     create_journal, logger)
@@ -186,13 +189,13 @@ def main(arguments):
                 # Check if device is primary or secondary
                 if device.promoteMasterDevice():
                     e = (f"Device {device.name}: is "
-                         f"part of cluster and primary.")
+                            f"part of cluster and primary.")
                     logger.info(e)
                 else:
                     # Device is secondary in cluster.
                     # Don't continue with this device.
                     e = (f"Device {device.name}: is part of cluster "
-                         f"but not primary. Skipping this host...")
+                            f"but not primary. Skipping this host...")
                     logger.info(e)
                     continue
             # Checks if device is in cleanup state
@@ -228,8 +231,8 @@ def main(arguments):
             # Add device to Zabbix
             device.createInZabbix(zabbix_groups, zabbix_templates,
                                     zabbix_proxy_list)
-    except SyncError:
-        pass
+        except SyncError:
+            pass
 
 
 if __name__ == "__main__":
