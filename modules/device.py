@@ -145,12 +145,12 @@ class PhysicalDevice():
     def get_templates_context(self):
         """ Get Zabbix templates from the device context """
         if "zabbix" not in self.config_context:
-            e = ("Key 'zabbix' not found in config "
-                    f"context for template host {self.name}")
+            e = (f"Host {self.name}: Key 'zabbix' not found in config "
+                 "context for template")
             raise TemplateError(e)
         if "templates" not in self.config_context["zabbix"]:
-            e = ("Key 'templates' not found in config "
-                    f"context 'zabbix' for template host {self.name}")
+            e = (f"Host {self.name}: Key 'templates' not found in config "
+                 "context 'zabbix' for template host")
             raise TemplateError(e)
         return self.config_context["zabbix"]["templates"]
 

@@ -3,7 +3,6 @@
 """Module that hosts all functions for virtual machine processing"""
 
 from os import sys
-from logging import getLogger
 from modules.device import PhysicalDevice
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
