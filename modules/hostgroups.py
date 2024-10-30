@@ -50,7 +50,7 @@ class Hostgroup():
             format_options["role"] = role
             format_options["site"] = self.nb.site.name if self.nb.site else None
             format_options["tenant"] = str(self.nb.tenant) if self.nb.tenant else None
-            format_options["tenant_group"] = str(self.tenant.group) if self.nb.tenant else None
+            format_options["tenant_group"] = str(self.nb.tenant.group) if self.nb.tenant else None
             format_options["platform"] = self.nb.platform.name if self.nb.platform else None
         # Variables only applicable for devices
         if self.type == "dev":
