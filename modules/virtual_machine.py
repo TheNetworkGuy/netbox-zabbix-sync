@@ -24,8 +24,6 @@ class VirtualMachine(PhysicalDevice):
         super().__init__(*args, **kwargs)
         self.hostgroup = None
         self.zbx_template_names = None
-        if "logger" not in kwargs:
-            self.logger = getLogger(__name__)
 
     def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
