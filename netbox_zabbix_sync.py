@@ -79,7 +79,7 @@ def main(arguments):
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Check if the provided Hostgroup layout is valid
     hg_objects = hostgroup_format.split("/")
-    allowed_objects = ["dev_location", "role", "manufacturer", "region",
+    allowed_objects = ["location", "role", "manufacturer", "region",
                         "site", "site_group", "tenant", "tenant_group"]
     # Create API call to get all custom fields which are on the device objects
     device_cfs = netbox.extras.custom_fields.filter(type="text", content_type_id=23)
