@@ -136,13 +136,13 @@ def main(arguments):
             vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
                                 create_journal, logger)
             logger.debug(f"Host {vm.name}: started operations on VM.")
-            vm.set_hostgroup(vm_hostgroup_format,netbox_site_groups,netbox_regions)
-            # Check if a valid hostgroup has been found for this VM.
-            if not vm.hostgroup:
-                continue
             vm.set_vm_template()
             # Check if a valid template has been found for this VM.
             if not vm.zbx_template_names:
+                continue
+            vm.set_hostgroup(vm_hostgroup_format,netbox_site_groups,netbox_regions)
+            # Check if a valid hostgroup has been found for this VM.
+            if not vm.hostgroup:
                 continue
             # Temporary disable inventory sync for VM's
             # vm.set_inventory(nb_vm)
@@ -189,13 +189,13 @@ def main(arguments):
             device = PhysicalDevice(nb_device, zabbix, netbox_journals, nb_version,
                                     create_journal, logger)
             logger.debug(f"Host {device.name}: started operations on device.")
-            device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
-            # Check if a valid hostgroup has been found for this VM.
-            if not device.hostgroup:
-                continue
             device.set_template(templates_config_context, templates_config_context_overrule)
             # Check if a valid template has been found for this VM.
             if not device.zbx_template_names:
+                continue
+            device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
+            # Check if a valid hostgroup has been found for this VM.
+            if not device.hostgroup:
                 continue
             device.set_inventory(nb_device)
             # Checks if device is part of cluster.
