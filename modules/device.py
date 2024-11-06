@@ -146,11 +146,11 @@ class PhysicalDevice():
         """ Get Zabbix templates from the device context """
         if "zabbix" not in self.config_context:
             e = (f"Host {self.name}: Key 'zabbix' not found in config "
-                 "context for template")
+                 "context for template lookup")
             raise TemplateError(e)
         if "templates" not in self.config_context["zabbix"]:
             e = (f"Host {self.name}: Key 'templates' not found in config "
-                 "context 'zabbix' for template host")
+                 "context 'zabbix' for template lookup")
             raise TemplateError(e)
         return self.config_context["zabbix"]["templates"]
 

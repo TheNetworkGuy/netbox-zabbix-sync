@@ -6,6 +6,8 @@ import logging
 import argparse
 from os import environ, path, sys
 from pynetbox import api
+from pynetbox.core.query import RequestError as NBRequestError
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
 from modules.device import PhysicalDevice
 from modules.virtual_machine import VirtualMachine
@@ -82,7 +84,15 @@ def main(arguments):
     allowed_objects = ["location", "role", "manufacturer", "region",
                         "site", "site_group", "tenant", "tenant_group"]
     # Create API call to get all custom fields which are on the device objects
-    device_cfs = netbox.extras.custom_fields.filter(type="text", content_type_id=23)
+    try:
+        device_cfs = list(netbox.extras.custom_fields.filter(type="text", content_type_id=23))
+    except RequestsConnectionError:
+        logger.error(f"Unable to connect to Netbox with URL {netbox_host}."
+                     " Please check the URL and status of Netbox.")
+        sys.exit(1)
+    except NBRequestError as e:
+        logger.error(f"Netbox error: {e}")
+        sys.exit(1)
     for cf in device_cfs:
         allowed_objects.append(cf.name)
     for hg_object in hg_objects:
