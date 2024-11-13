@@ -119,8 +119,10 @@ def main(arguments):
     else:
         proxy_name = "name"
     # Get all Zabbix and Netbox data
-    netbox_devices = netbox.dcim.devices.filter(**nb_device_filter)
-    netbox_vms = netbox.virtualization.virtual_machines.filter(**vm_device_filter) if sync_vms else []
+    netbox_devices = list(netbox.dcim.devices.filter(**nb_device_filter))
+    netbox_vms = []
+    if sync_vms:
+        netbox_vms = list(netbox.virtualization.virtual_machines.filter(**vm_device_filter))
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
