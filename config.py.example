@@ -64,7 +64,7 @@ traverse_site_groups = False
 # Default device filter, only get devices which have a name in Netbox:
 nb_device_filter = {"name__n": "null"}
 # Default filter for VMs
-vm_device_filter = {"name__n": "null"}
+nb_vm_filter = {"name__n": "null"}
 
 ## Inventory
 # See https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory

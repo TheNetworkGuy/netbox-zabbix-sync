@@ -25,7 +25,7 @@ try:
         vm_hostgroup_format,
         nb_device_filter,
         sync_vms,
-        vm_device_filter
+        nb_vm_filter
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -122,7 +122,7 @@ def main(arguments):
     netbox_devices = list(netbox.dcim.devices.filter(**nb_device_filter))
     netbox_vms = []
     if sync_vms:
-        netbox_vms = list(netbox.virtualization.virtual_machines.filter(**vm_device_filter))
+        netbox_vms = list(netbox.virtualization.virtual_machines.filter(**nb_vm_filter))
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
