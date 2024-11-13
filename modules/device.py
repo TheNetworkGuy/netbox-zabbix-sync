@@ -4,6 +4,7 @@
 Device specific handeling for Netbox to Zabbix
 """
 from os import sys
+from re import search
 from logging import getLogger
 from zabbix_utils import APIRequestError
 from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalError,
@@ -85,7 +86,8 @@ class PhysicalDevice():
         # Validate hostname format.
         odd_character_list = ["ä", "ö", "ü", "Ä", "Ö", "Ü", "ß"]
         self.use_visible_name = False
-        if any(letter in self.name for letter in odd_character_list):
+        if (any(letter in self.name for letter in odd_character_list) or
+            bool(search('[\u0400-\u04FF]', self.name))):
             self.name = f"NETBOX_ID{self.id}"
             self.visible_name = self.nb.name
             self.use_visible_name = True
