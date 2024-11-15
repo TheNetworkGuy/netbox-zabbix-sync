@@ -296,16 +296,28 @@ class PhysicalDevice():
         """
         if self.zabbix_id:
             try:
-                self.zabbix.host.delete(self.zabbix_id)
-                self.nb.custom_fields[device_cf] = None
-                self.nb.save()
-                e = f"Host {self.name}: Deleted host from Zabbix."
+                # Check if the Zabbix host exists in Zabbix
+                zbx_host = bool(self.zabbix.host.get(filter={'hostid': self.zabbix_id},
+                                                     output=[]))
+                e = (f"Host {self.name}: was already deleted from Zabbix."
+                        " Removed link in Netbox.")
+                if zbx_host:
+                    # Delete host should it exists
+                    self.zabbix.host.delete(self.zabbix_id)
+                    e = f"Host {self.name}: Deleted host from Zabbix."
+                self.zeroize_cf()
                 self.logger.info(e)
                 self.create_journal_entry("warning", "Deleted host from Zabbix")
             except APIRequestError as e:
                 message = f"Zabbix returned the following error: {str(e)}."
                 self.logger.error(message)
                 raise SyncExternalError(message) from e
+
+    def zeroize_cf(self):
+        """Sets the hostID custom field in Netbox to zero,
+        effectively destroying the link"""
+        self.nb.custom_fields[device_cf] = None
+        self.nb.save()
 
     def _zabbixHostnameExists(self):
         """
