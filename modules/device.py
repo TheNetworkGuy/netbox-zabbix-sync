@@ -305,7 +305,7 @@ class PhysicalDevice():
                     # Delete host should it exists
                     self.zabbix.host.delete(self.zabbix_id)
                     e = f"Host {self.name}: Deleted host from Zabbix."
-                self.zeroize_cf()
+                self._zeroize_cf()
                 self.logger.info(e)
                 self.create_journal_entry("warning", "Deleted host from Zabbix")
             except APIRequestError as e:
@@ -313,7 +313,7 @@ class PhysicalDevice():
                 self.logger.error(message)
                 raise SyncExternalError(message) from e
 
-    def zeroize_cf(self):
+    def _zeroize_cf(self):
         """Sets the hostID custom field in Netbox to zero,
         effectively destroying the link"""
         self.nb.custom_fields[device_cf] = None
