@@ -87,10 +87,14 @@ You can make the `zabbix_hostid` field hidden or read-only to prevent human inte
 
 This is optional and there is a use case for leaving it read-write in the UI to manually change the ID. For example to re-run a sync.
 
-## Virtual Machine (MV) Syncing
+## Virtual Machine (VM) Syncing
 In order to use VM syncing, make sure that the zabbix_id custom field is also present on Virtual machine objects in Netbox.
-Furthermore, use the new config.py.example file and set the "sync_vms" variable to True.
-You can set the "vm_hostgroup_format" variable to new VM attributes which are not present on devices such as cluster types.
+
+Use the `config.py` file and set the `sync_vms` variable to `True`.
+
+You can set the `vm_hostgroup_format` variable to new VM attributes which are not present on devices such as cluster types.
+
+To enable filtering for VM's, check the `nb_vm_filter` variable out. It works the same as with the device filter. However note that not all filtering capabilities and properties of devices are applicable to VM's and vice-versa. Check the Netbox API documentation to see which filtering options are available for each object type.
 
 ## Config file
 
