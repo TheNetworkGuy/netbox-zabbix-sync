@@ -157,9 +157,6 @@ def main(arguments):
             # Check if a valid hostgroup has been found for this VM.
             if not vm.hostgroup:
                 continue
-            # Temporary disable inventory sync for VM's
-            # vm.set_inventory(nb_vm)
-
             # Checks if device is in cleanup state
             if vm.status in zabbix_device_removal:
                 if vm.zabbix_id:
