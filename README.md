@@ -92,41 +92,52 @@ In order to use VM syncing, make sure that the `zabbix_id` custom field is also 
 
 Use the `config.py` file and set the `sync_vms` variable to `True`.
 
-You can set the `vm_hostgroup_format` variable to new VM attributes which are not present on devices such as cluster types.
+You can set the `vm_hostgroup_format` variable to a customizable value for VM hostgroups. The default is `cluster_type/cluster/role`.
 
-To enable filtering for VM's, check the `nb_vm_filter` variable out. It works the same as with the device filter. However note that not all filtering capabilities and properties of devices are applicable to VM's and vice-versa. Check the Netbox API documentation to see which filtering options are available for each object type.
+To enable filtering for VM's, check the `nb_vm_filter` variable out. It works the same as with the device filter (see documentation under "Hostgroup layout"). Note that not all filtering capabilities and properties of devices are applicable to VM's and vice-versa. Check the Netbox API documentation to see which filtering options are available for each object type.
 
 ## Config file
 
 ### Hostgroup
-Setting the `create_hostgroups` variable to `False` requires manual hostgroup creation for devices in a new category.
+Setting the `create_hostgroups` variable to `False` requires manual hostgroup creation for devices in a new category. I would recommend setting this variable to `True` since leaving it on `False` results in a lot of manual work.
 
-The format can be set with the `hostgroup_format` variable.
+The format can be set with the `hostgroup_format` variable for devices and `vm_hostgroup_format` for devices.
 
-Any nested parent hostgroups will also be created automatically.
+Any nested parent hostgroups will also be created automatically. For instance the region `Berlin` with parent region `Germany` will create the hostgroup `Germany/Berlin`.
 
 Make sure that the Zabbix user has proper permissions to create hosts.
 The hostgroups are in a nested format. This means that proper permissions only need to be applied to the site name hostgroup and cascaded to any child hostgroups.
 
 #### Layout
 The default hostgroup layout is "site/manufacturer/device_role".
-
-**Variables**
-
 You can change this behaviour with the hostgroup_format variable. The following values can be used:
+
+**Both devices and virtual machines**
 |  name | description  |
 | ------------ | ------------ |
-|dev_location|The device location name|
-|role|The device role name|
-|manufacturer|Manufacturer name|
-|region|The region name of the device|
+|role|Role name of a device or VM|
+|region|The region name|
 |site|Site name|
 |site_group|Site group name|
 |tenant|Tenant name|
 |tenant_group|Tenant group name|
+|platform|Software platform of a device or VM|
+|custom fields|See the section "Layout -> Custom Fields" to use custom fields as hostgroup variable|
+
+**Only for devices**
+|  name | description  |
+| ------------ | ------------ |
+|location|The device location name|
+|manufacturer|Device manufacturer name|
+
+**Only for VMs**
+|  name | description  |
+| ------------ | ------------ |
+|cluster|VM cluster name|
+|cluster_type|VM cluster type|
 
 
-You can specify the value like so, sperated by a "/":
+You can specify the value sperated by a "/" like so:
 ```
 hostgroup_format = "tenant/site/dev_location/role"
 ```
@@ -138,11 +149,18 @@ However, by setting `traverse_region` to `True` in `config.py` the script will r
 
 **Custom fields**
 
-You can also use the value of custom fields under the device object.
+You can use the value of custom fields for hostgroup generation. This allows more freedom and even allows a full static mapping instead of a dynamic rendered hostgroup name.
 
-This allows more freedom and even allows a full static mapping instead of a dynamic rendered hostgroup name.
+For instance a custom field with the name `mycustomfieldname` and type string has the following values for 2 devices:
 ```
-hostgroup_format = "site/mycustomfieldname"
+Device A has the value Train for custom field mycustomfieldname.
+Device B has the value Bus for custom field mycustomfieldname.
+Both devices are located in the site Paris.
+```
+With the hostgroup format `site/mycustomfieldname` the following hostgroups will be generated:
+```
+Device A: Paris/Train
+Device B: Paris/Bus
 ```
 **Empty variables or hostgroups**
 
