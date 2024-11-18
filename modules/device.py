@@ -4,12 +4,13 @@
 Device specific handeling for Netbox to Zabbix
 """
 from os import sys
+from re import search
 from logging import getLogger
 from zabbix_utils import APIRequestError
 from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalError,
                                 InterfaceConfigError, JournalError)
 from modules.interface import ZabbixInterface
-from modules.tools import build_path
+from modules.hostgroups import Hostgroup
 try:
     from config import (
         template_cf, device_cf,
@@ -24,8 +25,8 @@ except ModuleNotFoundError:
            "Please create the file or rename the config.py.example file to config.py.")
     sys.exit(0)
 
-class NetworkDevice():
-    # pylint: disable=too-many-instance-attributes, too-many-arguments
+class PhysicalDevice():
+    # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments
     """
     Represents Network device.
     INPUT: (Netbox device class, ZabbixAPI class, journal flag, NB journal class)
@@ -55,6 +56,12 @@ class NetworkDevice():
         self.logger = logger if logger else getLogger(__name__)
         self._setBasics()
 
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return self.__repr__()
+
     def _setBasics(self):
         """
         Sets basic information like IP address.
@@ -64,7 +71,7 @@ class NetworkDevice():
             self.cidr = self.nb.primary_ip.address
             self.ip = self.cidr.split("/")[0]
         else:
-            e = f"Device {self.name}: no primary IP."
+            e = f"Host {self.name}: no primary IP."
             self.logger.info(e)
             raise SyncInventoryError(e)
 
@@ -72,18 +79,19 @@ class NetworkDevice():
         if device_cf in self.nb.custom_fields:
             self.zabbix_id = self.nb.custom_fields[device_cf]
         else:
-            e = f"Device {self.name}: Custom field {device_cf} not present"
+            e = f"Host {self.name}: Custom field {device_cf} not present"
             self.logger.warning(e)
             raise SyncInventoryError(e)
 
         # Validate hostname format.
         odd_character_list = ["ä", "ö", "ü", "Ä", "Ö", "Ü", "ß"]
         self.use_visible_name = False
-        if any(letter in self.name for letter in odd_character_list):
+        if (any(letter in self.name for letter in odd_character_list) or
+            bool(search('[\u0400-\u04FF]', self.name))):
             self.name = f"NETBOX_ID{self.id}"
             self.visible_name = self.nb.name
             self.use_visible_name = True
-            self.logger.info(f"Device {self.visible_name} contains special characters. "
+            self.logger.info(f"Host {self.visible_name} contains special characters. "
                              f"Using {self.name} as name for the Netbox object "
                              f"and using {self.visible_name} as visible name in Zabbix.")
         else:
@@ -91,58 +99,12 @@ class NetworkDevice():
 
     def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
-        # Get all variables from the NB data
-        dev_location = str(self.nb.location) if self.nb.location else None
-        # Check the Netbox version. Use backwards compatibility for versions 2 and 3.
-        if self.nb_api_version.startswith(("2", "3")):
-            dev_role = self.nb.device_role.name
-        else:
-            dev_role = self.nb.role.name
-        manufacturer = self.nb.device_type.manufacturer.name
-        region = str(self.nb.site.region) if self.nb.site.region else None
-        site = self.nb.site.name
-        site_group = str(self.nb.site.group) if self.nb.site.group else None
-        tenant = str(self.tenant) if self.tenant else None
-        tenant_group = str(self.tenant.group) if tenant else None
-        # Set mapper for string -> variable
-        hostgroup_vars = {"dev_location": dev_location, "dev_role": dev_role,
-                          "manufacturer": manufacturer, "region": region,
-                          "site": site, "site_group": site_group,
-                          "tenant": tenant, "tenant_group": tenant_group}
-        # Generate list based off string input format
-        hg_items = hg_format.split("/")
-        hostgroup = ""
-        # Go through all hostgroup items
-        for item in hg_items:
-            # Check if the variable (such as Tenant) is empty.
-            if not hostgroup_vars[item]:
-                continue
-            # Check if the item is a custom field name
-            if item not in hostgroup_vars:
-                cf_value = self.nb.custom_fields[item] if item in self.nb.custom_fields else None
-                if cf_value:
-                    # If there is a cf match, add the value of this cf to the hostgroup
-                    hostgroup += cf_value + "/"
-                # Should there not be a match, this means that
-                # the variable is invalid. Skip regardless.
-                continue
-            # Add value of predefined variable to hostgroup format
-            if item == "site_group" and nb_site_groups and traverse_site_groups:
-                group_path = build_path(site_group, nb_site_groups)
-                hostgroup += "/".join(group_path) + "/"
-            elif item == "region" and nb_regions and traverse_regions:
-                region_path = build_path(region, nb_regions)
-                hostgroup += "/".join(region_path) + "/"
-            else:
-                hostgroup += hostgroup_vars[item] + "/"
-        # If the final hostgroup variable is empty
-        if not hostgroup:
-            e = (f"{self.name} has no reliable hostgroup. This is"
-                 "most likely due to the use of custom fields that are empty.")
-            self.logger.error(e)
-            raise SyncInventoryError(e)
-        # Remove final inserted "/" and set hostgroup to class var
-        self.hostgroup = hostgroup.rstrip("/")
+        # Create new Hostgroup instance
+        hg = Hostgroup("dev", self.nb, self.nb_api_version)
+        # Set Hostgroup nesting options
+        hg.set_nesting(traverse_site_groups, traverse_regions, nb_site_groups, nb_regions)
+        # Generate hostgroup based on hostgroup format
+        self.hostgroup = hg.generate(hg_format)
 
     def set_template(self, prefer_config_context, overrule_custom):
         """ Set Template """
@@ -185,12 +147,12 @@ class NetworkDevice():
     def get_templates_context(self):
         """ Get Zabbix templates from the device context """
         if "zabbix" not in self.config_context:
-            e = ("Key 'zabbix' not found in config "
-                    f"context for template host {self.name}")
+            e = (f"Host {self.name}: Key 'zabbix' not found in config "
+                 "context for template lookup")
             raise TemplateError(e)
         if "templates" not in self.config_context["zabbix"]:
-            e = ("Key 'templates' not found in config "
-                    f"context 'zabbix' for template host {self.name}")
+            e = (f"Host {self.name}: Key 'templates' not found in config "
+                 "context 'zabbix' for template lookup")
             raise TemplateError(e)
         return self.config_context["zabbix"]["templates"]
 
@@ -199,7 +161,7 @@ class NetworkDevice():
         # Set inventory mode. Default is disabled (see class init function).
         if inventory_mode == "disabled":
             if inventory_sync:
-                self.logger.error(f"Device {self.name}: Unable to map Netbox inventory to Zabbix. "
+                self.logger.error(f"Host {self.name}: Unable to map Netbox inventory to Zabbix. "
                               "Inventory sync is enabled in config but inventory mode is disabled.")
             return True
         if inventory_mode == "manual":
@@ -207,12 +169,12 @@ class NetworkDevice():
         elif inventory_mode == "automatic":
             self.inventory_mode = 1
         else:
-            self.logger.error(f"Device {self.name}: Specified value for inventory mode in"
+            self.logger.error(f"Host {self.name}: Specified value for inventory mode in"
                               f" config is not valid. Got value {inventory_mode}")
             return False
         self.inventory = {}
         if inventory_sync and self.inventory_mode in [0,1]:
-            self.logger.debug(f"Device {self.name}: Starting inventory mapper")
+            self.logger.debug(f"Host {self.name}: Starting inventory mapper")
             # Let's build an inventory dict for each property in the inventory_map
             for nb_inv_field, zbx_inv_field in inventory_map.items():
                 field_list = nb_inv_field.split("/") # convert str to list based on delimiter
@@ -229,14 +191,14 @@ class NetworkDevice():
                     self.inventory[zbx_inv_field] = str(value)
                 elif not value:
                     # empty value should just be an empty string for API compatibility
-                    self.logger.debug(f"Device {self.name}: Netbox inventory lookup for "
+                    self.logger.debug(f"Host {self.name}: Netbox inventory lookup for "
                                       f"'{nb_inv_field}' returned an empty value")
                     self.inventory[zbx_inv_field] = ""
                 else:
                     # Value is not a string or numeral, probably not what the user expected.
-                    self.logger.error(f"Device {self.name}: Inventory lookup for '{nb_inv_field}'"
+                    self.logger.error(f"Host {self.name}: Inventory lookup for '{nb_inv_field}'"
                                       " returned an unexpected type: it will be skipped.")
-            self.logger.debug(f"Device {self.name}: Inventory mapping complete. "
+            self.logger.debug(f"Host {self.name}: Inventory mapping complete. "
                             f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
         return True
 
@@ -270,12 +232,12 @@ class NetworkDevice():
         """
         masterid = self.getClusterMaster()
         if masterid == self.id:
-            self.logger.debug(f"Device {self.name} is primary cluster member. "
+            self.logger.debug(f"Host {self.name} is primary cluster member. "
                               f"Modifying hostname from {self.name} to " +
                               f"{self.nb.virtual_chassis.name}.")
             self.name = self.nb.virtual_chassis.name
             return True
-        self.logger.debug(f"Device {self.name} is non-primary cluster member.")
+        self.logger.debug(f"Host {self.name} is non-primary cluster member.")
         return False
 
     def zbxTemplatePrepper(self, templates):
@@ -286,7 +248,7 @@ class NetworkDevice():
         """
         # Check if there are templates defined
         if not self.zbx_template_names:
-            e = f"Device {self.name}: No templates found"
+            e = f"Host {self.name}: No templates found"
             self.logger.info(e)
             raise SyncInventoryError()
         # Set variable to empty list
@@ -303,7 +265,7 @@ class NetworkDevice():
                     template_match = True
                     self.zbx_templates.append({"templateid": zbx_template['templateid'],
                                                "name": zbx_template['name']})
-                    e = f"Device {self.name}: found template {zbx_template['name']}"
+                    e = f"Host {self.name}: found template {zbx_template['name']}"
                     self.logger.debug(e)
             # Return error should the template not be found in Zabbix
             if not template_match:
@@ -322,7 +284,7 @@ class NetworkDevice():
         for group in groups:
             if group['name'] == self.hostgroup:
                 self.group_id = group['groupid']
-                e = f"Device {self.name}: matched group {group['name']}"
+                e = f"Host {self.name}: matched group {group['name']}"
                 self.logger.debug(e)
                 return True
         return False
@@ -334,16 +296,28 @@ class NetworkDevice():
         """
         if self.zabbix_id:
             try:
-                self.zabbix.host.delete(self.zabbix_id)
-                self.nb.custom_fields[device_cf] = None
-                self.nb.save()
-                e = f"Device {self.name}: Deleted host from Zabbix."
+                # Check if the Zabbix host exists in Zabbix
+                zbx_host = bool(self.zabbix.host.get(filter={'hostid': self.zabbix_id},
+                                                     output=[]))
+                e = (f"Host {self.name}: was already deleted from Zabbix."
+                        " Removed link in Netbox.")
+                if zbx_host:
+                    # Delete host should it exists
+                    self.zabbix.host.delete(self.zabbix_id)
+                    e = f"Host {self.name}: Deleted host from Zabbix."
+                self._zeroize_cf()
                 self.logger.info(e)
                 self.create_journal_entry("warning", "Deleted host from Zabbix")
             except APIRequestError as e:
-                e = f"Zabbix returned the following error: {str(e)}."
-                self.logger.error(e)
-                raise SyncExternalError(e) from e
+                message = f"Zabbix returned the following error: {str(e)}."
+                self.logger.error(message)
+                raise SyncExternalError(message) from e
+
+    def _zeroize_cf(self):
+        """Sets the hostID custom field in Netbox to zero,
+        effectively destroying the link"""
+        self.nb.custom_fields[device_cf] = None
+        self.nb.save()
 
     def _zabbixHostnameExists(self):
         """
@@ -372,12 +346,12 @@ class NetworkDevice():
                 if interface.interface["type"] == 2:
                     interface.set_snmp()
             else:
-                interface.set_default()
+                interface.set_default_snmp()
             return [interface.interface]
         except InterfaceConfigError as e:
-            e = f"{self.name}: {e}"
-            self.logger.warning(e)
-            raise SyncInventoryError(e) from e
+            message = f"{self.name}: {e}"
+            self.logger.warning(message)
+            raise SyncInventoryError(message) from e
 
     def setProxy(self, proxy_list):
         """
@@ -410,11 +384,11 @@ class NetworkDevice():
                         continue
                     # If the proxy name matches
                     if proxy["name"] == proxy_name:
-                        self.logger.debug(f"Device {self.name}: using {proxy['type']}"
+                        self.logger.debug(f"Host {self.name}: using {proxy['type']}"
                                           f" {proxy_name}")
                         self.zbxproxy = proxy
                         return True
-                self.logger.warning(f"Device {self.name}: unable to find proxy {proxy_name}")
+                self.logger.warning(f"Host {self.name}: unable to find proxy {proxy_name}")
         return False
 
     def createInZabbix(self, groups, templates, proxies,
@@ -465,17 +439,17 @@ class NetworkDevice():
                 host = self.zabbix.host.create(**create_data)
                 self.zabbix_id = host["hostids"][0]
             except APIRequestError as e:
-                e = f"Device {self.name}: Couldn't create. Zabbix returned {str(e)}."
+                e = f"Host {self.name}: Couldn't create. Zabbix returned {str(e)}."
                 self.logger.error(e)
                 raise SyncExternalError(e) from None
             # Set Netbox custom field to hostID value.
             self.nb.custom_fields[device_cf] = int(self.zabbix_id)
             self.nb.save()
-            msg = f"Device {self.name}: Created host in Zabbix."
+            msg = f"Host {self.name}: Created host in Zabbix."
             self.logger.info(msg)
             self.create_journal_entry("success", msg)
         else:
-            e = f"Device {self.name}: Unable to add to Zabbix. Host already present."
+            e = f"Host {self.name}: Unable to add to Zabbix. Host already present."
             self.logger.warning(e)
 
     def createZabbixHostgroup(self, hostgroups):
@@ -499,9 +473,9 @@ class NetworkDevice():
                 # Add group to final data
                 final_data.append({'groupid': groupid["groupids"][0], 'name': zabbix_hg})
             except APIRequestError as e:
-                e = f"Hostgroup '{zabbix_hg}': unable to create. Zabbix returned {str(e)}."
-                self.logger.error(e)
-                raise SyncExternalError(e) from e
+                msg = f"Hostgroup '{zabbix_hg}': unable to create. Zabbix returned {str(e)}."
+                self.logger.error(msg)
+                raise SyncExternalError(msg) from e
         return final_data
 
     def lookupZabbixHostgroup(self, group_list, lookup_group):
@@ -524,7 +498,7 @@ class NetworkDevice():
         try:
             self.zabbix.host.update(hostid=self.zabbix_id, **kwargs)
         except APIRequestError as e:
-            e = (f"Device {self.name}: Unable to update. "
+            e = (f"Host {self.name}: Unable to update. "
                  f"Zabbix returned the following error: {str(e)}.")
             self.logger.error(e)
             raise SyncExternalError(e) from None
@@ -548,7 +522,7 @@ class NetworkDevice():
             if not self.group_id:
                 # Function returns true / false but also sets GroupID
                 if not self.setZabbixGroupID(groups) and not create_hostgroups:
-                    e = (f"Device {self.name}: different hostgroup is required but "
+                    e = (f"Host {self.name}: different hostgroup is required but "
                         "unable to create hostgroup without generation permission.")
                     self.logger.warning(e)
                     raise SyncInventoryError(e)
@@ -569,30 +543,30 @@ class NetworkDevice():
             self.logger.error(e)
             raise SyncInventoryError(e)
         if len(host) == 0:
-            e = (f"Device {self.name}: No Zabbix host found. "
+            e = (f"Host {self.name}: No Zabbix host found. "
                  f"This is likely the result of a deleted Zabbix host "
                  f"without zeroing the ID field in Netbox.")
             self.logger.error(e)
             raise SyncInventoryError(e)
         host = host[0]
         if host["host"] == self.name:
-            self.logger.debug(f"Device {self.name}: hostname in-sync.")
+            self.logger.debug(f"Host {self.name}: hostname in-sync.")
         else:
-            self.logger.warning(f"Device {self.name}: hostname OUT of sync. "
+            self.logger.warning(f"Host {self.name}: hostname OUT of sync. "
                                 f"Received value: {host['host']}")
             self.updateZabbixHost(host=self.name)
         # Execute check depending on wether the name is special or not
         if self.use_visible_name:
             if host["name"] == self.visible_name:
-                self.logger.debug(f"Device {self.name}: visible name in-sync.")
+                self.logger.debug(f"Host {self.name}: visible name in-sync.")
             else:
-                self.logger.warning(f"Device {self.name}: visible name OUT of sync."
+                self.logger.warning(f"Host {self.name}: visible name OUT of sync."
                                     f" Received value: {host['name']}")
                 self.updateZabbixHost(name=self.visible_name)
 
         # Check if the templates are in-sync
         if not self.zbx_template_comparer(host["parentTemplates"]):
-            self.logger.warning(f"Device {self.name}: template(s) OUT of sync.")
+            self.logger.warning(f"Host {self.name}: template(s) OUT of sync.")
             # Prepare Templates for API parsing
             templateids = []
             for template in self.zbx_templates:
@@ -601,33 +575,33 @@ class NetworkDevice():
             self.updateZabbixHost(templates_clear=host["parentTemplates"],
                                       templates=templateids)
         else:
-            self.logger.debug(f"Device {self.name}: template(s) in-sync.")
+            self.logger.debug(f"Host {self.name}: template(s) in-sync.")
 
         for group in host["groups"]:
             if group["groupid"] == self.group_id:
-                self.logger.debug(f"Device {self.name}: hostgroup in-sync.")
+                self.logger.debug(f"Host {self.name}: hostgroup in-sync.")
                 break
         else:
-            self.logger.warning(f"Device {self.name}: hostgroup OUT of sync.")
+            self.logger.warning(f"Host {self.name}: hostgroup OUT of sync.")
             self.updateZabbixHost(groups={'groupid': self.group_id})
 
         if int(host["status"]) == self.zabbix_state:
-            self.logger.debug(f"Device {self.name}: status in-sync.")
+            self.logger.debug(f"Host {self.name}: status in-sync.")
         else:
-            self.logger.warning(f"Device {self.name}: status OUT of sync.")
+            self.logger.warning(f"Host {self.name}: status OUT of sync.")
             self.updateZabbixHost(status=str(self.zabbix_state))
         # Check if a proxy has been defined
         if self.zbxproxy:
             # Check if proxy or proxy group is defined
             if (self.zbxproxy["idtype"] in host and
                 host[self.zbxproxy["idtype"]] == self.zbxproxy["id"]):
-                self.logger.debug(f"Device {self.name}: proxy in-sync.")
+                self.logger.debug(f"Host {self.name}: proxy in-sync.")
             # Backwards compatibility for Zabbix <= 6
             elif "proxy_hostid" in host and host["proxy_hostid"] == self.zbxproxy["id"]:
-                self.logger.debug(f"Device {self.name}: proxy in-sync.")
+                self.logger.debug(f"Host {self.name}: proxy in-sync.")
             # Proxy does not match, update Zabbix
             else:
-                self.logger.warning(f"Device {self.name}: proxy OUT of sync.")
+                self.logger.warning(f"Host {self.name}: proxy OUT of sync.")
                 # Zabbix <= 6 patch
                 if not str(self.zabbix.version).startswith('7'):
                     self.updateZabbixHost(proxy_hostid=self.zbxproxy['id'])
@@ -647,7 +621,7 @@ class NetworkDevice():
                         proxy_set = True
             if proxy_power and proxy_set:
                 # Zabbix <= 6 fix
-                self.logger.warning(f"Device {self.name}: no proxy is configured in Netbox "
+                self.logger.warning(f"Host {self.name}: no proxy is configured in Netbox "
                                     "but is configured in Zabbix. Removing proxy config in Zabbix")
                 if "proxy_hostid" in host and bool(host["proxy_hostid"]):
                     self.updateZabbixHost(proxy_hostid=0)
@@ -660,24 +634,24 @@ class NetworkDevice():
             # Checks if a proxy has been defined in Zabbix and if proxy_power config has been set
             if proxy_set and not proxy_power:
                 # Display error message
-                self.logger.error(f"Device {self.name} is configured "
+                self.logger.error(f"Host {self.name} is configured "
                                     f"with proxy in Zabbix but not in Netbox. The"
                                     " -p flag was ommited: no "
                                     "changes have been made.")
             if not proxy_set:
-                self.logger.debug(f"Device {self.name}: proxy in-sync.")
+                self.logger.debug(f"Host {self.name}: proxy in-sync.")
         # Check host inventory mode
         if str(host['inventory_mode']) == str(self.inventory_mode):
-            self.logger.debug(f"Device {self.name}: inventory_mode in-sync.")
+            self.logger.debug(f"Host {self.name}: inventory_mode in-sync.")
         else:
-            self.logger.warning(f"Device {self.name}: inventory_mode OUT of sync.")
+            self.logger.warning(f"Host {self.name}: inventory_mode OUT of sync.")
             self.updateZabbixHost(inventory_mode=str(self.inventory_mode))
         if inventory_sync and self.inventory_mode in [0,1]:
             # Check host inventory mapping
             if host['inventory'] == self.inventory:
-                self.logger.debug(f"Device {self.name}: inventory in-sync.")
+                self.logger.debug(f"Host {self.name}: inventory in-sync.")
             else:
-                self.logger.warning(f"Device {self.name}: inventory OUT of sync.")
+                self.logger.warning(f"Host {self.name}: inventory OUT of sync.")
                 self.updateZabbixHost(inventory=self.inventory)
 
         # If only 1 interface has been found
@@ -715,10 +689,10 @@ class NetworkDevice():
                         updates[key] = item
             if updates:
                 # If interface updates have been found: push to Zabbix
-                self.logger.warning(f"Device {self.name}: Interface OUT of sync.")
+                self.logger.warning(f"Host {self.name}: Interface OUT of sync.")
                 if "type" in updates:
                     # Changing interface type not supported. Raise exception.
-                    e = (f"Device {self.name}: changing interface type to "
+                    e = (f"Host {self.name}: changing interface type to "
                          f"{str(updates['type'])} is not supported.")
                     self.logger.error(e)
                     raise InterfaceConfigError(e)
@@ -727,19 +701,19 @@ class NetworkDevice():
                 try:
                     # API call to Zabbix
                     self.zabbix.hostinterface.update(updates)
-                    e = f"Device {self.name}: solved interface conflict."
+                    e = f"Host {self.name}: solved interface conflict."
                     self.logger.info(e)
                     self.create_journal_entry("info", e)
                 except APIRequestError as e:
-                    e = f"Zabbix returned the following error: {str(e)}."
-                    self.logger.error(e)
-                    raise SyncExternalError(e) from e
+                    msg = f"Zabbix returned the following error: {str(e)}."
+                    self.logger.error(msg)
+                    raise SyncExternalError(msg) from e
             else:
                 # If no updates are found, Zabbix interface is in-sync
-                e = f"Device {self.name}: interface in-sync."
+                e = f"Host {self.name}: interface in-sync."
                 self.logger.debug(e)
         else:
-            e = (f"Device {self.name} has unsupported interface configuration."
+            e = (f"Host {self.name} has unsupported interface configuration."
                  f" Host has total of {len(host['interfaces'])} interfaces. "
                  "Manual interfention required.")
             self.logger.error(e)
@@ -762,7 +736,7 @@ class NetworkDevice():
                        }
             try:
                 self.nb_journals.create(journal)
-                self.logger.debug(f"Device {self.name}: Created journal entry in Netbox")
+                self.logger.debug(f"Host {self.name}: Created journal entry in Netbox")
                 return True
             except JournalError(e) as e:
                 self.logger.warning("Unable to create journal entry for "
@@ -789,7 +763,7 @@ class NetworkDevice():
                     # and add this NB template to the list of successfull templates
                     tmpls_from_zabbix.pop(pos)
                     succesfull_templates.append(nb_tmpl)
-                    self.logger.debug(f"Device {self.name}: template "
+                    self.logger.debug(f"Host {self.name}: template "
                                       f"{nb_tmpl['name']} is present in Zabbix.")
                     break
         if len(succesfull_templates) == len(self.zbx_templates) and len(tmpls_from_zabbix) == 0:

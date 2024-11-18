@@ -3,7 +3,7 @@
 # coming from config context instead of a custom field.
 templates_config_context = False
 
-# Set to true to give config context templates a 
+# Set to true to give config context templates a
 # higher priority then custom field templates
 templates_config_context_overrule = False
 
@@ -21,6 +21,14 @@ create_hostgroups = True
 ## Create journal entries
 create_journal = False
 
+## Virtual machine sync
+# Set sync_vms to True in order to use this new feature
+# Use the hostgroup vm_hostgroup_format mapper for specific
+# hostgroup atributes of VM's such as cluster_type and cluster
+sync_vms = False
+# Check the README documentation for values to use in the VM hostgroup format.
+vm_hostgroup_format = "cluster_type/cluster/role"
+
 ## Proxy Sync
 # Set to true to enable removal of proxy's under hosts. Use with caution and make sure that you specified
 # all the required proxy's in the device config context before enabeling this option.
@@ -32,7 +40,7 @@ zabbix_device_removal = ["Decommissioning", "Inventory"]
 zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
 
 ## Hostgroup mapping
-# Available choices: dev_location, dev_role, manufacturer, region, site, site_group, tenant, tenant_group
+# See the README documentation for available options
 # You can also use CF (custom field) names under the device. The CF content will be used for the hostgroup generation.
 #
 # When using region in the group name, the default behaviour is to use name of the directly assigned region.
@@ -40,8 +48,8 @@ zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
 #
 # 'Global/Europe/Netherlands/Amsterdam' instead of just 'Amsterdam'.
 #
-# traverse_site_groups controls the same behaviour for any assigned site_groups.   
-hostgroup_format = "site/manufacturer/dev_role"
+# traverse_site_groups controls the same behaviour for any assigned site_groups.
+hostgroup_format = "site/manufacturer/role"
 traverse_regions = False
 traverse_site_groups = False
 
@@ -56,6 +64,8 @@ traverse_site_groups = False
 
 # Default device filter, only get devices which have a name in Netbox:
 nb_device_filter = {"name__n": "null"}
+# Default filter for VMs
+nb_vm_filter = {"name__n": "null"}
 
 ## Inventory
 # See https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory

@@ -6,8 +6,11 @@ import logging
 import argparse
 from os import environ, path, sys
 from pynetbox import api
+from pynetbox.core.query import RequestError as NBRequestError
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
-from modules.device import NetworkDevice
+from modules.device import PhysicalDevice
+from modules.virtual_machine import VirtualMachine
 from modules.tools import convert_recordset, proxy_prepper
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
 try:
@@ -19,7 +22,10 @@ try:
         zabbix_device_removal,
         zabbix_device_disable,
         hostgroup_format,
-        nb_device_filter
+        vm_hostgroup_format,
+        nb_device_filter,
+        sync_vms,
+        nb_vm_filter
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -76,10 +82,18 @@ def main(arguments):
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Check if the provided Hostgroup layout is valid
     hg_objects = hostgroup_format.split("/")
-    allowed_objects = ["dev_location", "dev_role", "manufacturer", "region",
+    allowed_objects = ["location", "role", "manufacturer", "region",
                         "site", "site_group", "tenant", "tenant_group"]
     # Create API call to get all custom fields which are on the device objects
-    device_cfs = netbox.extras.custom_fields.filter(type="text", content_type_id=23)
+    try:
+        device_cfs = list(netbox.extras.custom_fields.filter(type="text", content_type_id=23))
+    except RequestsConnectionError:
+        logger.error(f"Unable to connect to Netbox with URL {netbox_host}."
+                     " Please check the URL and status of Netbox.")
+        sys.exit(1)
+    except NBRequestError as e:
+        logger.error(f"Netbox error: {e}")
+        sys.exit(1)
     for cf in device_cfs:
         allowed_objects.append(cf.name)
     for hg_object in hg_objects:
@@ -105,7 +119,10 @@ def main(arguments):
     else:
         proxy_name = "name"
     # Get all Zabbix and Netbox data
-    netbox_devices = netbox.dcim.devices.filter(**nb_device_filter)
+    netbox_devices = list(netbox.dcim.devices.filter(**nb_device_filter))
+    netbox_vms = []
+    if sync_vms:
+        netbox_vms = list(netbox.virtualization.virtual_machines.filter(**nb_vm_filter))
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
@@ -127,13 +144,72 @@ def main(arguments):
     nb_version = netbox.version
 
     # Go through all Netbox devices
+    for nb_vm in netbox_vms:
+        try:
+            vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
+                                create_journal, logger)
+            logger.debug(f"Host {vm.name}: started operations on VM.")
+            vm.set_vm_template()
+            # Check if a valid template has been found for this VM.
+            if not vm.zbx_template_names:
+                continue
+            vm.set_hostgroup(vm_hostgroup_format,netbox_site_groups,netbox_regions)
+            # Check if a valid hostgroup has been found for this VM.
+            if not vm.hostgroup:
+                continue
+            # Temporary disable inventory sync for VM's
+            # vm.set_inventory(nb_vm)
+
+            # Checks if device is in cleanup state
+            if vm.status in zabbix_device_removal:
+                if vm.zabbix_id:
+                    # Delete device from Zabbix
+                    # and remove hostID from Netbox.
+                    vm.cleanup()
+                    logger.info(f"VM {vm.name}: cleanup complete")
+                    continue
+                # Device has been added to Netbox
+                # but is not in Activate state
+                logger.info(f"VM {vm.name}: skipping since this VM is "
+                            f"not in the active state.")
+                continue
+            # Check if the VM is in the disabled state
+            if vm.status in zabbix_device_disable:
+                vm.zabbix_state = 1
+            # Check if VM is already in Zabbix
+            if vm.zabbix_id:
+                vm.ConsistencyCheck(zabbix_groups, zabbix_templates,
+                                        zabbix_proxy_list, full_proxy_sync,
+                                        create_hostgroups)
+                continue
+            # Add hostgroup is config is set
+            if create_hostgroups:
+                # Create new hostgroup. Potentially multiple groups if nested
+                hostgroups = vm.createZabbixHostgroup(zabbix_groups)
+                # go through all newly created hostgroups
+                for group in hostgroups:
+                    # Add new hostgroups to zabbix group list
+                    zabbix_groups.append(group)
+            # Add VM to Zabbix
+            vm.createInZabbix(zabbix_groups, zabbix_templates,
+                                    zabbix_proxy_list)
+        except SyncError:
+            pass
+
     for nb_device in netbox_devices:
         try:
             # Set device instance set data such as hostgroup and template information.
-            device = NetworkDevice(nb_device, zabbix, netbox_journals, nb_version,
-                                   create_journal, logger)
-            device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
+            device = PhysicalDevice(nb_device, zabbix, netbox_journals, nb_version,
+                                    create_journal, logger)
+            logger.debug(f"Host {device.name}: started operations on device.")
             device.set_template(templates_config_context, templates_config_context_overrule)
+            # Check if a valid template has been found for this VM.
+            if not device.zbx_template_names:
+                continue
+            device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
+            # Check if a valid hostgroup has been found for this VM.
+            if not device.hostgroup:
+                continue
             device.set_inventory(nb_device)
             # Checks if device is part of cluster.
             # Requires clustering variable
