@@ -154,6 +154,9 @@ class PhysicalDevice():
             e = (f"Host {self.name}: Key 'templates' not found in config "
                  "context 'zabbix' for template lookup")
             raise TemplateError(e)
+        # Check if format is list or string.
+        if isinstance(self.config_context["zabbix"]["templates"], str):
+            return [self.config_context["zabbix"]["templates"]]
         return self.config_context["zabbix"]["templates"]
 
     def set_inventory(self, nbdevice):
