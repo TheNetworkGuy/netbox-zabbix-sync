@@ -7,7 +7,7 @@ templates_config_context = False
 # higher priority then custom field templates
 templates_config_context_overrule = False
 
-# Set template and device Netbox "custom field" names
+# Set template and device NetBox "custom field" names
 # Template_cf is not used when templates_config_context is enabled
 template_cf = "zabbix_template"
 device_cf = "zabbix_hostid"
@@ -35,7 +35,7 @@ vm_hostgroup_format = "cluster_type/cluster/role"
 # With this option disabled proxy's will only be added and modified for Zabbix hosts.
 full_proxy_sync = False
 
-## Netbox to Zabbix device state convertion
+## NetBox to Zabbix device state convertion
 zabbix_device_removal = ["Decommissioning", "Inventory"]
 zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
 
@@ -62,7 +62,7 @@ traverse_site_groups = False
 #  nb_device_filter = {"site": ["HQ-AMS", "HQ-FRA"]} #Device must be in either one of these sites
 #  nb_device_filter = {"site": "HQ-AMS", "tag": "zabbix", "role__n": ["PDU", "console-server"]} #Device must be in site HQ-AMS, have the tag zabbix and must not be part of the PDU or console-server role
 
-# Default device filter, only get devices which have a name in Netbox:
+# Default device filter, only get devices which have a name in NetBox:
 nb_device_filter = {"name__n": "null"}
 # Default filter for VMs
 nb_vm_filter = {"name__n": "null"}

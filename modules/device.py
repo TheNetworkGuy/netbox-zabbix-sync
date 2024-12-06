@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines
 """
-Device specific handeling for Netbox to Zabbix
+Device specific handeling for NetBox to Zabbix
 """
 from os import sys
 from re import search
@@ -29,7 +29,7 @@ class PhysicalDevice():
     # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments
     """
     Represents Network device.
-    INPUT: (Netbox device class, ZabbixAPI class, journal flag, NB journal class)
+    INPUT: (NetBox device class, ZabbixAPI class, journal flag, NB journal class)
     """
 
     def __init__(self, nb, zabbix, nb_journal_class, nb_version, journal=None, logger=None):
@@ -92,7 +92,7 @@ class PhysicalDevice():
             self.visible_name = self.nb.name
             self.use_visible_name = True
             self.logger.info(f"Host {self.visible_name} contains special characters. "
-                             f"Using {self.name} as name for the Netbox object "
+                             f"Using {self.name} as name for the NetBox object "
                              f"and using {self.visible_name} as visible name in Zabbix.")
         else:
             pass
@@ -164,7 +164,7 @@ class PhysicalDevice():
         # Set inventory mode. Default is disabled (see class init function).
         if inventory_mode == "disabled":
             if inventory_sync:
-                self.logger.error(f"Host {self.name}: Unable to map Netbox inventory to Zabbix. "
+                self.logger.error(f"Host {self.name}: Unable to map NetBox inventory to Zabbix. "
                               "Inventory sync is enabled in config but inventory mode is disabled.")
             return True
         if inventory_mode == "manual":
@@ -194,7 +194,7 @@ class PhysicalDevice():
                     self.inventory[zbx_inv_field] = str(value)
                 elif not value:
                     # empty value should just be an empty string for API compatibility
-                    self.logger.debug(f"Host {self.name}: Netbox inventory lookup for "
+                    self.logger.debug(f"Host {self.name}: NetBox inventory lookup for "
                                       f"'{nb_inv_field}' returned an empty value")
                     self.inventory[zbx_inv_field] = ""
                 else:
@@ -221,7 +221,7 @@ class PhysicalDevice():
             self.logger.warning(e)
             raise SyncInventoryError(e)
         if not self.nb.virtual_chassis.master:
-            e = (f"{self.name} is part of a Netbox virtual chassis which does "
+            e = (f"{self.name} is part of a NetBox virtual chassis which does "
                  "not have a master configured. Skipping for this reason.")
             self.logger.error(e)
             raise SyncInventoryError(e)
@@ -256,7 +256,7 @@ class PhysicalDevice():
             raise SyncInventoryError()
         # Set variable to empty list
         self.zbx_templates = []
-        # Go through all templates definded in Netbox
+        # Go through all templates definded in NetBox
         for nb_template in self.zbx_template_names:
             template_match = False
             # Go through all templates found in Zabbix
@@ -295,7 +295,7 @@ class PhysicalDevice():
     def cleanup(self):
         """
         Removes device from external resources.
-        Resets custom fields in Netbox.
+        Resets custom fields in NetBox.
         """
         if self.zabbix_id:
             try:
@@ -303,7 +303,7 @@ class PhysicalDevice():
                 zbx_host = bool(self.zabbix.host.get(filter={'hostid': self.zabbix_id},
                                                      output=[]))
                 e = (f"Host {self.name}: was already deleted from Zabbix."
-                        " Removed link in Netbox.")
+                        " Removed link in NetBox.")
                 if zbx_host:
                     # Delete host should it exists
                     self.zabbix.host.delete(self.zabbix_id)
@@ -317,7 +317,7 @@ class PhysicalDevice():
                 raise SyncExternalError(message) from e
 
     def _zeroize_cf(self):
-        """Sets the hostID custom field in Netbox to zero,
+        """Sets the hostID custom field in NetBox to zero,
         effectively destroying the link"""
         self.nb.custom_fields[device_cf] = None
         self.nb.save()
@@ -336,13 +336,13 @@ class PhysicalDevice():
 
     def setInterfaceDetails(self):
         """
-        Checks interface parameters from Netbox and
+        Checks interface parameters from NetBox and
         creates a model for the interface to be used in Zabbix.
         """
         try:
             # Initiate interface class
             interface = ZabbixInterface(self.nb.config_context, self.ip)
-            # Check if Netbox has device context.
+            # Check if NetBox has device context.
             # If not fall back to old config.
             if interface.get_context():
                 # If device is SNMP type, add aditional information.
@@ -377,7 +377,7 @@ class PhysicalDevice():
             # Only insert groups in front of list for Zabbix7
             proxy_types.insert(0, "proxy_group")
         for proxy_type in proxy_types:
-            # Check if the key exists in Netbox CC
+            # Check if the key exists in NetBox CC
             if proxy_type in self.nb.config_context["zabbix"]:
                 proxy_name = self.nb.config_context["zabbix"][proxy_type]
                 # go through all proxies
@@ -395,9 +395,9 @@ class PhysicalDevice():
         return False
 
     def createInZabbix(self, groups, templates, proxies,
-                       description="Host added by Netbox sync script."):
+                       description="Host added by NetBox sync script."):
         """
-        Creates Zabbix host object with parameters from Netbox object.
+        Creates Zabbix host object with parameters from NetBox object.
         """
         # Check if hostname is already present in Zabbix
         if not self._zabbixHostnameExists():
@@ -445,7 +445,7 @@ class PhysicalDevice():
                 e = f"Host {self.name}: Couldn't create. Zabbix returned {str(e)}."
                 self.logger.error(e)
                 raise SyncExternalError(e) from None
-            # Set Netbox custom field to hostID value.
+            # Set NetBox custom field to hostID value.
             self.nb.custom_fields[device_cf] = int(self.zabbix_id)
             self.nb.save()
             msg = f"Host {self.name}: Created host in Zabbix."
@@ -511,7 +511,7 @@ class PhysicalDevice():
     def ConsistencyCheck(self, groups, templates, proxies, proxy_power, create_hostgroups):
         # pylint: disable=too-many-branches, too-many-statements
         """
-        Checks if Zabbix object is still valid with Netbox parameters.
+        Checks if Zabbix object is still valid with NetBox parameters.
         """
         # If group is found or if the hostgroup is nested
         if not self.setZabbixGroupID(groups) or len(self.hostgroup.split('/')) > 1:
@@ -548,7 +548,7 @@ class PhysicalDevice():
         if len(host) == 0:
             e = (f"Host {self.name}: No Zabbix host found. "
                  f"This is likely the result of a deleted Zabbix host "
-                 f"without zeroing the ID field in Netbox.")
+                 f"without zeroing the ID field in NetBox.")
             self.logger.error(e)
             raise SyncInventoryError(e)
         host = host[0]
@@ -615,7 +615,7 @@ class PhysicalDevice():
                                    "monitored_by": self.zbxproxy['monitored_by']}
                     self.updateZabbixHost(**update_data)
         else:
-            # No proxy is defined in Netbox
+            # No proxy is defined in NetBox
             proxy_set = False
             # Check if a proxy is defined. Uses the proxy_hostid key for backwards compatibility
             for key in ("proxy_hostid", "proxyid", "proxy_groupid"):
@@ -624,7 +624,7 @@ class PhysicalDevice():
                         proxy_set = True
             if proxy_power and proxy_set:
                 # Zabbix <= 6 fix
-                self.logger.warning(f"Host {self.name}: no proxy is configured in Netbox "
+                self.logger.warning(f"Host {self.name}: no proxy is configured in NetBox "
                                     "but is configured in Zabbix. Removing proxy config in Zabbix")
                 if "proxy_hostid" in host and bool(host["proxy_hostid"]):
                     self.updateZabbixHost(proxy_hostid=0)
@@ -638,7 +638,7 @@ class PhysicalDevice():
             if proxy_set and not proxy_power:
                 # Display error message
                 self.logger.error(f"Host {self.name} is configured "
-                                    f"with proxy in Zabbix but not in Netbox. The"
+                                    f"with proxy in Zabbix but not in NetBox. The"
                                     " -p flag was ommited: no "
                                     "changes have been made.")
             if not proxy_set:
@@ -663,7 +663,7 @@ class PhysicalDevice():
             updates = {}
             # Go through each key / item and check if it matches Zabbix
             for key, item in self.setInterfaceDetails()[0].items():
-                # Check if Netbox value is found in Zabbix
+                # Check if NetBox value is found in Zabbix
                 if key in host["interfaces"][0]:
                     # If SNMP is used, go through nested dict
                     # to compare SNMP parameters
@@ -724,8 +724,8 @@ class PhysicalDevice():
 
     def create_journal_entry(self, severity, message):
         """
-        Send a new Journal entry to Netbox. Usefull for viewing actions
-        in Netbox without having to look in Zabbix or the script log output
+        Send a new Journal entry to NetBox. Usefull for viewing actions
+        in NetBox without having to look in Zabbix or the script log output
         """
         if self.journal:
             # Check if the severity is valid
@@ -739,7 +739,7 @@ class PhysicalDevice():
                        }
             try:
                 self.nb_journals.create(journal)
-                self.logger.debug(f"Host {self.name}: Created journal entry in Netbox")
+                self.logger.debug(f"Host {self.name}: Created journal entry in NetBox")
                 return True
             except JournalError(e) as e:
                 self.logger.warning("Unable to create journal entry for "
@@ -749,14 +749,14 @@ class PhysicalDevice():
 
     def zbx_template_comparer(self, tmpls_from_zabbix):
         """
-        Compares the Netbox and Zabbix templates with each other.
+        Compares the NetBox and Zabbix templates with each other.
         Should there be a mismatch then the function will return false
 
         INPUT: list of NB and ZBX templates
         OUTPUT: Boolean True/False
         """
         succesfull_templates = []
-        # Go through each Netbox template
+        # Go through each NetBox template
         for nb_tmpl in self.zbx_templates:
             # Go through each Zabbix template
             for pos, zbx_tmpl in enumerate(tmpls_from_zabbix):
@@ -770,7 +770,7 @@ class PhysicalDevice():
                                       f"{nb_tmpl['name']} is present in Zabbix.")
                     break
         if len(succesfull_templates) == len(self.zbx_templates) and len(tmpls_from_zabbix) == 0:
-            # All of the Netbox templates have been confirmed as successfull
+            # All of the NetBox templates have been confirmed as successfull
             # and the ZBX template list is empty. This means that
             # all of the templates match.
             return True

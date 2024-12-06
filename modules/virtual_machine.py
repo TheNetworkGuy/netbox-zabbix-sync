@@ -50,7 +50,7 @@ class VirtualMachine(PhysicalDevice):
         try:
             # Initiate interface class
             interface = ZabbixInterface(self.nb.config_context, self.ip)
-            # Check if Netbox has device context.
+            # Check if NetBox has device context.
             # If not fall back to old config.
             if interface.get_context():
                 # If device is SNMP type, add aditional information.
