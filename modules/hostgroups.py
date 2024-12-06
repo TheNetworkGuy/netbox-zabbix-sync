@@ -34,7 +34,7 @@ class Hostgroup():
         format_options = {}
         # Set variables for both type of devices
         if self.type in ("vm", "dev"):
-            # Role fix for Netbox <=3
+            # Role fix for NetBox <=3
             role = None
             if self.nb_version.startswith(("2", "3")) and self.type == "dev":
                 role = self.nb.device_role.name if self.nb.device_role else None
@@ -129,7 +129,7 @@ class Hostgroup():
 
     def custom_field_lookup(self, hg_category):
         """
-        Checks if a valid custom field is present in Netbox.
+        Checks if a valid custom field is present in NetBox.
         INPUT: Custom field name
         OUTPUT: dictionary with 'result' and 'cf' keys.
         """

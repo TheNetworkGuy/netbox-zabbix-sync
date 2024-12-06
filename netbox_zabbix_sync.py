@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation
 
-"""Netbox to Zabbix sync script."""
+"""NetBox to Zabbix sync script."""
 import logging
 import argparse
 import ssl
@@ -45,7 +45,7 @@ lgfile = logging.FileHandler(path.join(path.dirname(
 lgfile.setFormatter(log_format)
 lgfile.setLevel(logging.DEBUG)
 
-logger = logging.getLogger("Netbox-Zabbix-sync")
+logger = logging.getLogger("NetBox-Zabbix-sync")
 logger.addHandler(lgout)
 logger.addHandler(lgfile)
 logger.setLevel(logging.WARNING)
@@ -80,7 +80,7 @@ def main(arguments):
     zabbix_host = environ.get("ZABBIX_HOST")
     netbox_host = environ.get("NETBOX_HOST")
     netbox_token = environ.get("NETBOX_TOKEN")
-    # Set Netbox API
+    # Set NetBox API
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Check if the provided Hostgroup layout is valid
     hg_objects = hostgroup_format.split("/")
@@ -91,11 +91,11 @@ def main(arguments):
         device_cfs = list(netbox.extras.custom_fields.filter(
             type="text", content_type_id=23))
     except RequestsConnectionError:
-        logger.error(f"Unable to connect to Netbox with URL {netbox_host}."
-                     " Please check the URL and status of Netbox.")
+        logger.error(f"Unable to connect to NetBox with URL {netbox_host}."
+                     " Please check the URL and status of NetBox.")
         sys.exit(1)
     except NBRequestError as e:
-        logger.error(f"Netbox error: {e}")
+        logger.error(f"NetBox error: {e}")
         sys.exit(1)
     for cf in device_cfs:
         allowed_objects.append(cf.name)
@@ -129,7 +129,7 @@ def main(arguments):
         proxy_name = "host"
     else:
         proxy_name = "name"
-    # Get all Zabbix and Netbox data
+    # Get all Zabbix and NetBox data
     netbox_devices = list(netbox.dcim.devices.filter(**nb_device_filter))
     netbox_vms = []
     if sync_vms:
@@ -153,10 +153,10 @@ def main(arguments):
     # Prepare list of all proxy and proxy_groups
     zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
 
-    # Get Netbox API version
+    # Get NetBox API version
     nb_version = netbox.version
 
-    # Go through all Netbox devices
+    # Go through all NetBox devices
     for nb_vm in netbox_vms:
         try:
             vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
@@ -175,11 +175,11 @@ def main(arguments):
             if vm.status in zabbix_device_removal:
                 if vm.zabbix_id:
                     # Delete device from Zabbix
-                    # and remove hostID from Netbox.
+                    # and remove hostID from NetBox.
                     vm.cleanup()
                     logger.info(f"VM {vm.name}: cleanup complete")
                     continue
-                # Device has been added to Netbox
+                # Device has been added to NetBox
                 # but is not in Activate state
                 logger.info(f"VM {vm.name}: skipping since this VM is "
                             f"not in the active state.")
@@ -243,11 +243,11 @@ def main(arguments):
             if device.status in zabbix_device_removal:
                 if device.zabbix_id:
                     # Delete device from Zabbix
-                    # and remove hostID from Netbox.
+                    # and remove hostID from NetBox.
                     device.cleanup()
                     logger.info(f"Device {device.name}: cleanup complete")
                     continue
-                # Device has been added to Netbox
+                # Device has been added to NetBox
                 # but is not in Activate state
                 logger.info(f"Device {device.name}: skipping since this device is "
                             f"not in the active state.")
@@ -278,7 +278,7 @@ def main(arguments):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='A script to sync Zabbix with Netbox device data.'
+        description='A script to sync Zabbix with NetBox device data.'
     )
     parser.add_argument("-v", "--verbose", help="Turn on debugging.",
                         action="store_true")

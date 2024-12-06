@@ -1,6 +1,6 @@
-# Netbox to Zabbix synchronization
+# NetBox to Zabbix synchronization
 
-A script to create, update and delete Zabbix hosts using Netbox device objects.
+A script to create, update and delete Zabbix hosts using NetBox device objects.
 
 ## Installation via Docker
 
@@ -81,16 +81,16 @@ password. In that case `ZABBIX_USER` and `ZABBIX_PASS` will be ignored.
 ZABBIX_TOKEN=othersecrettoken
 ```
 
-If you are using custom SSL certificates for Netbox and/or Zabbix, you can set
+If you are using custom SSL certificates for NetBox and/or Zabbix, you can set
 the following environment variable to the path of your CA bundle file:
 
 ```bash
 REQUEST_CA_BUNDLE=/path/to/your/ca-bundle.crt
 ```
 
-### Netbox custom fields
+### NetBox custom fields
 
-Use the following custom fields in Netbox (if you are using config context for
+Use the following custom fields in NetBox (if you are using config context for
 the template information then the zabbix_template field is not required):
 
 ```
@@ -118,7 +118,7 @@ manually change the ID. For example to re-run a sync.
 ## Virtual Machine (VM) Syncing
 
 In order to use VM syncing, make sure that the `zabbix_id` custom field is also
-present on Virtual machine objects in Netbox.
+present on Virtual machine objects in NetBox.
 
 Use the `config.py` file and set the `sync_vms` variable to `True`.
 
@@ -128,7 +128,7 @@ hostgroups. The default is `cluster_type/cluster/role`.
 To enable filtering for VM's, check the `nb_vm_filter` variable out. It works
 the same as with the device filter (see documentation under "Hostgroup layout").
 Note that not all filtering capabilities and properties of devices are
-applicable to VM's and vice-versa. Check the Netbox API documentation to see
+applicable to VM's and vice-versa. Check the NetBox API documentation to see
 which filtering options are available for each object type.
 
 ## Config file
@@ -260,15 +260,15 @@ in an error:
 ```
 hostgroup_format = "mycustomfieldname"
 
-Netbox-Zabbix-sync - ERROR - ESXI1 has no reliable hostgroup. This is most likely due to the use of custom fields that are empty.
+NetBox-Zabbix-sync - ERROR - ESXI1 has no reliable hostgroup. This is most likely due to the use of custom fields that are empty.
 ```
 
 ### Device status
 
-By setting a status on a Netbox device you determine how the host is added (or
+By setting a status on a NetBox device you determine how the host is added (or
 updated) in Zabbix. There are, by default, 3 options:
 
-- Delete the host from Zabbix (triggered by Netbox status "Decommissioning" and
+- Delete the host from Zabbix (triggered by NetBox status "Decommissioning" and
   "Inventory")
 - Create the host in Zabbix but with a disabled status (Trigger by "Offline",
   "Planned", "Staged" and "Failed")
@@ -284,8 +284,8 @@ script:
 ### Zabbix Inventory
 
 This script allows you to enable the inventory on managed Zabbix hosts and sync
-NetBox device properties to the specified inventory fields. To map Netbox
-information to Netbox inventory fields, set `inventory_sync` to `True`.
+NetBox device properties to the specified inventory fields. To map NetBox
+information to NetBox inventory fields, set `inventory_sync` to `True`.
 
 You can set the inventory mode to "disabled", "manual" or "automatic" with the
 `inventory_mode` variable. See
@@ -310,7 +310,7 @@ fields.
 
 ### Template source
 
-You can either use a Netbox device type custom field or Netbox config context
+You can either use a NetBox device type custom field or NetBox config context
 for the Zabbix template information.
 
 Using a custom field allows for only one template. You can assign multiple
@@ -342,7 +342,7 @@ in the config context in this format:
 ```
 
 You can also opt for the default device type custom field behaviour but with the
-added benefit of overwriting the template should a device in Netbox have a
+added benefit of overwriting the template should a device in NetBox have a
 device specific context defined. In this case the device specific context
 template(s) will take priority over the device type custom field template.
 
@@ -352,9 +352,9 @@ templates_config_context_overrule = True
 
 ## Permissions
 
-### Netbox
+### NetBox
 
-Make sure that the Netbox user has proper permissions for device read and modify
+Make sure that the NetBox user has proper permissions for device read and modify
 (modify to set the Zabbix HostID custom field) operations. The user should also
 have read-only access to the device types.
 
@@ -435,13 +435,13 @@ In the example above the host will use the group on Zabbix 7. On Zabbix 6 and
 below the host will use the proxy. Zabbix 7 will use the proxy value when
 ommiting the proxy_group value.
 
-Because of the possible amount of destruction when setting up Netbox but
+Because of the possible amount of destruction when setting up NetBox but
 forgetting the proxy command, the sync works a bit different. By default
 everything is synced except in a situation where the Zabbix host has a proxy
-configured but nothing is configured in Netbox. To force deletion and a full
+configured but nothing is configured in NetBox. To force deletion and a full
 sync, set the `full_proxy_sync` variable in the config file.
 
-### Set interface parameters within Netbox
+### Set interface parameters within NetBox
 
 When adding a new device, you can set the interface type with custom context. By
 default, the following configuration is applied when no config context is
@@ -453,14 +453,14 @@ provided:
 - SNMP community: {$SNMP_COMMUNITY}
 
 Due to Zabbix limitations of changing interface type with a linked template,
-changing the interface type from within Netbox is not supported and the script
+changing the interface type from within NetBox is not supported and the script
 will generate an error.
 
 For example when changing a SNMP interface to an Agent interface:
 
 ```
-Netbox-Zabbix-sync - WARNING - Device: Interface OUT of sync.
-Netbox-Zabbix-sync - ERROR - Device: changing interface type to 1 is not supported.
+NetBox-Zabbix-sync - WARNING - Device: Interface OUT of sync.
+NetBox-Zabbix-sync - ERROR - Device: changing interface type to 1 is not supported.
 ```
 
 To configure the interface parameters you'll need to use custom context. Custom
@@ -519,7 +519,7 @@ environment. For example, you could:
 ```
 
 I would recommend using macros for sensitive data such as community strings
-since the data in Netbox is plain-text.
+since the data in NetBox is plain-text.
 
 > **_NOTE:_** Not all SNMP data is required for a working configuration.
 > [The following parameters are allowed](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed")but

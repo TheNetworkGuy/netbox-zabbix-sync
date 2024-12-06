@@ -29,7 +29,7 @@ class ZabbixInterface():
         return True
 
     def get_context(self):
-        """ check if Netbox custom context has been defined. """
+        """ check if NetBox custom context has been defined. """
         if "zabbix" in self.context:
             zabbix = self.context["zabbix"]
             if "interface_type" in zabbix:
@@ -46,7 +46,7 @@ class ZabbixInterface():
         """ Check if interface is type SNMP """
         # pylint: disable=too-many-branches
         if self.interface["type"] == 2:
-            # Checks if SNMP settings are defined in Netbox
+            # Checks if SNMP settings are defined in NetBox
             if "snmp" in self.context["zabbix"]:
                 snmp = self.context["zabbix"]["snmp"]
                 self.interface["details"] = {}
@@ -56,7 +56,7 @@ class ZabbixInterface():
                 else:
                     # Fallback to bulk enabled if not specified
                     self.interface["details"]["bulk"] = "1"
-                # SNMP Version config is required in Netbox config context
+                # SNMP Version config is required in NetBox config context
                 if snmp.get("version"):
                     self.interface["details"]["version"] = str(snmp.pop("version"))
                 else:
@@ -72,7 +72,7 @@ class ZabbixInterface():
                         community = "{$SNMP_COMMUNITY}"
                     self.interface["details"]["community"] = str(community)
                 # If version 3 has been used, get all
-                # SNMPv3 Netbox related configs
+                # SNMPv3 NetBox related configs
                 elif self.interface["details"]["version"] == '3':
                     items = ["securityname", "securitylevel", "authpassphrase",
                              "privpassphrase", "authprotocol", "privprotocol",
