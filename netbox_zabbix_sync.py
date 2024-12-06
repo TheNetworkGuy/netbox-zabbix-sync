@@ -4,6 +4,7 @@
 """Netbox to Zabbix sync script."""
 import logging
 import argparse
+import ssl
 from os import environ, path, sys
 from pynetbox import api
 from pynetbox.core.query import RequestError as NBRequestError
@@ -29,7 +30,7 @@ try:
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
-           "Please create the file or rename the config.py.example file to config.py.")
+          "Please create the file or rename the config.py.example file to config.py.")
     sys.exit(1)
 
 # Set logging
@@ -48,6 +49,7 @@ logger = logging.getLogger("Netbox-Zabbix-sync")
 logger.addHandler(lgout)
 logger.addHandler(lgfile)
 logger.setLevel(logging.WARNING)
+
 
 def main(arguments):
     """Run the sync process."""
@@ -83,10 +85,11 @@ def main(arguments):
     # Check if the provided Hostgroup layout is valid
     hg_objects = hostgroup_format.split("/")
     allowed_objects = ["location", "role", "manufacturer", "region",
-                        "site", "site_group", "tenant", "tenant_group"]
+                       "site", "site_group", "tenant", "tenant_group"]
     # Create API call to get all custom fields which are on the device objects
     try:
-        device_cfs = list(netbox.extras.custom_fields.filter(type="text", content_type_id=23))
+        device_cfs = list(netbox.extras.custom_fields.filter(
+            type="text", content_type_id=23))
     except RequestsConnectionError:
         logger.error(f"Unable to connect to Netbox with URL {netbox_host}."
                      " Please check the URL and status of Netbox.")
@@ -99,17 +102,25 @@ def main(arguments):
     for hg_object in hg_objects:
         if hg_object not in allowed_objects:
             e = (f"Hostgroup item {hg_object} is not valid. Make sure you"
-                    " use valid items and seperate them with '/'.")
+                 " use valid items and seperate them with '/'.")
             logger.error(e)
             raise HostgroupError(e)
     # Set Zabbix API
     try:
+        ssl_ctx = ssl.create_default_context()
+
+        # If a custom CA bundle is set for pynetbox (requests), also use it for the Zabbix API
+        if environ.get("REQUESTS_CA_BUNDLE", None):
+            ssl_ctx.load_verify_locations(environ["REQUESTS_CA_BUNDLE"])
+
         if not zabbix_token:
-            zabbix = ZabbixAPI(zabbix_host, user=zabbix_user, password=zabbix_pass)
+            zabbix = ZabbixAPI(zabbix_host, user=zabbix_user,
+                               password=zabbix_pass, ssl_context=ssl_ctx)
         else:
-            zabbix = ZabbixAPI(zabbix_host, token=zabbix_token)
+            zabbix = ZabbixAPI(
+                zabbix_host, token=zabbix_token, ssl_context=ssl_ctx)
         zabbix.check_auth()
-    except (APIRequestError, ProcessingError)  as e:
+    except (APIRequestError, ProcessingError) as e:
         e = f"Zabbix returned the following error: {str(e)}"
         logger.error(e)
         sys.exit(1)
@@ -122,7 +133,8 @@ def main(arguments):
     netbox_devices = list(netbox.dcim.devices.filter(**nb_device_filter))
     netbox_vms = []
     if sync_vms:
-        netbox_vms = list(netbox.virtualization.virtual_machines.filter(**nb_vm_filter))
+        netbox_vms = list(
+            netbox.virtualization.virtual_machines.filter(**nb_vm_filter))
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
@@ -132,7 +144,8 @@ def main(arguments):
     # Set empty list for proxy processing Zabbix <= 6
     zabbix_proxygroups = []
     if str(zabbix.version).startswith('7'):
-        zabbix_proxygroups = zabbix.proxygroup.get(output=["proxy_groupid", "name"])
+        zabbix_proxygroups = zabbix.proxygroup.get(
+            output=["proxy_groupid", "name"])
     # Sanitize proxy data
     if proxy_name == "host":
         for proxy in zabbix_proxies:
@@ -153,7 +166,8 @@ def main(arguments):
             # Check if a valid template has been found for this VM.
             if not vm.zbx_template_names:
                 continue
-            vm.set_hostgroup(vm_hostgroup_format,netbox_site_groups,netbox_regions)
+            vm.set_hostgroup(vm_hostgroup_format,
+                             netbox_site_groups, netbox_regions)
             # Check if a valid hostgroup has been found for this VM.
             if not vm.hostgroup:
                 continue
@@ -176,8 +190,8 @@ def main(arguments):
             # Check if VM is already in Zabbix
             if vm.zabbix_id:
                 vm.ConsistencyCheck(zabbix_groups, zabbix_templates,
-                                        zabbix_proxy_list, full_proxy_sync,
-                                        create_hostgroups)
+                                    zabbix_proxy_list, full_proxy_sync,
+                                    create_hostgroups)
                 continue
             # Add hostgroup is config is set
             if create_hostgroups:
@@ -189,7 +203,7 @@ def main(arguments):
                     zabbix_groups.append(group)
             # Add VM to Zabbix
             vm.createInZabbix(zabbix_groups, zabbix_templates,
-                                    zabbix_proxy_list)
+                              zabbix_proxy_list)
         except SyncError:
             pass
 
@@ -199,11 +213,13 @@ def main(arguments):
             device = PhysicalDevice(nb_device, zabbix, netbox_journals, nb_version,
                                     create_journal, logger)
             logger.debug(f"Host {device.name}: started operations on device.")
-            device.set_template(templates_config_context, templates_config_context_overrule)
+            device.set_template(templates_config_context,
+                                templates_config_context_overrule)
             # Check if a valid template has been found for this VM.
             if not device.zbx_template_names:
                 continue
-            device.set_hostgroup(hostgroup_format,netbox_site_groups,netbox_regions)
+            device.set_hostgroup(
+                hostgroup_format, netbox_site_groups, netbox_regions)
             # Check if a valid hostgroup has been found for this VM.
             if not device.hostgroup:
                 continue
@@ -255,7 +271,7 @@ def main(arguments):
                     zabbix_groups.append(group)
             # Add device to Zabbix
             device.createInZabbix(zabbix_groups, zabbix_templates,
-                                    zabbix_proxy_list)
+                                  zabbix_proxy_list)
         except SyncError:
             pass
 
