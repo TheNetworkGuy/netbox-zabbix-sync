@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dockertest
+      - testing
 #    tags: 
 #      - [0-9]+.*
 
