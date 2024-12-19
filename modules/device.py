@@ -102,8 +102,8 @@ class PhysicalDevice():
         # Create new Hostgroup instance
         hg = Hostgroup("dev", self.nb, self.nb_api_version, logger=self.logger,
                        nested_sitegroup_flag=traverse_site_groups,
-                       nested_region_flag=traverse_regions, 
-                       nb_groups=nb_site_groups, 
+                       nested_region_flag=traverse_regions,
+                       nb_groups=nb_site_groups,
                        nb_regions=nb_regions)
         # Generate hostgroup based on hostgroup format
         self.hostgroup = hg.generate(hg_format)
