@@ -6,7 +6,7 @@ from modules.tools import build_path
 class Hostgroup():
     """Hostgroup class for devices and VM's
     Takes type (vm or dev) and NB object"""
-    def __init__(self, obj_type, nb_obj, version, logger=None,
+    def __init__(self, obj_type, nb_obj, version, logger=None, #pylint: disable=too-many-arguments, too-many-positional-arguments
                  nested_sitegroup_flag=False, nested_region_flag=False,
                  nb_regions=None, nb_groups=None):
         self.logger = logger if logger else getLogger(__name__)
