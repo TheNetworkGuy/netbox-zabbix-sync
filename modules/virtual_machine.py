@@ -6,9 +6,12 @@ from os import sys
 from modules.device import PhysicalDevice
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
+from modules.inventory import Inventory
 from modules.exceptions import TemplateError, InterfaceConfigError, SyncInventoryError
 try:
     from config import (
+        inventory_sync,
+        vm_inventory_map,
         traverse_site_groups,
         traverse_regions
     )
@@ -34,6 +37,10 @@ class VirtualMachine(PhysicalDevice):
                        nb_regions=nb_regions)
         # Generate hostgroup based on hostgroup format
         self.hostgroup = hg.generate(hg_format)
+
+    def set_inventory(self, nbvm):
+        """ Set inventory """
+        Inventory.set_inventory(self, nbvm)
 
     def set_vm_template(self):
         """ Set Template for VMs. Overwrites default class

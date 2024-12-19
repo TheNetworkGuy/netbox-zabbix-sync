@@ -11,14 +11,15 @@ from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalE
                                 InterfaceConfigError, JournalError)
 from modules.interface import ZabbixInterface
 from modules.hostgroups import Hostgroup
+from modules.inventory import Inventory
+
 try:
     from config import (
         template_cf, device_cf,
         traverse_site_groups,
         traverse_regions,
         inventory_sync,
-        inventory_mode,
-        inventory_map
+        device_inventory_map
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -162,51 +163,55 @@ class PhysicalDevice():
         return self.config_context["zabbix"]["templates"]
 
     def set_inventory(self, nbdevice):
-        """ Set host inventory """
-        # Set inventory mode. Default is disabled (see class init function).
-        if inventory_mode == "disabled":
-            if inventory_sync:
-                self.logger.error(f"Host {self.name}: Unable to map NetBox inventory to Zabbix. "
-                              "Inventory sync is enabled in config but inventory mode is disabled.")
-            return True
-        if inventory_mode == "manual":
-            self.inventory_mode = 0
-        elif inventory_mode == "automatic":
-            self.inventory_mode = 1
-        else:
-            self.logger.error(f"Host {self.name}: Specified value for inventory mode in"
-                              f" config is not valid. Got value {inventory_mode}")
-            return False
-        self.inventory = {}
-        if inventory_sync and self.inventory_mode in [0,1]:
-            self.logger.debug(f"Host {self.name}: Starting inventory mapper")
-            # Let's build an inventory dict for each property in the inventory_map
-            for nb_inv_field, zbx_inv_field in inventory_map.items():
-                field_list = nb_inv_field.split("/") # convert str to list based on delimiter
-                # start at the base of the dict...
-                value = nbdevice
-                # ... and step through the dict till we find the needed value
-                for item in field_list:
-                    value = value[item] if value else None
-                # Check if the result is usable and expected
-                # We want to apply any int or float 0 values,
-                # even if python thinks those are empty.
-                if ((value and isinstance(value, int | float | str )) or
-                     (isinstance(value, int | float) and int(value) ==0)):
-                    self.inventory[zbx_inv_field] = str(value)
-                elif not value:
-                    # empty value should just be an empty string for API compatibility
-                    self.logger.debug(f"Host {self.name}: NetBox inventory lookup for "
-                                      f"'{nb_inv_field}' returned an empty value")
-                    self.inventory[zbx_inv_field] = ""
-                else:
-                    # Value is not a string or numeral, probably not what the user expected.
-                    self.logger.error(f"Host {self.name}: Inventory lookup for '{nb_inv_field}'"
-                                      " returned an unexpected type: it will be skipped.")
-            self.logger.debug(f"Host {self.name}: Inventory mapping complete. "
-                            f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
-        return True
+        """ Set inventory """
+        Inventory.set_inventory(self, nbdevice)
 
+#    def set_inventory(self, nbdevice):
+#        """ Set host inventory """
+#        # Set inventory mode. Default is disabled (see class init function).
+#        if inventory_mode == "disabled":
+#            if inventory_sync:
+#                self.logger.error(f"Host {self.name}: Unable to map NetBox inventory to Zabbix. "
+#                              "Inventory sync is enabled in config but inventory mode is disabled.")
+#            return True
+#        if inventory_mode == "manual":
+#            self.inventory_mode = 0
+#        elif inventory_mode == "automatic":
+#            self.inventory_mode = 1
+#        else:
+#            self.logger.error(f"Host {self.name}: Specified value for inventory mode in"
+#                              f" config is not valid. Got value {inventory_mode}")
+#            return False
+#        self.inventory = {}
+#        if inventory_sync and self.inventory_mode in [0,1]:
+#            self.logger.debug(f"Host {self.name}: Starting inventory mapper")
+#            # Let's build an inventory dict for each property in the inventory_map
+#            for nb_inv_field, zbx_inv_field in inventory_map.items():
+#                field_list = nb_inv_field.split("/") # convert str to list based on delimiter
+#                # start at the base of the dict...
+#                value = nbdevice
+#                # ... and step through the dict till we find the needed value
+#                for item in field_list:
+#                    value = value[item] if value else None
+#                # Check if the result is usable and expected
+#                # We want to apply any int or float 0 values,
+#                # even if python thinks those are empty.
+#                if ((value and isinstance(value, int | float | str )) or
+#                     (isinstance(value, int | float) and int(value) ==0)):
+#                    self.inventory[zbx_inv_field] = str(value)
+#                elif not value:
+#                    # empty value should just be an empty string for API compatibility
+#                    self.logger.debug(f"Host {self.name}: NetBox inventory lookup for "
+#                                      f"'{nb_inv_field}' returned an empty value")
+#                    self.inventory[zbx_inv_field] = ""
+#                else:
+#                    # Value is not a string or numeral, probably not what the user expected.
+#                    self.logger.error(f"Host {self.name}: Inventory lookup for '{nb_inv_field}'"
+#                                      " returned an unexpected type: it will be skipped.")
+#            self.logger.debug(f"Host {self.name}: Inventory mapping complete. "
+#                            f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
+#        return True
+#
     def isCluster(self):
         """
         Checks if device is part of cluster.
@@ -541,7 +546,7 @@ class PhysicalDevice():
                                                       'interfaceid'],
                                     selectGroups=["groupid"],
                                     selectParentTemplates=["templateid"],
-                                    selectInventory=list(inventory_map.values()))
+                                    selectInventory=list(device_inventory_map.values()))
         if len(host) > 1:
             e = (f"Got {len(host)} results for Zabbix hosts "
                  f"with ID {self.zabbix_id} - hostname {self.name}.")

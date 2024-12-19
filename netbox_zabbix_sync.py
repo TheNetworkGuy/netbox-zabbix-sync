@@ -5,6 +5,7 @@
 import logging
 import argparse
 import ssl
+from pprint import pprint
 from os import environ, path, sys
 from pynetbox import api
 from pynetbox.core.query import RequestError as NBRequestError
@@ -171,6 +172,7 @@ def main(arguments):
             # Check if a valid hostgroup has been found for this VM.
             if not vm.hostgroup:
                 continue
+            vm.set_inventory(nb_vm)
             # Checks if device is in cleanup state
             if vm.status in zabbix_device_removal:
                 if vm.zabbix_id:
