@@ -27,8 +27,11 @@ class VirtualMachine(PhysicalDevice):
     def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
         # Create new Hostgroup instance
-        hg = Hostgroup("vm", self.nb, self.nb_api_version, logger=self.logger)
-        hg.set_nesting(traverse_site_groups, traverse_regions, nb_site_groups, nb_regions)
+        hg = Hostgroup("vm", self.nb, self.nb_api_version, logger=self.logger,
+                       nested_sitegroup_flag=traverse_site_groups,
+                       nested_region_flag=traverse_regions,
+                       nb_groups=nb_site_groups,
+                       nb_regions=nb_regions)
         # Generate hostgroup based on hostgroup format
         self.hostgroup = hg.generate(hg_format)
 
