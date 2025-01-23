@@ -1,2 +1,2 @@
 pynetbox
-zabbix_utils
+zabbix-utils==2.0.1
