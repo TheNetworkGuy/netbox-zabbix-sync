@@ -90,8 +90,9 @@ def main(arguments):
     try:
         device_cfs = list(netbox.extras.custom_fields.filter(
             type="text", content_type_id=23))
-    except RequestsConnectionError:
+    except RequestsConnectionError as e:
         logger.error(f"Unable to connect to NetBox with URL {netbox_host}."
+                     f" Error is: {e}"
                      " Please check the URL and status of NetBox.")
         sys.exit(1)
     except NBRequestError as e:
