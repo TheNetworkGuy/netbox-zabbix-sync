@@ -585,7 +585,7 @@ class PhysicalDevice():
 
         # Check if Zabbix version is 6 or higher. Issue #93
         group_dictname = "hostgroups"
-        if str(self.zabbix.version).startswith('6'):
+        if str(self.zabbix.version).startswith(('6', '5')):
             group_dictname = "groups"
         for group in host[group_dictname]:
             if group["groupid"] == self.group_id:
