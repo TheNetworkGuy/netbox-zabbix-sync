@@ -540,6 +540,7 @@ class PhysicalDevice():
                                                       'port', 'details',
                                                       'interfaceid'],
                                     selectGroups=["groupid"],
+                                    selectHostGroups=["groupid"],
                                     selectParentTemplates=["templateid"],
                                     selectInventory=list(inventory_map.values()))
         if len(host) > 1:
@@ -582,7 +583,11 @@ class PhysicalDevice():
         else:
             self.logger.debug(f"Host {self.name}: template(s) in-sync.")
 
-        for group in host["groups"]:
+        # Check if Zabbix version is 6 or higher. Issue #93
+        group_dictname = "hostgroups"
+        if str(self.zabbix.version).startswith('6'):
+            group_dictname = "groups"
+        for group in host[group_dictname]:
             if group["groupid"] == self.group_id:
                 self.logger.debug(f"Host {self.name}: hostgroup in-sync.")
                 break
