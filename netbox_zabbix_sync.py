@@ -5,7 +5,6 @@
 import logging
 import argparse
 import ssl
-from pprint import pprint
 from os import environ, path, sys
 from pynetbox import api
 from pynetbox.core.query import RequestError as NBRequestError
