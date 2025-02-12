@@ -42,10 +42,6 @@ class VirtualMachine(PhysicalDevice):
         # Generate hostgroup based on hostgroup format
         self.hostgroup = hg.generate(hg_format)
 
-#    def set_inventory(self, nbvm):
-#        """ Set inventory """
-#        Inventory.set_inventory(self, nbvm)
-
     def set_vm_template(self):
         """ Set Template for VMs. Overwrites default class
         to skip a lookup of custom fields."""

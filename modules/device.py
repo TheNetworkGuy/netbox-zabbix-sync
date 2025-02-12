@@ -166,10 +166,6 @@ class PhysicalDevice():
             return [self.config_context["zabbix"]["templates"]]
         return self.config_context["zabbix"]["templates"]
 
-#    def set_inventory(self, nbdevice):
-#        """ Set inventory """
-#        Inventory.set_inventory(self, nbdevice)
-
     def set_inventory(self, nbdevice):
         """ Set host inventory """
         # Set inventory mode. Default is disabled (see class init function).
