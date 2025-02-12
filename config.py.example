@@ -99,8 +99,5 @@ device_inventory_map = { "asset_tag": "asset_tag",
 
 # We also support inventory mapping on Virtual Machines.
 vm_inventory_map = { "status/label": "deployment_status",
-                     "location/name": "location",
-                     "latitude": "location_lat",
-                     "longitude": "location_lon",
                      "comments": "notes",
                      "name": "name" }
