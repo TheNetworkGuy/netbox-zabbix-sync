@@ -80,19 +80,24 @@ inventory_sync = False
 # For nested properties, you can use the '/' seperator.
 # For example, the following map will assign the custom field 'mycustomfield' to the 'alias' Zabbix inventory field:
 #
-# inventory_map = { "custom_fields/mycustomfield/name": "alias"}
+# device_inventory_map = { "custom_fields/mycustomfield/name": "alias"}
 #
-# The following map should provide some nice defaults:
-inventory_map = { "asset_tag": "asset_tag",
-                  "virtual_chassis/name": "chassis",
-                  "status/label": "deployment_status",
-                  "location/name": "location",
-                  "latitude": "location_lat",
-                  "longitude": "location_lon",
-                  "comments": "notes",
-                  "name": "name",
-                  "rack/name": "site_rack",
-                  "serial": "serialno_a",
-                  "device_type/model": "type",
-                  "device_type/manufacturer/name": "vendor",
-                  "oob_ip/address": "oob_ip" }
+# The following maps should provide some nice defaults:
+device_inventory_map = { "asset_tag": "asset_tag",
+                         "virtual_chassis/name": "chassis",
+                         "status/label": "deployment_status",
+                         "location/name": "location",
+                         "latitude": "location_lat",
+                         "longitude": "location_lon",
+                         "comments": "notes",
+                         "name": "name",
+                         "rack/name": "site_rack",
+                         "serial": "serialno_a",
+                         "device_type/model": "type",
+                         "device_type/manufacturer/name": "vendor",
+                         "oob_ip/address": "oob_ip" }
+
+# We also support inventory mapping on Virtual Machines.
+vm_inventory_map = { "status/label": "deployment_status",
+                     "comments": "notes",
+                     "name": "name" }

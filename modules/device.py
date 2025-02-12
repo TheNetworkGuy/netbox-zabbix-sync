@@ -11,6 +11,7 @@ from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalE
                                 InterfaceConfigError, JournalError)
 from modules.interface import ZabbixInterface
 from modules.hostgroups import Hostgroup
+
 try:
     from config import (
         template_cf, device_cf,
@@ -18,7 +19,7 @@ try:
         traverse_regions,
         inventory_sync,
         inventory_mode,
-        inventory_map
+        device_inventory_map
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -62,6 +63,10 @@ class PhysicalDevice():
     def __str__(self):
         return self.__repr__()
 
+    def _inventory_map(self):
+        """ Use device inventory maps """
+        return device_inventory_map
+ 
     def _setBasics(self):
         """
         Sets basic information like IP address.
@@ -181,7 +186,7 @@ class PhysicalDevice():
         if inventory_sync and self.inventory_mode in [0,1]:
             self.logger.debug(f"Host {self.name}: Starting inventory mapper")
             # Let's build an inventory dict for each property in the inventory_map
-            for nb_inv_field, zbx_inv_field in inventory_map.items():
+            for nb_inv_field, zbx_inv_field in self._inventory_map().items():
                 field_list = nb_inv_field.split("/") # convert str to list based on delimiter
                 # start at the base of the dict...
                 value = nbdevice
@@ -542,7 +547,7 @@ class PhysicalDevice():
                                     selectGroups=["groupid"],
                                     selectHostGroups=["groupid"],
                                     selectParentTemplates=["templateid"],
-                                    selectInventory=list(inventory_map.values()))
+                                    selectInventory=list(self._inventory_map().values()))
         if len(host) > 1:
             e = (f"Got {len(host)} results for Zabbix hosts "
                  f"with ID {self.zabbix_id} - hostname {self.name}.")
