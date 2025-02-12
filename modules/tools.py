@@ -42,4 +42,3 @@ def proxy_prepper(proxy_list, proxy_group_list):
         group["monitored_by"] = 2
         output.append(group)
     return output
-
