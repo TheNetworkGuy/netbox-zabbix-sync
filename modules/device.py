@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines
+# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines, too-many-public-methods
 """
 Device specific handeling for NetBox to Zabbix
 """
@@ -9,12 +9,11 @@ from copy import deepcopy
 from logging import getLogger
 from zabbix_utils import APIRequestError
 from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalError,
-                                InterfaceConfigError, JournalError, UsermacroError)
+                                InterfaceConfigError, JournalError)
 from modules.interface import ZabbixInterface
 from modules.usermacros import ZabbixUsermacros
 from modules.hostgroups import Hostgroup
 from modules.tools import field_mapper
-from pprint import pprint
 
 try:
     from config import (
@@ -73,7 +72,7 @@ class PhysicalDevice():
     def _inventory_map(self):
         """ Use device inventory maps """
         return device_inventory_map
- 
+
     def _usermacro_map(self):
         """ Use device inventory maps """
         return device_usermacro_map
@@ -197,31 +196,6 @@ class PhysicalDevice():
         if inventory_sync and self.inventory_mode in [0,1]:
             self.logger.debug(f"Host {self.name}: Starting inventory mapper")
             self.inventory = field_mapper(self.name, self._inventory_map(), nbdevice, self.logger)
-#            # Let's build an inventory dict for each property in the inventory_map
-#            for nb_inv_field, zbx_inv_field in self._inventory_map().items():
-#                field_list = nb_inv_field.split("/") # convert str to list based on delimiter
-#                # start at the base of the dict...
-#                value = nbdevice
-#                # ... and step through the dict till we find the needed value
-#                for item in field_list:
-#                    value = value[item] if value else None
-#                # Check if the result is usable and expected
-#                # We want to apply any int or float 0 values,
-#                # even if python thinks those are empty.
-#                if ((value and isinstance(value, int | float | str )) or
-#                     (isinstance(value, int | float) and int(value) ==0)):
-#                    self.inventory[zbx_inv_field] = str(value)
-#                elif not value:
-#                    # empty value should just be an empty string for API compatibility
-#                    self.logger.debug(f"Host {self.name}: NetBox inventory lookup for "
-#                                      f"'{nb_inv_field}' returned an empty value")
-#                    self.inventory[zbx_inv_field] = ""
-#                else:
-#                    # Value is not a string or numeral, probably not what the user expected.
-#                    self.logger.error(f"Host {self.name}: Inventory lookup for '{nb_inv_field}'"
-#                                      " returned an unexpected type: it will be skipped.")
-#            self.logger.debug(f"Host {self.name}: Inventory mapping complete. "
-#                            f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
         return True
 
     def isCluster(self):
@@ -375,14 +349,19 @@ class PhysicalDevice():
             self.logger.warning(message)
             raise SyncInventoryError(message) from e
 
-    def setUsermacros(self):
-        # Initiate Usermacros class
-        macros = ZabbixUsermacros(self.nb.config_context, self._usermacro_map())
-        if macros.sync == False:
-            return []
-        else:
-            return macros.generate() 
- 
+    def set_usermacros(self):
+        """
+        Generates Usermacros
+        """
+        macros = ZabbixUsermacros(self.nb, self._usermacro_map(),
+                                  usermacro_sync, logger=self.logger,
+                                  host=self.name)
+        if macros.sync is False:
+            self.usermacros = []
+
+        self.usermacros = macros.generate()
+        return True
+
     def setProxy(self, proxy_list):
         """
         Sets proxy or proxy group if this
@@ -443,8 +422,6 @@ class PhysicalDevice():
             groups = [{"groupid": self.group_id}]
             # Set Zabbix proxy if defined
             self.setProxy(proxies)
-            # Set usermacros
-            self.usermacros = self.setUsermacros()
             # Set basic data for host creation
             create_data = {"host": self.name,
                             "name": self.visible_name,
@@ -571,7 +548,7 @@ class PhysicalDevice():
                                     selectHostGroups=["groupid"],
                                     selectParentTemplates=["templateid"],
                                     selectInventory=list(self._inventory_map().values()),
-                                    selectMacros=["macro","value","type","description"] 
+                                    selectMacros=["macro","value","type","description"]
                                     )
         if len(host) > 1:
             e = (f"Got {len(host)} results for Zabbix hosts "
@@ -621,9 +598,9 @@ class PhysicalDevice():
             if group["groupid"] == self.group_id:
                 self.logger.debug(f"Host {self.name}: hostgroup in-sync.")
                 break
-        else:
-            self.logger.warning(f"Host {self.name}: hostgroup OUT of sync.")
-            self.updateZabbixHost(groups={'groupid': self.group_id})
+            else:
+                self.logger.warning(f"Host {self.name}: hostgroup OUT of sync.")
+                self.updateZabbixHost(groups={'groupid': self.group_id})
 
         if int(host["status"]) == self.zabbix_state:
             self.logger.debug(f"Host {self.name}: status in-sync.")
@@ -697,14 +674,13 @@ class PhysicalDevice():
         # Check host usermacros
         if usermacro_sync:
             macros_filtered = []
-            self.usermacros = self.setUsermacros()
             # Do not re-sync secret usermacros unless sync is set to 'full'
-            if not str(usermacro_sync).lower() == "full":
+            if str(usermacro_sync).lower() != "full":
                 for m in deepcopy(self.usermacros):
                     if m['type'] == str(1):
-                       # Remove the value as the api doesn't return it
-                       # this will allow us to only update usermacros that don't exist
-                       m.pop('value')
+                        # Remove the value as the api doesn't return it
+                        # this will allow us to only update usermacros that don't exist
+                        m.pop('value')
                     macros_filtered.append(m)
             if host['macros'] == self.usermacros or host['macros'] == macros_filtered:
                 self.logger.debug(f"Host {self.name}: usermacros in-sync.")

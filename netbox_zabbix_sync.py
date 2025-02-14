@@ -161,7 +161,7 @@ def main(arguments):
         try:
             vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
                                 create_journal, logger)
-            logger.debug(f"Host {vm.name}: started operations on VM.")
+            logger.debug(f"Host {vm.name}: Started operations on VM.")
             vm.set_vm_template()
             # Check if a valid template has been found for this VM.
             if not vm.zbx_template_names:
@@ -172,6 +172,7 @@ def main(arguments):
             if not vm.hostgroup:
                 continue
             vm.set_inventory(nb_vm)
+            vm.set_usermacros()
             # Checks if device is in cleanup state
             if vm.status in zabbix_device_removal:
                 if vm.zabbix_id:
@@ -225,6 +226,7 @@ def main(arguments):
             if not device.hostgroup:
                 continue
             device.set_inventory(nb_device)
+            device.set_usermacros()
             # Checks if device is part of cluster.
             # Requires clustering variable
             if device.isCluster() and clustering:

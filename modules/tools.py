@@ -1,6 +1,5 @@
-from logging import getLogger
-
 """A collection of tools used by several classes"""
+
 def convert_recordset(recordset):
     """ Converts netbox RedcordSet to list of dicts. """
     recordlist = []
@@ -45,7 +44,6 @@ def proxy_prepper(proxy_list, proxy_group_list):
         output.append(group)
     return output
 
-
 def field_mapper(host, mapper, nbdevice, logger):
     """
     Maps NetBox field data to Zabbix properties.
@@ -75,6 +73,6 @@ def field_mapper(host, mapper, nbdevice, logger):
             # Value is not a string or numeral, probably not what the user expected.
             logger.error(f"Host {host}: Lookup for '{nb_field}'"
                               " returned an unexpected type: it will be skipped.")
-    logger.debug(f"Host {host}: Field mapping complete."
-                    f"Mapped {len(list(filter(None, data.values())))} field(s)")
+    logger.debug(f"Host {host}: Field mapping complete. "
+                     f"Mapped {len(list(filter(None, data.values())))} field(s)")
     return data

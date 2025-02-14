@@ -9,8 +9,6 @@ from modules.interface import ZabbixInterface
 from modules.exceptions import TemplateError, InterfaceConfigError, SyncInventoryError
 try:
     from config import (
-        inventory_sync,
-        inventory_mode,
         vm_inventory_map,
         traverse_site_groups,
         traverse_regions
