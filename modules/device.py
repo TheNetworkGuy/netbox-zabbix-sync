@@ -13,6 +13,7 @@ from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalE
 from modules.interface import ZabbixInterface
 from modules.usermacros import ZabbixUsermacros
 from modules.hostgroups import Hostgroup
+from modules.tools import field_mapper
 from pprint import pprint
 
 try:
@@ -195,31 +196,32 @@ class PhysicalDevice():
         self.inventory = {}
         if inventory_sync and self.inventory_mode in [0,1]:
             self.logger.debug(f"Host {self.name}: Starting inventory mapper")
-            # Let's build an inventory dict for each property in the inventory_map
-            for nb_inv_field, zbx_inv_field in self._inventory_map().items():
-                field_list = nb_inv_field.split("/") # convert str to list based on delimiter
-                # start at the base of the dict...
-                value = nbdevice
-                # ... and step through the dict till we find the needed value
-                for item in field_list:
-                    value = value[item] if value else None
-                # Check if the result is usable and expected
-                # We want to apply any int or float 0 values,
-                # even if python thinks those are empty.
-                if ((value and isinstance(value, int | float | str )) or
-                     (isinstance(value, int | float) and int(value) ==0)):
-                    self.inventory[zbx_inv_field] = str(value)
-                elif not value:
-                    # empty value should just be an empty string for API compatibility
-                    self.logger.debug(f"Host {self.name}: NetBox inventory lookup for "
-                                      f"'{nb_inv_field}' returned an empty value")
-                    self.inventory[zbx_inv_field] = ""
-                else:
-                    # Value is not a string or numeral, probably not what the user expected.
-                    self.logger.error(f"Host {self.name}: Inventory lookup for '{nb_inv_field}'"
-                                      " returned an unexpected type: it will be skipped.")
-            self.logger.debug(f"Host {self.name}: Inventory mapping complete. "
-                            f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
+            self.inventory = field_mapper(self.name, self._inventory_map(), nbdevice, self.logger)
+#            # Let's build an inventory dict for each property in the inventory_map
+#            for nb_inv_field, zbx_inv_field in self._inventory_map().items():
+#                field_list = nb_inv_field.split("/") # convert str to list based on delimiter
+#                # start at the base of the dict...
+#                value = nbdevice
+#                # ... and step through the dict till we find the needed value
+#                for item in field_list:
+#                    value = value[item] if value else None
+#                # Check if the result is usable and expected
+#                # We want to apply any int or float 0 values,
+#                # even if python thinks those are empty.
+#                if ((value and isinstance(value, int | float | str )) or
+#                     (isinstance(value, int | float) and int(value) ==0)):
+#                    self.inventory[zbx_inv_field] = str(value)
+#                elif not value:
+#                    # empty value should just be an empty string for API compatibility
+#                    self.logger.debug(f"Host {self.name}: NetBox inventory lookup for "
+#                                      f"'{nb_inv_field}' returned an empty value")
+#                    self.inventory[zbx_inv_field] = ""
+#                else:
+#                    # Value is not a string or numeral, probably not what the user expected.
+#                    self.logger.error(f"Host {self.name}: Inventory lookup for '{nb_inv_field}'"
+#                                      " returned an unexpected type: it will be skipped.")
+#            self.logger.debug(f"Host {self.name}: Inventory mapping complete. "
+#                            f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
         return True
 
     def isCluster(self):
