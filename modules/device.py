@@ -5,6 +5,7 @@ Device specific handeling for NetBox to Zabbix
 """
 from os import sys
 from re import search
+from copy import deepcopy
 from logging import getLogger
 from zabbix_utils import APIRequestError
 from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalError,
@@ -22,6 +23,7 @@ try:
         inventory_sync,
         inventory_mode,
         device_inventory_map,
+        usermacro_sync,
         device_usermacro_map
     )
 except ModuleNotFoundError:
@@ -372,18 +374,13 @@ class PhysicalDevice():
             raise SyncInventoryError(message) from e
 
     def setUsermacros(self):
-        try:
-            # Initiate interface class
-            macros = ZabbixUsermacros(self.nb.config_context, self._usermacro_map())
-            if macros.sync == False:
-               return {}
-            else:
-                return [{'macro': '{$USERMACRO}', 'value': '123', 'type': 0, 'description': 'just a test'}]
-        except UsermacroError as e:
-            message = f"{self.name}: {e}"
-            self.logger.warning(message)
-            raise UsermacroError(message) from e
-
+        # Initiate Usermacros class
+        macros = ZabbixUsermacros(self.nb.config_context, self._usermacro_map())
+        if macros.sync == False:
+            return []
+        else:
+            return macros.generate() 
+ 
     def setProxy(self, proxy_list):
         """
         Sets proxy or proxy group if this
@@ -574,7 +571,6 @@ class PhysicalDevice():
                                     selectInventory=list(self._inventory_map().values()),
                                     selectMacros=["macro","value","type","description"] 
                                     )
-        pprint(host)
         if len(host) > 1:
             e = (f"Got {len(host)} results for Zabbix hosts "
                  f"with ID {self.zabbix_id} - hostname {self.name}.")
@@ -695,6 +691,24 @@ class PhysicalDevice():
             else:
                 self.logger.warning(f"Host {self.name}: inventory OUT of sync.")
                 self.updateZabbixHost(inventory=self.inventory)
+
+        # Check host usermacros
+        if usermacro_sync:
+            macros_filtered = []
+            self.usermacros = self.setUsermacros()
+            # Do not re-sync secret usermacros unless sync is set to 'full'
+            if not str(usermacro_sync).lower() == "full":
+                for m in deepcopy(self.usermacros):
+                    if m['type'] == str(1):
+                       # Remove the value as the api doesn't return it
+                       # this will allow us to only update usermacros that don't exist
+                       m.pop('value')
+                    macros_filtered.append(m)
+            if host['macros'] == self.usermacros or host['macros'] == macros_filtered:
+                self.logger.debug(f"Host {self.name}: usermacros in-sync.")
+            else:
+                self.logger.warning(f"Host {self.name}: usermacros OUT of sync.")
+                self.updateZabbixHost(macros=self.usermacros)
 
         # If only 1 interface has been found
         # pylint: disable=too-many-nested-blocks
