@@ -101,3 +101,23 @@ device_inventory_map = { "asset_tag": "asset_tag",
 vm_inventory_map = { "status/label": "deployment_status",
                      "comments": "notes",
                      "name": "name" }
+
+# To allow syncing of usermacros from NetBox, set to True.
+# this will enable both field mapping and config context usermacros.
+#
+# If set to "full", it will force the update of secret usermacros every run.
+# Please see the README.md for more information.
+usermacro_sync = False
+
+# device usermacro_map to map NetBox fields to usermacros.
+device_usermacro_map = {"serial": "{$HW_SERIAL}",
+                        "role/name": "{$DEV_ROLE}",
+                        "url": "{$NB_URL}",
+                        "id": "{$NB_ID}"}
+
+# virtual machine usermacro_map to map NetBox fields to usermacros.
+vm_usermacro_map = {"memory": "{$TOTAL_MEMORY}",
+                    "role/name": "{$DEV_ROLE}",
+                    "url": "{$NB_URL}",
+                    "id": "{$NB_ID}"}
+

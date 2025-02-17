@@ -7,7 +7,7 @@ A script to create, update and delete Zabbix hosts using NetBox device objects.
 To pull the latest stable version to your local cache, use the following docker
 pull command:
 
-```
+```bash
 docker pull ghcr.io/thenetworkguy/netbox-zabbix-sync:main
 ```
 
@@ -15,7 +15,7 @@ Make sure to specify the needed environment variables for the script to work
 (see [here](#set-environment-variables)) on the command line or use an
 [env file](https://docs.docker.com/reference/cli/docker/container/run/#env).
 
-```
+```bash
 docker run -d -t -i -e ZABBIX_HOST='https://zabbix.local' \ 
 -e ZABBIX_TOKEN='othersecrettoken' \
 -e NETBOX_HOST='https://netbox.local' \
@@ -30,7 +30,7 @@ The image uses the default `config.py` for it's configuration, you can use a
 volume mount in the docker run command to override with your own config file if
 needed (see [config file](#config-file)):
 
-```
+```bash
 docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ...
 ```
 
@@ -38,7 +38,7 @@ docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ...
 
 ### Cloning the repository
 
-```
+```bash
 git clone https://github.com/TheNetworkGuy/netbox-zabbix-sync.git
 ```
 
@@ -66,7 +66,7 @@ cp config.py.example config.py
 
 Set the following environment variables:
 
-```
+```bash
 ZABBIX_HOST="https://zabbix.local"
 ZABBIX_USER="username"
 ZABBIX_PASS="Password"
@@ -77,7 +77,7 @@ NETBOX_TOKEN="secrettoken"
 Or, you can use a Zabbix API token to login instead of using a username and
 password. In that case `ZABBIX_USER` and `ZABBIX_PASS` will be ignored.
 
-```
+```bash
 ZABBIX_TOKEN=othersecrettoken
 ```
 
@@ -183,9 +183,9 @@ used:
 | cluster      | VM cluster name |
 | cluster_type | VM cluster type |
 
-You can specify the value sperated by a "/" like so:
+You can specify the value seperated by a "/" like so:
 
-```
+```python
 hostgroup_format = "tenant/site/dev_location/role"
 ```
 
@@ -232,7 +232,7 @@ have a relationship with a tenant.
 - Device_role: PDU
 - Site: HQ-AMS
 
-```
+```python
 hostgroup_format = "site/tenant/device_role"
 ```
 
@@ -245,7 +245,7 @@ generated for both hosts:
 
 The same logic applies to custom fields being used in the HG format:
 
-```
+```python
 hostgroup_format = "site/mycustomfieldname"
 ```
 
@@ -299,7 +299,7 @@ seperator. For example, the following map will assign the custom field
 
 For Virtual Machines, use `vm_inventory_map`.
 
-```
+```python
 inventory_sync = True
 inventory_mode = "manual"
 device_inventory_map = {"custom_fields/mycustomfield/name": "alias"}
@@ -324,14 +324,14 @@ sticking to the custom field.
 You can change the behaviour in the config file. By default this setting is
 false but you can set it to true to use config context:
 
-```
+```python
 templates_config_context = True
 ```
 
 After that make sure that for each host there is at least one template defined
 in the config context in this format:
 
-```
+```json
 {
     "zabbix": {
         "templates": [
@@ -349,9 +349,113 @@ added benefit of overwriting the template should a device in NetBox have a
 device specific context defined. In this case the device specific context
 template(s) will take priority over the device type custom field template.
 
-```
+```python
 templates_config_context_overrule = True
 ```
+
+### Usermacros
+
+You can choose to use NetBox as a source for Host usermacros by 
+enabling the following option in the configuration file:
+
+```
+usermacro_sync = True
+```
+
+Please be advised that enabling this option will _clear_ any usermacros
+manually set on the managed hosts and override them with the usermacros
+from NetBox.
+
+There are two NetBox sources that can be used to populate usermacros:
+
+1. NetBox config context
+2. NetBox fields
+
+#### Config context
+
+By defining a dictionary `usermacros` within the `zabbix` key in 
+config context, you can dynamically assign usermacro values based on 
+anything that you can target based on 
+[config contexts](https://netboxlabs.com/docs/netbox/en/stable/features/context-data/)
+within NetBox.
+
+Through this method, it is possible to define the following types of usermacros:
+
+1. Text
+2. Secret
+3. Vault
+
+The default macro type is text if no `type` and `value` have been set.
+It is also possible to create usermacros with
+[context](https://www.zabbix.com/documentation/7.0/en/manual/config/macros/user_macros_context).
+Examples:
+
+```json
+{
+    "zabbix": {
+        "usermacros": {
+            "{$USER_MACRO}": "test value",
+            "{$CONTEXT_MACRO:\"test\"}": "test value",
+            "{$CONTEXT_REGEX_MACRO:regex:\".*\"}": "test value",
+            "{$SECRET_MACRO}": {
+                "type": "secret",
+                "value": "PaSsPhRaSe"
+            },
+            "{$VAULT_MACRO}": {
+                "type": "vault",
+                "value": "secret/vmware:password"
+            },
+            "{$USER_MACRO2}": {
+                "type": "text",
+                "value": "another test value"
+            }
+        }
+    }
+}
+
+```
+
+Please be aware that secret usermacros are only synced _once_ by default.
+This is the default behaviour because Zabbix API won't return the value of 
+secrets so the script cannot compare the values with the ones set in NetBox.
+
+If you update a secret usermacro value, just remove the value from the host
+in Zabbix and the new value will be synced during the next run.
+
+Alternatively, you can set the following option in the config file:
+
+```python
+usermacro_sync = "full"
+```
+
+This will force a full usermacro sync on every run on hosts that have secret usermacros set.
+That way, you will know for sure the secret values are always up to date.
+
+Keep in mind that NetBox (and the log output of this script) will show your secrets
+in plain text. If true secrecy is required, consider switching to
+[vault](https://www.zabbix.com/documentation/current/en/manual/config/macros/secret_macros#vault-secret) 
+usermacros.
+
+#### Netbox Fields
+
+To use NetBox fields as a source for usermacros, you will need to set up usermacro maps
+for devices and/or virtual machines in the configuration file.
+This method only supports `text` type usermacros.
+
+For example:
+```python
+usermacro_sync = True
+device_usermacro_map = {"serial": "{$HW_SERIAL}",
+                        "role/name": "{$DEV_ROLE}", 
+                        "url": "{$NB_URL}",
+                        "id": "{$NB_ID}"}
+vm_usermacro_map = {"memory": "{$TOTAL_MEMORY}",
+                    "role/name": "{$DEV_ROLE}", 
+                    "url": "{$NB_URL}",
+                    "id": "{$NB_ID}"}
+```
+
+
 
 ## Permissions
 
@@ -521,9 +625,13 @@ environment. For example, you could:
 }
 ```
 
-I would recommend using macros for sensitive data such as community strings
+I would recommend using usermacros for sensitive data such as community strings
 since the data in NetBox is plain-text.
 
 > **_NOTE:_** Not all SNMP data is required for a working configuration.
 > [The following parameters are allowed](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed")but
 > are not all required, depending on your environment.
+
+
+
+
