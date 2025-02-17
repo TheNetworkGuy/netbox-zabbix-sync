@@ -358,7 +358,7 @@ templates_config_context_overrule = True
 You can choose to use NetBox as a source for Host usermacros by 
 enabling the following option in the configuration file:
 
-```
+```python
 usermacro_sync = True
 ```
 
@@ -388,6 +388,7 @@ Through this method, it is possible to define the following types of usermacros:
 The default macro type is text if no `type` and `value` have been set.
 It is also possible to create usermacros with
 [context](https://www.zabbix.com/documentation/7.0/en/manual/config/macros/user_macros_context).
+
 Examples:
 
 ```json
@@ -443,6 +444,7 @@ for devices and/or virtual machines in the configuration file.
 This method only supports `text` type usermacros.
 
 For example:
+
 ```python
 usermacro_sync = True
 device_usermacro_map = {"serial": "{$HW_SERIAL}",
