@@ -10,6 +10,7 @@ from modules.exceptions import TemplateError, InterfaceConfigError, SyncInventor
 try:
     from config import (
         vm_inventory_map,
+        vm_usermacro_map,
         traverse_site_groups,
         traverse_regions
     )
@@ -28,6 +29,10 @@ class VirtualMachine(PhysicalDevice):
     def _inventory_map(self):
         """ use VM inventory maps """
         return vm_inventory_map
+
+    def _usermacro_map(self):
+        """ use VM inventory maps """
+        return vm_usermacro_map
 
     def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
