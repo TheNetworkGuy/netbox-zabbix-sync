@@ -173,6 +173,7 @@ def main(arguments):
                 continue
             vm.set_inventory(nb_vm)
             vm.set_usermacros()
+            vm.set_tags()
             # Checks if device is in cleanup state
             if vm.status in zabbix_device_removal:
                 if vm.zabbix_id:
@@ -227,6 +228,7 @@ def main(arguments):
                 continue
             device.set_inventory(nb_device)
             device.set_usermacros()
+            device.set_tags()
             # Checks if device is part of cluster.
             # Requires clustering variable
             if device.isCluster() and clustering:

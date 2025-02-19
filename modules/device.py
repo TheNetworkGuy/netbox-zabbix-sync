@@ -12,8 +12,9 @@ from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalE
                                 InterfaceConfigError, JournalError)
 from modules.interface import ZabbixInterface
 from modules.usermacros import ZabbixUsermacros
+from modules.tags import ZabbixTags
 from modules.hostgroups import Hostgroup
-from modules.tools import field_mapper
+from modules.tools import field_mapper, remove_duplicates
 
 try:
     from config import (
@@ -24,7 +25,12 @@ try:
         inventory_mode,
         device_inventory_map,
         usermacro_sync,
-        device_usermacro_map
+        device_usermacro_map,
+        tag_sync,
+        tag_lower,
+        tag_name,
+        tag_value,
+        device_tag_map
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -60,6 +66,7 @@ class PhysicalDevice():
         self.inventory_mode = -1
         self.inventory = {}
         self.usermacros = {}
+        self.tags = {}
         self.logger = logger if logger else getLogger(__name__)
         self._setBasics()
 
@@ -76,6 +83,10 @@ class PhysicalDevice():
     def _usermacro_map(self):
         """ Use device inventory maps """
         return device_usermacro_map
+
+    def _tag_map(self):
+        """ Use device host tag maps """
+        return device_tag_map
 
     def _setBasics(self):
         """
@@ -362,6 +373,21 @@ class PhysicalDevice():
         self.usermacros = macros.generate()
         return True
 
+
+    def set_tags(self):
+        """
+        Generates Host Tags
+        """
+        tags = ZabbixTags(self.nb, self._tag_map(),
+                                  tag_sync, tag_lower, tag_name=tag_name,
+                                  tag_value=tag_value, logger=self.logger,
+                                  host=self.name)
+        if tags.sync is False:
+            self.tags = []
+
+        self.tags = tags.generate()
+        return True
+
     def setProxy(self, proxy_list):
         """
         Sets proxy or proxy group if this
@@ -432,7 +458,8 @@ class PhysicalDevice():
                             "description": description,
                             "inventory_mode": self.inventory_mode,
                             "inventory": self.inventory,
-                            "macros": self.usermacros
+                            "macros": self.usermacros,
+                            "tags": self.tags
                             }
             # If a Zabbix proxy or Zabbix Proxy group has been defined
             if self.zbxproxy:
@@ -548,7 +575,8 @@ class PhysicalDevice():
                                     selectHostGroups=["groupid"],
                                     selectParentTemplates=["templateid"],
                                     selectInventory=list(self._inventory_map().values()),
-                                    selectMacros=["macro","value","type","description"]
+                                    selectMacros=["macro","value","type","description"],
+                                    selectTags=["tag","value"]
                                     )
         if len(host) > 1:
             e = (f"Got {len(host)} results for Zabbix hosts "
@@ -598,9 +626,8 @@ class PhysicalDevice():
             if group["groupid"] == self.group_id:
                 self.logger.debug(f"Host {self.name}: hostgroup in-sync.")
                 break
-            else:
-                self.logger.warning(f"Host {self.name}: hostgroup OUT of sync.")
-                self.updateZabbixHost(groups={'groupid': self.group_id})
+            self.logger.warning(f"Host {self.name}: hostgroup OUT of sync.")
+            self.updateZabbixHost(groups={'groupid': self.group_id})
 
         if int(host["status"]) == self.zabbix_state:
             self.logger.debug(f"Host {self.name}: status in-sync.")
@@ -687,6 +714,14 @@ class PhysicalDevice():
             else:
                 self.logger.warning(f"Host {self.name}: usermacros OUT of sync.")
                 self.updateZabbixHost(macros=self.usermacros)
+
+        # Check host usermacros
+        if tag_sync:
+            if remove_duplicates(host['tags'],sortkey='tag') == self.tags:
+                self.logger.debug(f"Host {self.name}: tags in-sync.")
+            else:
+                self.logger.warning(f"Host {self.name}: tags OUT of sync.")
+                self.updateZabbixHost(tags=self.tags)
 
         # If only 1 interface has been found
         # pylint: disable=too-many-nested-blocks

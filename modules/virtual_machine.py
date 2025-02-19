@@ -11,6 +11,7 @@ try:
     from config import (
         vm_inventory_map,
         vm_usermacro_map,
+        vm_tag_map,
         traverse_site_groups,
         traverse_regions
     )
@@ -31,8 +32,12 @@ class VirtualMachine(PhysicalDevice):
         return vm_inventory_map
 
     def _usermacro_map(self):
-        """ use VM inventory maps """
+        """ use VM usermacro maps """
         return vm_usermacro_map
+
+    def _tag_map(self):
+        """ use VM tag maps """
+        return vm_tag_map
 
     def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""

@@ -76,3 +76,14 @@ def field_mapper(host, mapper, nbdevice, logger):
     logger.debug(f"Host {host}: Field mapping complete. "
                      f"Mapped {len(list(filter(None, data.values())))} field(s)")
     return data
+
+def remove_duplicates(input_list, sortkey=None):
+    """
+    Removes duplicate entries from a list and sorts the list
+    """
+    output_list = []
+    if isinstance(input_list, list):
+        output_list = [dict(t) for t in {tuple(d.items()) for d in input_list}]
+    if sortkey and isinstance(sortkey, str):
+        output_list.sort(key=lambda x: x[sortkey])
+    return output_list

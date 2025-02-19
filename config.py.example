@@ -121,3 +121,33 @@ vm_usermacro_map = {"memory": "{$TOTAL_MEMORY}",
                     "url": "{$NB_URL}",
                     "id": "{$NB_ID}"}
 
+# To sync host tags to Zabbix, set to True.
+tag_sync = False
+
+# Setting tag_lower to True will lower capital letters ain tag names and values
+# This is more inline with the Zabbix way of working with tags.
+#
+# You can however set this to False to ensure capital letters are synced to Zabbix tags.
+tag_lower = True
+
+# We can sync NetBox device/VM tags to Zabbix, but as NetBox tags don't follow the key/value
+# pattern, we need to specify a tag name to register the NetBox tags in Zabbix.
+#
+#
+# 
+# If tag_name is set to False, we won't sync NetBox device/VM tags to Zabbix.
+tag_name = 'NetBox'
+
+# We can choose to use 'name', 'slug' or 'display' NetBox tag properties as a value in Zabbix.
+# 'name'is used by default.
+tag_value = "name"
+
+# device tag_map to map NetBox fields to host tags.
+device_tag_map = {"site/name": "site",
+                  "rack/name": "rack",
+                  "platform/name": "target"}
+
+# Virtual machine tag_map to map NetBox fields to host tags.
+vm_tag_map = {"site/name": "site",
+              "cluster/name": "cluster",
+              "platform/name": "target"}
