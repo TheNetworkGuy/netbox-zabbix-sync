@@ -353,6 +353,86 @@ template(s) will take priority over the device type custom field template.
 templates_config_context_overrule = True
 ```
 
+### Tags
+
+This script can sync host tags to your Zabbix hosts for use in filtering,
+SLA calculations and event correlation.
+
+Tags can be synced from the following sources:
+
+1. NetBox device/vm tags
+2. NetBox config ontext
+3. NetBox fields
+
+Syncing tags will override any tags that were set manually on the host,
+making NetBox the single source-of-truth for managing tags.
+
+To enable syncing, turn on tag_sync in the config file.
+By default, this script will modify tag names and tag values to lowercase.
+You can change this behaviour by setting tag_lower to False.
+
+```python
+tag_sync = True
+tag_lower = True
+```
+
+#### Device tags
+
+As NetBox doesn't follow the tag/value pattern for tags, we will need a tag
+name set to register the netwbox tags.
+
+By default the tag name is "NetBox", but you can change this to whatever you want.
+The value for the tag can be choosen from 'name', 'display' or 'slug'.
+
+```python
+tag_name = 'NetBox'
+tag_value = 'name'
+```
+
+#### Config context
+
+You can supply custom tags via config context by adding the following:
+
+```json
+{
+    "zabbix": {
+        "tags": [
+            {
+                "MyTagName": "MyTagValue"
+            },
+            {
+                "environment": "production"
+            }
+        ],
+    }
+}
+```
+
+This will allow you to assign tags based on the config context rules.
+
+#### NetBox Field
+
+NetBox field can also be used as input for tags, just like inventory and usermacros.
+To enable syncing from fields, make sure to configure a `device_tag_map` and/or a `vm_tag_map`.
+
+```python
+device_tag_map = {"site/name": "site",
+                  "rack/name": "rack",
+                  "platform/name": "target"}
+
+vm_tag_map = {"site/name": "site",
+              "cluster/name": "cluster",
+              "platform/name": "target"}
+```
+
+To turn off field syncing, set the maps to empty dictionaries:
+
+```python
+device_tag_map = {}
+vm_tag_map = {}
+```
+
+
 ### Usermacros
 
 You can choose to use NetBox as a source for Host usermacros by 
