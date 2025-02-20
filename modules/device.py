@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines
+# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines, too-many-public-methods
 """
 Device specific handeling for NetBox to Zabbix
 """
 from os import sys
 from re import search
+from copy import deepcopy
 from logging import getLogger
 from zabbix_utils import APIRequestError
 from modules.exceptions import (SyncInventoryError, TemplateError, SyncExternalError,
                                 InterfaceConfigError, JournalError)
 from modules.interface import ZabbixInterface
+from modules.usermacros import ZabbixUsermacros
+from modules.tags import ZabbixTags
 from modules.hostgroups import Hostgroup
+from modules.tools import field_mapper, remove_duplicates
+
 try:
     from config import (
         template_cf, device_cf,
@@ -18,7 +23,14 @@ try:
         traverse_regions,
         inventory_sync,
         inventory_mode,
-        inventory_map
+        device_inventory_map,
+        usermacro_sync,
+        device_usermacro_map,
+        tag_sync,
+        tag_lower,
+        tag_name,
+        tag_value,
+        device_tag_map
     )
 except ModuleNotFoundError:
     print("Configuration file config.py not found in main directory."
@@ -53,6 +65,8 @@ class PhysicalDevice():
         self.nb_journals = nb_journal_class
         self.inventory_mode = -1
         self.inventory = {}
+        self.usermacros = {}
+        self.tags = {}
         self.logger = logger if logger else getLogger(__name__)
         self._setBasics()
 
@@ -61,6 +75,18 @@ class PhysicalDevice():
 
     def __str__(self):
         return self.__repr__()
+
+    def _inventory_map(self):
+        """ Use device inventory maps """
+        return device_inventory_map
+
+    def _usermacro_map(self):
+        """ Use device inventory maps """
+        return device_usermacro_map
+
+    def _tag_map(self):
+        """ Use device host tag maps """
+        return device_tag_map
 
     def _setBasics(self):
         """
@@ -180,31 +206,7 @@ class PhysicalDevice():
         self.inventory = {}
         if inventory_sync and self.inventory_mode in [0,1]:
             self.logger.debug(f"Host {self.name}: Starting inventory mapper")
-            # Let's build an inventory dict for each property in the inventory_map
-            for nb_inv_field, zbx_inv_field in inventory_map.items():
-                field_list = nb_inv_field.split("/") # convert str to list based on delimiter
-                # start at the base of the dict...
-                value = nbdevice
-                # ... and step through the dict till we find the needed value
-                for item in field_list:
-                    value = value[item] if value else None
-                # Check if the result is usable and expected
-                # We want to apply any int or float 0 values,
-                # even if python thinks those are empty.
-                if ((value and isinstance(value, int | float | str )) or
-                     (isinstance(value, int | float) and int(value) ==0)):
-                    self.inventory[zbx_inv_field] = str(value)
-                elif not value:
-                    # empty value should just be an empty string for API compatibility
-                    self.logger.debug(f"Host {self.name}: NetBox inventory lookup for "
-                                      f"'{nb_inv_field}' returned an empty value")
-                    self.inventory[zbx_inv_field] = ""
-                else:
-                    # Value is not a string or numeral, probably not what the user expected.
-                    self.logger.error(f"Host {self.name}: Inventory lookup for '{nb_inv_field}'"
-                                      " returned an unexpected type: it will be skipped.")
-            self.logger.debug(f"Host {self.name}: Inventory mapping complete. "
-                            f"Mapped {len(list(filter(None, self.inventory.values())))} field(s)")
+            self.inventory = field_mapper(self.name, self._inventory_map(), nbdevice, self.logger)
         return True
 
     def isCluster(self):
@@ -358,6 +360,34 @@ class PhysicalDevice():
             self.logger.warning(message)
             raise SyncInventoryError(message) from e
 
+    def set_usermacros(self):
+        """
+        Generates Usermacros
+        """
+        macros = ZabbixUsermacros(self.nb, self._usermacro_map(),
+                                  usermacro_sync, logger=self.logger,
+                                  host=self.name)
+        if macros.sync is False:
+            self.usermacros = []
+
+        self.usermacros = macros.generate()
+        return True
+
+
+    def set_tags(self):
+        """
+        Generates Host Tags
+        """
+        tags = ZabbixTags(self.nb, self._tag_map(),
+                                  tag_sync, tag_lower, tag_name=tag_name,
+                                  tag_value=tag_value, logger=self.logger,
+                                  host=self.name)
+        if tags.sync is False:
+            self.tags = []
+
+        self.tags = tags.generate()
+        return True
+
     def setProxy(self, proxy_list):
         """
         Sets proxy or proxy group if this
@@ -427,7 +457,9 @@ class PhysicalDevice():
                             "templates": templateids,
                             "description": description,
                             "inventory_mode": self.inventory_mode,
-                            "inventory": self.inventory
+                            "inventory": self.inventory,
+                            "macros": self.usermacros,
+                            "tags": self.tags
                             }
             # If a Zabbix proxy or Zabbix Proxy group has been defined
             if self.zbxproxy:
@@ -542,7 +574,10 @@ class PhysicalDevice():
                                     selectGroups=["groupid"],
                                     selectHostGroups=["groupid"],
                                     selectParentTemplates=["templateid"],
-                                    selectInventory=list(inventory_map.values()))
+                                    selectInventory=list(self._inventory_map().values()),
+                                    selectMacros=["macro","value","type","description"],
+                                    selectTags=["tag","value"]
+                                    )
         if len(host) > 1:
             e = (f"Got {len(host)} results for Zabbix hosts "
                  f"with ID {self.zabbix_id} - hostname {self.name}.")
@@ -591,7 +626,6 @@ class PhysicalDevice():
             if group["groupid"] == self.group_id:
                 self.logger.debug(f"Host {self.name}: hostgroup in-sync.")
                 break
-        else:
             self.logger.warning(f"Host {self.name}: hostgroup OUT of sync.")
             self.updateZabbixHost(groups={'groupid': self.group_id})
 
@@ -663,6 +697,31 @@ class PhysicalDevice():
             else:
                 self.logger.warning(f"Host {self.name}: inventory OUT of sync.")
                 self.updateZabbixHost(inventory=self.inventory)
+
+        # Check host usermacros
+        if usermacro_sync:
+            macros_filtered = []
+            # Do not re-sync secret usermacros unless sync is set to 'full'
+            if str(usermacro_sync).lower() != "full":
+                for m in deepcopy(self.usermacros):
+                    if m['type'] == str(1):
+                        # Remove the value as the api doesn't return it
+                        # this will allow us to only update usermacros that don't exist
+                        m.pop('value')
+                    macros_filtered.append(m)
+            if host['macros'] == self.usermacros or host['macros'] == macros_filtered:
+                self.logger.debug(f"Host {self.name}: usermacros in-sync.")
+            else:
+                self.logger.warning(f"Host {self.name}: usermacros OUT of sync.")
+                self.updateZabbixHost(macros=self.usermacros)
+
+        # Check host usermacros
+        if tag_sync:
+            if remove_duplicates(host['tags'],sortkey='tag') == self.tags:
+                self.logger.debug(f"Host {self.name}: tags in-sync.")
+            else:
+                self.logger.warning(f"Host {self.name}: tags OUT of sync.")
+                self.updateZabbixHost(tags=self.tags)
 
         # If only 1 interface has been found
         # pylint: disable=too-many-nested-blocks
