@@ -31,3 +31,6 @@ class HostgroupError(SyncError):
 
 class TemplateError(SyncError):
     """ Class TemplateError """
+
+class UsermacroError(SyncError):
+    """ Class UsermacroError """
