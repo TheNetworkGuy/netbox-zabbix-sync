@@ -4,13 +4,24 @@
 All of the Zabbix Usermacro related configuration
 """
 from logging import getLogger
+
 from modules.tools import field_mapper, remove_duplicates
 
-class ZabbixTags():
+
+class ZabbixTags:
     """Class that represents a Zabbix interface."""
 
-    def __init__(self, nb, tag_map, tag_sync, tag_lower=True,
-                     tag_name=None, tag_value=None, logger=None, host=None):
+    def __init__(
+        self,
+        nb,
+        tag_map,
+        tag_sync,
+        tag_lower=True,
+        tag_name=None,
+        tag_value=None,
+        logger=None,
+        host=None,
+    ):
         self.nb = nb
         self.name = host if host else nb.name
         self.tag_map = tag_map
@@ -42,7 +53,7 @@ class ZabbixTags():
         """
         Validates tag name
         """
-        if tag_name and isinstance(tag_name, str) and len(tag_name)<=256:
+        if tag_name and isinstance(tag_name, str) and len(tag_name) <= 256:
             return True
         return False
 
@@ -50,7 +61,7 @@ class ZabbixTags():
         """
         Validates tag value
         """
-        if tag_value and isinstance(tag_value, str) and len(tag_value)<=256:
+        if tag_value and isinstance(tag_value, str) and len(tag_value) <= 256:
             return True
         return False
 
@@ -58,23 +69,25 @@ class ZabbixTags():
         """
         Renders a tag
         """
-        tag={}
+        tag = {}
         if self.validate_tag(tag_name):
             if self.lower:
-                tag['tag'] = tag_name.lower()
+                tag["tag"] = tag_name.lower()
             else:
-                tag['tag'] = tag_name
+                tag["tag"] = tag_name
         else:
-            self.logger.error(f'Tag {tag_name} is not a valid tag name, skipping.')
+            self.logger.error(f"Tag {tag_name} is not a valid tag name, skipping.")
             return False
 
         if self.validate_value(tag_value):
             if self.lower:
-                tag['value'] = tag_value.lower()
+                tag["value"] = tag_value.lower()
             else:
-                tag['value'] = tag_value
+                tag["value"] = tag_value
         else:
-            self.logger.error(f'Tag {tag_name} has an invalid value: \'{tag_value}\', skipping.')
+            self.logger.error(
+                f"Tag {tag_name} has an invalid value: '{tag_value}', skipping."
+            )
             return False
         return tag
 
@@ -83,7 +96,7 @@ class ZabbixTags():
         Generate full set of Usermacros
         """
         # pylint: disable=too-many-branches
-        tags=[]
+        tags = []
         # Parse the field mapper for tags
         if self.tag_map:
             self.logger.debug(f"Host {self.nb.name}: Starting tag mapper")
@@ -94,9 +107,12 @@ class ZabbixTags():
                     tags.append(t)
 
         # Parse NetBox config context for tags
-        if ("zabbix" in self.nb.config_context and "tags" in self.nb.config_context['zabbix']
-               and isinstance(self.nb.config_context['zabbix']['tags'], list)):
-            for tag in self.nb.config_context['zabbix']['tags']:
+        if (
+            "zabbix" in self.nb.config_context
+            and "tags" in self.nb.config_context["zabbix"]
+            and isinstance(self.nb.config_context["zabbix"]["tags"], list)
+        ):
+            for tag in self.nb.config_context["zabbix"]["tags"]:
                 if isinstance(tag, dict):
                     for tagname, value in tag.items():
                         t = self.render_tag(tagname, value)
@@ -106,12 +122,12 @@ class ZabbixTags():
         # Pull in NetBox device tags if tag_name is set
         if self.tag_name and isinstance(self.tag_name, str):
             for tag in self.nb.tags:
-                if self.tag_value.lower() in ['display', 'name', 'slug']:
+                if self.tag_value.lower() in ["display", "name", "slug"]:
                     value = tag[self.tag_value]
                 else:
-                    value = tag['name']
+                    value = tag["name"]
                 t = self.render_tag(self.tag_name, value)
                 if t:
                     tags.append(t)
 
-        return remove_duplicates(tags, sortkey='tag')
+        return remove_duplicates(tags, sortkey="tag")
