@@ -41,23 +41,18 @@ except ModuleNotFoundError:
     sys.exit(1)
 
 # Set logging
-log_format = logging.Formatter(
-    "%(asctime)s - %(name)s - " "%(levelname)s - %(message)s"
-)
 lgout = logging.StreamHandler()
-lgout.setFormatter(log_format)
-lgout.setLevel(logging.DEBUG)
-
 lgfile = logging.FileHandler(
     path.join(path.dirname(path.realpath(__file__)), "sync.log")
 )
-lgfile.setFormatter(log_format)
-lgfile.setLevel(logging.DEBUG)
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.WARNING,
+    handlers=[lgout, lgfile],
+)
 
 logger = logging.getLogger("NetBox-Zabbix-sync")
-logger.addHandler(lgout)
-logger.addHandler(lgfile)
-logger.setLevel(logging.WARNING)
 
 
 def main(arguments):
@@ -65,7 +60,11 @@ def main(arguments):
     # pylint: disable=too-many-branches, too-many-statements
     # set environment variables
     if arguments.verbose:
+        logger.setLevel(logging.INFO)
+    if arguments.debug:
         logger.setLevel(logging.DEBUG)
+    if arguments.debug_all:
+        logging.getLogger().setLevel(logging.DEBUG)
     env_vars = ["ZABBIX_HOST", "NETBOX_HOST", "NETBOX_TOKEN"]
     if "ZABBIX_TOKEN" in environ:
         env_vars.append("ZABBIX_TOKEN")
@@ -319,6 +318,15 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-v", "--verbose", help="Turn on debugging.", action="store_true"
+    )
+    parser.add_argument(
+        "-vv", "--debug", help="Turn on debugging.", action="store_true"
+    )
+    parser.add_argument(
+        "-vvv",
+        "--debug-all",
+        help="Turn on debugging for all modules.",
+        action="store_true",
     )
     args = parser.parse_args()
     main(args)
