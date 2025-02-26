@@ -1,3 +1,7 @@
+"""
+Logging module for Netbox-Zabbix-sync
+"""
+
 import logging
 from os import path
 
