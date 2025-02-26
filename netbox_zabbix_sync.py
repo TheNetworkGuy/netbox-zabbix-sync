@@ -65,6 +65,9 @@ def main(arguments):
         logger.setLevel(logging.DEBUG)
     if arguments.debug_all:
         logging.getLogger().setLevel(logging.DEBUG)
+    if arguments.quiet:
+        logging.getLogger().setLevel(logging.ERROR)
+
     env_vars = ["ZABBIX_HOST", "NETBOX_HOST", "NETBOX_TOKEN"]
     if "ZABBIX_TOKEN" in environ:
         env_vars.append("ZABBIX_TOKEN")
@@ -328,5 +331,6 @@ if __name__ == "__main__":
         help="Turn on debugging for all modules.",
         action="store_true",
     )
+    parser.add_argument("-q", "--quiet", help="Turn off warnings.", action="store_true")
     args = parser.parse_args()
     main(args)
