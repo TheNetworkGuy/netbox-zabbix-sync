@@ -7,6 +7,7 @@ from copy import deepcopy
 from logging import getLogger
 from os import sys
 from re import search
+from venv import logger
 
 from zabbix_utils import APIRequestError
 
@@ -19,6 +20,7 @@ from modules.exceptions import (
 )
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
+from modules.logging import get_logger
 from modules.tags import ZabbixTags
 from modules.tools import field_mapper, remove_duplicates
 from modules.usermacros import ZabbixUsermacros
@@ -111,7 +113,7 @@ class PhysicalDevice:
             self.ip = self.cidr.split("/")[0]
         else:
             e = f"Host {self.name}: no primary IP."
-            self.logger.info(e)
+            self.logger.warning(e)
             raise SyncInventoryError(e)
 
         # Check if device has custom field for ZBX ID
@@ -193,6 +195,7 @@ class PhysicalDevice:
             f"found for {self.nb.device_type.manufacturer.name}"
             f" - {self.nb.device_type.display}."
         )
+        self.logger.warning(e)
         raise TemplateError(e)
 
     def get_templates_context(self):
@@ -548,7 +551,7 @@ class PhysicalDevice:
             except APIRequestError as e:
                 e = f"Host {self.name}: Couldn't create. Zabbix returned {str(e)}."
                 self.logger.error(e)
-                raise SyncExternalError(e) from None
+                raise SyncExternalError(e) from e
             # Set NetBox custom field to hostID value.
             self.nb.custom_fields[device_cf] = int(self.zabbix_id)
             self.nb.save()
@@ -556,8 +559,9 @@ class PhysicalDevice:
             self.logger.info(msg)
             self.create_journal_entry("success", msg)
         else:
-            e = f"Host {self.name}: Unable to add to Zabbix. Host already present."
-            self.logger.warning(e)
+            self.logger.error(
+                f"Host {self.name}: Unable to add to Zabbix. Host already present."
+            )
 
     def createZabbixHostgroup(self, hostgroups):
         """

@@ -14,6 +14,7 @@ from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 
 from modules.device import PhysicalDevice
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
+from modules.logging import get_logger, set_log_levels, setup_logger
 from modules.tools import convert_recordset, proxy_prepper
 from modules.virtual_machine import VirtualMachine
 
@@ -40,19 +41,9 @@ except ModuleNotFoundError:
     )
     sys.exit(1)
 
-# Set logging
-lgout = logging.StreamHandler()
-lgfile = logging.FileHandler(
-    path.join(path.dirname(path.realpath(__file__)), "sync.log")
-)
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.WARNING,
-    handlers=[lgout, lgfile],
-)
-
-logger = logging.getLogger("NetBox-Zabbix-sync")
+setup_logger()
+logger = get_logger()
 
 
 def main(arguments):
@@ -60,13 +51,13 @@ def main(arguments):
     # pylint: disable=too-many-branches, too-many-statements
     # set environment variables
     if arguments.verbose:
-        logger.setLevel(logging.INFO)
+        set_log_levels(logging.WARNING, logging.INFO)
     if arguments.debug:
-        logger.setLevel(logging.DEBUG)
+        set_log_levels(logging.WARNING, logging.DEBUG)
     if arguments.debug_all:
-        logging.getLogger().setLevel(logging.DEBUG)
+        set_log_levels(logging.DEBUG, logging.DEBUG)
     if arguments.quiet:
-        logging.getLogger().setLevel(logging.ERROR)
+        set_log_levels(logging.ERROR, logging.ERROR)
 
     env_vars = ["ZABBIX_HOST", "NETBOX_HOST", "NETBOX_TOKEN"]
     if "ZABBIX_TOKEN" in environ:
@@ -202,7 +193,7 @@ def main(arguments):
                     # Delete device from Zabbix
                     # and remove hostID from NetBox.
                     vm.cleanup()
-                    logger.info(f"VM {vm.name}: cleanup complete")
+                    logger.debug(f"VM {vm.name}: cleanup complete")
                     continue
                 # Device has been added to NetBox
                 # but is not in Activate state

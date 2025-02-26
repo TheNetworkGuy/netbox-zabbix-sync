@@ -76,7 +76,7 @@ class ZabbixTags:
             else:
                 tag["tag"] = tag_name
         else:
-            self.logger.error(f"Tag {tag_name} is not a valid tag name, skipping.")
+            self.logger.warning(f"Tag {tag_name} is not a valid tag name, skipping.")
             return False
 
         if self.validate_value(tag_value):
@@ -85,7 +85,7 @@ class ZabbixTags:
             else:
                 tag["value"] = tag_value
         else:
-            self.logger.error(
+            self.logger.warning(
                 f"Tag {tag_name} has an invalid value: '{tag_value}', skipping."
             )
             return False
