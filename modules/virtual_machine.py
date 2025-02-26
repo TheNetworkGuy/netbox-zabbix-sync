@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # pylint: disable=duplicate-code
 """Module that hosts all functions for virtual machine processing"""
 

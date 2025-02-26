@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines, too-many-public-methods
+# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines, too-many-public-methods, duplicate-code
 """
 Device specific handeling for NetBox to Zabbix
 """
@@ -7,7 +6,6 @@ from copy import deepcopy
 from logging import getLogger
 from os import sys
 from re import search
-from venv import logger
 
 from zabbix_utils import APIRequestError
 
@@ -20,7 +18,6 @@ from modules.exceptions import (
 )
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
-from modules.logging import get_logger
 from modules.tags import ZabbixTags
 from modules.tools import field_mapper, remove_duplicates
 from modules.usermacros import ZabbixUsermacros
@@ -549,9 +546,9 @@ class PhysicalDevice:
                 host = self.zabbix.host.create(**create_data)
                 self.zabbix_id = host["hostids"][0]
             except APIRequestError as e:
-                e = f"Host {self.name}: Couldn't create. Zabbix returned {str(e)}."
-                self.logger.error(e)
-                raise SyncExternalError(e) from e
+                msg = f"Host {self.name}: Couldn't create. Zabbix returned {str(e)}."
+                self.logger.error(msg)
+                raise SyncExternalError(msg) from e
             # Set NetBox custom field to hostID value.
             self.nb.custom_fields[device_cf] = int(self.zabbix_id)
             self.nb.save()

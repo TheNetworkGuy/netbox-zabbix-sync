@@ -5,7 +5,7 @@
 import argparse
 import logging
 import ssl
-from os import environ, path, sys
+from os import environ, sys
 
 from pynetbox import api
 from pynetbox.core.query import RequestError as NBRequestError

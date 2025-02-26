@@ -10,12 +10,13 @@ class Hostgroup:
     """Hostgroup class for devices and VM's
     Takes type (vm or dev) and NB object"""
 
+    # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
     def __init__(
         self,
         obj_type,
         nb_obj,
         version,
-        logger=None,  # pylint: disable=too-many-arguments, too-many-positional-arguments
+        logger=None,
         nested_sitegroup_flag=False,
         nested_region_flag=False,
         nb_regions=None,
