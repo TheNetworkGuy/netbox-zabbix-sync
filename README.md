@@ -575,9 +575,11 @@ python3 netbox_zabbix_sync.py
 
 ### Flags
 
-| Flag | Option  | Description            |
-| ---- | ------- | ---------------------- |
-| -v   | verbose | Log with debugging on. |
+| Flag | Option    | Description                           |
+| ---- | --------- | ------------------------------------- |
+| -v   | verbose   | Log with info on.                     |
+| -vv  | debug     | Log with debugging on.                |
+| -vvv | debug-all | Log with debugging on for all modules |
 
 ## Config context
 

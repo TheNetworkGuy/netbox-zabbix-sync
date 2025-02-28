@@ -2,35 +2,47 @@
 """
 All custom exceptions used for Exception generation
 """
+
+
 class SyncError(Exception):
-    """ Class SyncError """
+    """Class SyncError"""
+
 
 class JournalError(Exception):
-    """ Class SyncError """
+    """Class SyncError"""
+
 
 class SyncExternalError(SyncError):
-    """ Class SyncExternalError """
+    """Class SyncExternalError"""
+
 
 class SyncInventoryError(SyncError):
-    """ Class SyncInventoryError """
+    """Class SyncInventoryError"""
+
 
 class SyncDuplicateError(SyncError):
-    """ Class SyncDuplicateError """
+    """Class SyncDuplicateError"""
+
 
 class EnvironmentVarError(SyncError):
-    """ Class EnvironmentVarError """
+    """Class EnvironmentVarError"""
+
 
 class InterfaceConfigError(SyncError):
-    """ Class InterfaceConfigError """
+    """Class InterfaceConfigError"""
+
 
 class ProxyConfigError(SyncError):
-    """ Class ProxyConfigError """
+    """Class ProxyConfigError"""
+
 
 class HostgroupError(SyncError):
-    """ Class HostgroupError """
+    """Class HostgroupError"""
+
 
 class TemplateError(SyncError):
-    """ Class TemplateError """
+    """Class TemplateError"""
+
 
 class UsermacroError(SyncError):
-    """ Class UsermacroError """
+    """Class UsermacroError"""
