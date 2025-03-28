@@ -7,7 +7,7 @@ A script to create, update and delete Zabbix hosts using NetBox device objects.
 To pull the latest stable version to your local cache, use the following docker
 pull command:
 
-```
+```sh
 docker pull ghcr.io/thenetworkguy/netbox-zabbix-sync:main
 ```
 
@@ -15,7 +15,7 @@ Make sure to specify the needed environment variables for the script to work
 (see [here](#set-environment-variables)) on the command line or use an
 [env file](https://docs.docker.com/reference/cli/docker/container/run/#env).
 
-```
+```sh
 docker run -d -t -i -e ZABBIX_HOST='https://zabbix.local' \ 
 -e ZABBIX_TOKEN='othersecrettoken' \
 -e NETBOX_HOST='https://netbox.local' \
@@ -30,7 +30,7 @@ The image uses the default `config.py` for it's configuration, you can use a
 volume mount in the docker run command to override with your own config file if
 needed (see [config file](#config-file)):
 
-```
+```sh
 docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ...
 ```
 
@@ -38,7 +38,7 @@ docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ...
 
 ### Cloning the repository
 
-```
+```sh
 git clone https://github.com/TheNetworkGuy/netbox-zabbix-sync.git
 ```
 
@@ -48,9 +48,15 @@ Make sure that you have a python environment with the following packages
 installed. You can also use the `requirements.txt` file for installation with
 pip.
 
-```
+```sh
+# Packages:
 pynetbox
 pyzabbix
+
+# Install them through requirements.txt from a venv:
+virtualenv .venv
+source .venv/bin/activate
+.venv/bin/pip --require-virtualenv install -r requirements.txt
 ```
 
 ### Config file
@@ -58,7 +64,7 @@ pyzabbix
 First time user? Copy the `config.py.example` file to `config.py`. This file is
 used for modifying filters and setting variables such as custom field names.
 
-```
+```sh
 cp config.py.example config.py
 ```
 
@@ -66,26 +72,26 @@ cp config.py.example config.py
 
 Set the following environment variables:
 
-```
-ZABBIX_HOST="https://zabbix.local"
-ZABBIX_USER="username"
-ZABBIX_PASS="Password"
-NETBOX_HOST="https://netbox.local"
-NETBOX_TOKEN="secrettoken"
+```sh
+export ZABBIX_HOST="https://zabbix.local"
+export ZABBIX_USER="username"
+export ZABBIX_PASS="Password"
+export NETBOX_HOST="https://netbox.local"
+export NETBOX_TOKEN="secrettoken"
 ```
 
 Or, you can use a Zabbix API token to login instead of using a username and
 password. In that case `ZABBIX_USER` and `ZABBIX_PASS` will be ignored.
 
-```
-ZABBIX_TOKEN=othersecrettoken
+```sh
+export ZABBIX_TOKEN=othersecrettoken
 ```
 
 If you are using custom SSL certificates for NetBox and/or Zabbix, you can set
 the following environment variable to the path of your CA bundle file:
 
-```bash
-REQUEST_CA_BUNDLE=/path/to/your/ca-bundle.crt
+```sh
+export REQUESTS_CA_BUNDLE=/path/to/your/ca-bundle.crt
 ```
 
 ### NetBox custom fields
