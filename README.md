@@ -49,8 +49,14 @@ installed. You can also use the `requirements.txt` file for installation with
 pip.
 
 ```
+# Packages:
 pynetbox
 pyzabbix
+
+# Install them through requirements.txt from a venv:
+virtualenv .venv
+source .venv/bin/activate
+.venv/bin/pip --require-virtualenv install -r requirements.txt
 ```
 
 ### Config file
@@ -67,25 +73,25 @@ cp config.py.example config.py
 Set the following environment variables:
 
 ```
-ZABBIX_HOST="https://zabbix.local"
-ZABBIX_USER="username"
-ZABBIX_PASS="Password"
-NETBOX_HOST="https://netbox.local"
-NETBOX_TOKEN="secrettoken"
+export ZABBIX_HOST="https://zabbix.local"
+export ZABBIX_USER="username"
+export ZABBIX_PASS="Password"
+export NETBOX_HOST="https://netbox.local"
+export NETBOX_TOKEN="secrettoken"
 ```
 
 Or, you can use a Zabbix API token to login instead of using a username and
 password. In that case `ZABBIX_USER` and `ZABBIX_PASS` will be ignored.
 
 ```
-ZABBIX_TOKEN=othersecrettoken
+export ZABBIX_TOKEN=othersecrettoken
 ```
 
 If you are using custom SSL certificates for NetBox and/or Zabbix, you can set
 the following environment variable to the path of your CA bundle file:
 
 ```bash
-REQUEST_CA_BUNDLE=/path/to/your/ca-bundle.crt
+export REQUESTS_CA_BUNDLE=/path/to/your/ca-bundle.crt
 ```
 
 ### NetBox custom fields
