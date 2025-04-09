@@ -80,19 +80,74 @@ inventory_sync = False
 # For nested properties, you can use the '/' seperator.
 # For example, the following map will assign the custom field 'mycustomfield' to the 'alias' Zabbix inventory field:
 #
-# inventory_map = { "custom_fields/mycustomfield/name": "alias"}
+# device_inventory_map = { "custom_fields/mycustomfield/name": "alias"}
 #
-# The following map should provide some nice defaults:
-inventory_map = { "asset_tag": "asset_tag",
-                  "virtual_chassis/name": "chassis",
-                  "status/label": "deployment_status",
-                  "location/name": "location",
-                  "latitude": "location_lat",
-                  "longitude": "location_lon",
-                  "comments": "notes",
-                  "name": "name",
-                  "rack/name": "site_rack",
-                  "serial": "serialno_a",
-                  "device_type/model": "type",
-                  "device_type/manufacturer/name": "vendor",
-                  "oob_ip/address": "oob_ip" }
+# The following maps should provide some nice defaults:
+device_inventory_map = { "asset_tag": "asset_tag",
+                         "virtual_chassis/name": "chassis",
+                         "status/label": "deployment_status",
+                         "location/name": "location",
+                         "latitude": "location_lat",
+                         "longitude": "location_lon",
+                         "comments": "notes",
+                         "name": "name",
+                         "rack/name": "site_rack",
+                         "serial": "serialno_a",
+                         "device_type/model": "type",
+                         "device_type/manufacturer/name": "vendor",
+                         "oob_ip/address": "oob_ip" }
+
+# We also support inventory mapping on Virtual Machines.
+vm_inventory_map = { "status/label": "deployment_status",
+                     "comments": "notes",
+                     "name": "name" }
+
+# To allow syncing of usermacros from NetBox, set to True.
+# this will enable both field mapping and config context usermacros.
+#
+# If set to "full", it will force the update of secret usermacros every run.
+# Please see the README.md for more information.
+usermacro_sync = False
+
+# device usermacro_map to map NetBox fields to usermacros.
+device_usermacro_map = {"serial": "{$HW_SERIAL}",
+                        "role/name": "{$DEV_ROLE}",
+                        "url": "{$NB_URL}",
+                        "id": "{$NB_ID}"}
+
+# virtual machine usermacro_map to map NetBox fields to usermacros.
+vm_usermacro_map = {"memory": "{$TOTAL_MEMORY}",
+                    "role/name": "{$DEV_ROLE}",
+                    "url": "{$NB_URL}",
+                    "id": "{$NB_ID}"}
+
+# To sync host tags to Zabbix, set to True.
+tag_sync = False
+
+# Setting tag_lower to True will lower capital letters ain tag names and values
+# This is more inline with the Zabbix way of working with tags.
+#
+# You can however set this to False to ensure capital letters are synced to Zabbix tags.
+tag_lower = True
+
+# We can sync NetBox device/VM tags to Zabbix, but as NetBox tags don't follow the key/value
+# pattern, we need to specify a tag name to register the NetBox tags in Zabbix.
+#
+#
+# 
+# If tag_name is set to False, we won't sync NetBox device/VM tags to Zabbix.
+tag_name = 'NetBox'
+
+# We can choose to use 'name', 'slug' or 'display' NetBox tag properties as a value in Zabbix.
+# 'name'is used by default.
+tag_value = "name"
+
+# device tag_map to map NetBox fields to host tags.
+device_tag_map = {"site/name": "site",
+                  "rack/name": "rack",
+                  "platform/name": "target"}
+
+# Virtual machine tag_map to map NetBox fields to host tags.
+vm_tag_map = {"site/name": "site",
+              "cluster/name": "cluster",
+              "platform/name": "target"}
