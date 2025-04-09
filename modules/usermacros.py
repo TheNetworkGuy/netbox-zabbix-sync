@@ -57,7 +57,7 @@ class ZabbixUsermacros:
             macro["macro"] = str(macro_name)
             if isinstance(macro_properties, dict):
                 if not "value" in macro_properties:
-                    self.logger.error(f"Usermacro {macro_name} has no value, skipping.")
+                    self.logger.warning(f"Usermacro {macro_name} has no value, skipping.")
                     return False
                 macro["value"] = macro_properties["value"]
 
@@ -76,10 +76,14 @@ class ZabbixUsermacros:
                 else:
                     macro["description"] = ""
 
-            elif isinstance(macro_properties, str):
+            elif isinstance(macro_properties, str) and macro_properties:
                 macro["value"] = macro_properties
                 macro["type"] = str(0)
                 macro["description"] = ""
+
+            else:
+                self.logger.warning(f"Usermacro {macro_name} has no value, skipping.")
+                return False
         else:
             self.logger.error(
                 f"Usermacro {macro_name} is not a valid usermacro name, skipping."
