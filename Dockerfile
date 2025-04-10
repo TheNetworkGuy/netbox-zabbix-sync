@@ -1,6 +1,5 @@
 # syntax=docker/dockerfile:1
 FROM python:3.12-alpine
-USER 1000:1000
 RUN mkdir -p /opt/netbox-zabbix
 COPY --chown=1000:1000 . /opt/netbox-zabbix
 WORKDIR /opt/netbox-zabbix
