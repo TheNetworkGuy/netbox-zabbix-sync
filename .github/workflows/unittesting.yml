@@ -25,7 +25,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y docker.io
-          apt-get install docker-compose -y
+          apt install docker-compose-v2 -y
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -39,7 +39,7 @@ jobs:
         run: |
           git clone -b release https://github.com/netbox-community/netbox-docker.git
           mv netbox-docker/docker-compose.override.yml.example netbox-docker/docker-compose.override.yml
-          docker-compose -f netbox-docker/docker-compose.yml pull
-          docker-compose -f netbox-docker/docker-compose.yml up -d
+          docker compose -f netbox-docker/docker-compose.yml pull
+          docker compose -f netbox-docker/docker-compose.yml up -d
       - name: Wait 2 minutes for compose stack to build
         run: sleep 120s
