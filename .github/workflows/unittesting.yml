@@ -21,17 +21,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Docker
+      - name: Install Docker and Docker-compose
         run: |
           apt-get update
           apt-get install -y docker.io
+          sudo apt-get install docker-compose -y
 
-      - name: Test Docker
-        run: |
-          docker version
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: 3.12
       - name: Show Python version
         run: python --version
+      - name: Test Docker
+        run: |
+          docker version
+      - name: configure and start Netbox
+        run: |
+          git clone -b release https://github.com/netbox-community/netbox-docker.git
+          mv netbox-docker/docker-compose.override.yml.example netbox-docker/docker-compose.override.yml
+          docker-compose -f netbox-docker/docker-compose.yml pull
+          docker-compose -f netbox-docker/docker-compose.yml up -d
+      - name: Wait 2 minutes for compose stack to build
+        run: sleep 120s
