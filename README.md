@@ -1,6 +1,7 @@
 # NetBox to Zabbix synchronization
 
 A script to create, update and delete Zabbix hosts using NetBox device objects.
+Currently compatible with Zabbix 7.0. Zabbix 7.2 is unfortunately not supported and will result in the script failing.
 
 ## Installation via Docker
 
