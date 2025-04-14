@@ -38,7 +38,7 @@ jobs:
       - name: configure and start Netbox
         run: |
           git clone -b release https://github.com/netbox-community/netbox-docker.git
-          mv netbox-docker/docker-compose.override.yml.example netbox-docker/docker-compose.override.yml
+          mv infra/netbox-compose.yml netbox-docker/docker-compose.override.yml
           docker compose -f netbox-docker/docker-compose.yml pull
           docker compose -f netbox-docker/docker-compose.yml up -d
       - name: Wait 2 minutes for compose stack to build
