@@ -16,11 +16,8 @@ jobs:
           options: --privileged --shm-size=2g
           volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
-    container:
-      image: ubuntu:latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Docker and Docker-compose
         run: |
           apt-get update
@@ -42,4 +39,6 @@ jobs:
           docker compose -f netbox-docker/docker-compose.yml pull
           docker compose -f netbox-docker/docker-compose.yml up -d
       - name: Wait 2 minutes for compose stack to build
-        run: sleep 120s
+        run: |
+          sleep 120s
+          docker compose -f netbox-docker/docker-compose.yml logs netbox
