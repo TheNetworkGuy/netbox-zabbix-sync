@@ -1,0 +1,37 @@
+---
+name: Unit testing and functional code control
+on:
+  push:
+    branches:
+      - 'main'
+      - 'develop'
+      - 'unittesting'
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+        docker:
+          image: docker:dind
+          options: --privileged --shm-size=2g
+          volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+    container:
+      image: ubuntu:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Docker
+        run: |
+          apt-get update
+          apt-get install -y docker.io
+
+      - name: Test Docker
+        run: |
+          docker version
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+      - name: Show Python version
+        run: python --version
