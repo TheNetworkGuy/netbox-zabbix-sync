@@ -1,2 +1,3 @@
 pynetbox
 zabbix-utils==2.0.1
+pyyaml

@@ -1,0 +1,27 @@
+# Required: Custom Field name for Zabbix templates
+template_cf: "zabbix_templates"
+
+# Required: Custom Field name for Zabbix device
+device_cf: "zabbix_hostid"
+
+# Optional: Traverse site groups and assign Zabbix hostgroups based on site groups
+traverse_site_groups: false
+
+# Optional: Traverse regions and assign Zabbix hostgroups based on region hierarchy
+traverse_regions: false
+
+# Optional: Enable inventory syncing for host metadata
+inventory_sync: true
+
+# Optional: Choose which inventory fields to sync ("enabled", "manual", "disabled")
+inventory_mode: "manual"
+
+# Optional: Mapping of NetBox device fields to Zabbix inventory fields
+# See: https://www.zabbix.com/documentation/current/en/manual/api/reference/host/object#host_inventory
+inventory_map:
+  serial: "serial"
+  asset_tag: "asset_tag"
+  description: "comment"
+  location: "location"
+  contact: "contact"
+  site: "site"
