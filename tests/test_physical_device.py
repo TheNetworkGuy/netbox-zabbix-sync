@@ -371,3 +371,59 @@ class TestPhysicalDevice(unittest.TestCase):
 
         # Check isCluster result
         self.assertFalse(device.isCluster())
+
+
+    def test_promote_master_device_primary(self):
+        """Test promoteMasterDevice when device is primary in cluster."""
+        # Set up virtual chassis with master device
+        mock_vc = MagicMock()
+        mock_vc.name = "virtual-chassis-1"
+        mock_master = MagicMock()
+        mock_master.id = self.mock_nb_device.id  # Set master ID to match the current device
+        mock_vc.master = mock_master
+        self.mock_nb_device.virtual_chassis = mock_vc
+
+        # Create device with the updated mock
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger
+        )
+
+        # Call promoteMasterDevice and check the result
+        result = device.promoteMasterDevice()
+
+        # Should return True for primary device
+        self.assertTrue(result)
+        # Device name should be updated to virtual chassis name
+        self.assertEqual(device.name, "virtual-chassis-1")
+
+
+    def test_promote_master_device_secondary(self):
+        """Test promoteMasterDevice when device is secondary in cluster."""
+        # Set up virtual chassis with a different master device
+        mock_vc = MagicMock()
+        mock_vc.name = "virtual-chassis-1"
+        mock_master = MagicMock()
+        mock_master.id = self.mock_nb_device.id + 1  # Different ID than the current device
+        mock_vc.master = mock_master
+        self.mock_nb_device.virtual_chassis = mock_vc
+
+        # Create device with the updated mock
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger
+        )
+
+        # Call promoteMasterDevice and check the result
+        result = device.promoteMasterDevice()
+
+        # Should return False for secondary device
+        self.assertFalse(result)
+        # Device name should not be modified
+        self.assertEqual(device.name, "test-device")
