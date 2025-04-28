@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
 # pylint: disable=duplicate-code
 """Module that hosts all functions for virtual machine processing"""
-
-from os import sys
 from modules.device import PhysicalDevice
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
-from modules.exceptions import TemplateError, InterfaceConfigError, SyncInventoryError
-try:
-    from config import (
-        traverse_site_groups,
-        traverse_regions
-    )
-except ModuleNotFoundError:
-    print("Configuration file config.py not found in main directory."
-           "Please create the file or rename the config.py.example file to config.py.")
-    sys.exit(0)
+from modules.exceptions import (TemplateError, InterfaceConfigError,
+                                SyncInventoryError)
+from modules.config import load_config
+# Load config
+config = load_config()
+
 
 class VirtualMachine(PhysicalDevice):
     """Model for virtual machines"""
@@ -28,8 +22,8 @@ class VirtualMachine(PhysicalDevice):
         """Set the hostgroup for this device"""
         # Create new Hostgroup instance
         hg = Hostgroup("vm", self.nb, self.nb_api_version, logger=self.logger,
-                       nested_sitegroup_flag=traverse_site_groups,
-                       nested_region_flag=traverse_regions,
+                       nested_sitegroup_flag=config["traverse_site_groups"],
+                       nested_region_flag=config["traverse_regions"],
                        nb_groups=nb_site_groups,
                        nb_regions=nb_regions)
         # Generate hostgroup based on hostgroup format
@@ -45,7 +39,7 @@ class VirtualMachine(PhysicalDevice):
             self.logger.warning(e)
         return True
 
-    def setInterfaceDetails(self): # pylint: disable=invalid-name
+    def setInterfaceDetails(self):  # pylint: disable=invalid-name
         """
         Overwrites device function to select an agent interface type by default
         Agent type interfaces are more likely to be used with VMs then SNMP
