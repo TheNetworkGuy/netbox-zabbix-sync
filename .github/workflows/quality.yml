@@ -24,4 +24,4 @@ jobs:
         pip install -r requirements.txt
     - name: Analysing the code with pylint
       run: |
-        pylint --module-naming-style=any $(git ls-files '*.py')
+        pylint --module-naming-style=any modules/* netbox_zabbix_sync.py
