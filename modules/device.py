@@ -157,7 +157,8 @@ class PhysicalDevice():
         if config["inventory_mode"] == "disabled":
             if config["inventory_sync"]:
                 self.logger.error(f"Host {self.name}: Unable to map NetBox inventory to Zabbix. "
-                                  "Inventory sync is enabled in config but inventory mode is disabled.")
+                                  "Inventory sync is enabled in "
+                                  "config but inventory mode is disabled.")
             return True
         if config["inventory_mode"] == "manual":
             self.inventory_mode = 0
@@ -359,7 +360,7 @@ class PhysicalDevice():
         if "zabbix" not in self.nb.config_context:
             return False
         if ("proxy" in self.nb.config_context["zabbix"] and
-               not self.nb.config_context["zabbix"]["proxy"]):
+           not self.nb.config_context["zabbix"]["proxy"]):
             return False
         # Proxy group takes priority over a proxy due
         # to it being HA and therefore being more reliable
@@ -409,16 +410,17 @@ class PhysicalDevice():
             # Set Zabbix proxy if defined
             self.setProxy(proxies)
             # Set basic data for host creation
-            create_data = {"host": self.name,
-                            "name": self.visible_name,
-                            "status": self.zabbix_state,
-                            "interfaces": interfaces,
-                            "groups": groups,
-                            "templates": templateids,
-                            "description": description,
-                            "inventory_mode": self.inventory_mode,
-                            "inventory": self.inventory
-                            }
+            create_data = {
+                "host": self.name,
+                "name": self.visible_name,
+                "status": self.zabbix_state,
+                "interfaces": interfaces,
+                "groups": groups,
+                "templates": templateids,
+                "description": description,
+                "inventory_mode": self.inventory_mode,
+                "inventory": self.inventory
+            }
             # If a Zabbix proxy or Zabbix Proxy group has been defined
             if self.zbxproxy:
                 # If a lower version than 7 is used, we can assume that
@@ -518,7 +520,7 @@ class PhysicalDevice():
                 # Function returns true / false but also sets GroupID
                 if not self.setZabbixGroupID(groups) and not create_hostgroups:
                     e = (f"Host {self.name}: different hostgroup is required but "
-                        "unable to create hostgroup without generation permission.")
+                         "unable to create hostgroup without generation permission.")
                     self.logger.warning(e)
                     raise SyncInventoryError(e)
         # Prepare templates and proxy config
@@ -569,7 +571,7 @@ class PhysicalDevice():
                 templateids.append({'templateid': template['templateid']})
             # Update Zabbix with NB templates and clear any old / lost templates
             self.updateZabbixHost(templates_clear=host["parentTemplates"],
-                                      templates=templateids)
+                                  templates=templateids)
         else:
             self.logger.debug(f"Host {self.name}: template(s) in-sync.")
 
@@ -594,7 +596,7 @@ class PhysicalDevice():
         if self.zbxproxy:
             # Check if proxy or proxy group is defined
             if (self.zbxproxy["idtype"] in host and
-                host[self.zbxproxy["idtype"]] == self.zbxproxy["id"]):
+               host[self.zbxproxy["idtype"]] == self.zbxproxy["id"]):
                 self.logger.debug(f"Host {self.name}: proxy in-sync.")
             # Backwards compatibility for Zabbix <= 6
             elif "proxy_hostid" in host and host["proxy_hostid"] == self.zbxproxy["id"]:
@@ -646,7 +648,7 @@ class PhysicalDevice():
         else:
             self.logger.warning(f"Host {self.name}: inventory_mode OUT of sync.")
             self.updateZabbixHost(inventory_mode=str(self.inventory_mode))
-        if config["inventory_sync"] and self.inventory_mode in [0,1]:
+        if config["inventory_sync"] and self.inventory_mode in [0, 1]:
             # Check host inventory mapping
             if host['inventory'] == self.inventory:
                 self.logger.debug(f"Host {self.name}: inventory in-sync.")
@@ -664,7 +666,7 @@ class PhysicalDevice():
                 if key in host["interfaces"][0]:
                     # If SNMP is used, go through nested dict
                     # to compare SNMP parameters
-                    if isinstance(item,dict) and key == "details":
+                    if isinstance(item, dict) and key == "details":
                         for k, i in item.items():
                             if k in host["interfaces"][0][key]:
                                 # Set update if values don't match
