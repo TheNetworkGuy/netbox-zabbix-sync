@@ -8,6 +8,8 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 
+# PLEASE NOTE: This is a sample config file. You should create your own config.py
+
 DEFAULT_CONFIG = {
     "templates_config_context": False,
     "templates_config_context_overrule": False,
@@ -17,9 +19,32 @@ DEFAULT_CONFIG = {
     "create_hostgroups": True,
     "create_journal": False,
     "sync_vms": False,
+    "vm_hostgroup_format": "cluster_type/cluster/role",
+    "full_proxy_sync": False,
     "zabbix_device_removal": ["Decommissioning", "Inventory"],
     "zabbix_device_disable": ["Offline", "Planned", "Staged", "Failed"],
-    "inventory_mode": "disabled"
+    "hostgroup_format": "site/manufacturer/role",
+    "traverse_regions": False,
+    "traverse_site_groups": False,
+    "nb_device_filter": {"name__n": "null"},
+    "nb_vm_filter": {"name__n": "null"},
+    "inventory_mode": "disabled",
+    "inventory_sync": False,
+    "inventory_map": {
+        "asset_tag": "asset_tag",
+        "virtual_chassis/name": "chassis",
+        "status/label": "deployment_status",
+        "location/name": "location",
+        "latitude": "location_lat",
+        "longitude": "location_lon",
+        "comments": "notes",
+        "name": "name",
+        "rack/name": "site_rack",
+        "serial": "serialno_a",
+        "device_type/model": "type",
+        "device_type/manufacturer/name": "vendor",
+        "oob_ip/address": "oob_ip"
+    }
 }
 
 
