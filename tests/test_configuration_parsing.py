@@ -102,15 +102,26 @@ def test_load_config_file_not_found():
 
 def test_load_env_variable_function():
     """Test the load_env_variable function directly"""
-    # Test when the environment variable exists
-    with patch.dict(os.environ, {"templates_config_context": "True"}):
+    # Create a real environment variable for testing with correct prefix and uppercase
+    test_var = "NBZX_TEMPLATES_CONFIG_CONTEXT"
+    original_env = os.environ.get(test_var, None)
+    try:
+        # Set the environment variable with the proper prefix and case
+        os.environ[test_var] = "True"
+
+        # Test that it's properly read (using lowercase in the function call)
         value = load_env_variable("templates_config_context")
         assert value == "True"
 
-    # Test when the environment variable doesn't exist
-    with patch.dict(os.environ, {}, clear=True):
+        # Test when the environment variable doesn't exist
         value = load_env_variable("nonexistent_variable")
         assert value is None
+    finally:
+        # Clean up - restore original environment
+        if original_env is not None:
+            os.environ[test_var] = original_env
+        else:
+            os.environ.pop(test_var, None)
 
 
 def test_load_config_file_exception_handling():

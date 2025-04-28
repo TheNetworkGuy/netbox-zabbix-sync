@@ -1,142 +1,166 @@
-"""Testing device creation"""
-from unittest.mock import MagicMock, patch, call
+"""Tests for device deletion functionality in the PhysicalDevice class."""
+import unittest
+from unittest.mock import MagicMock, patch
+from zabbix_utils import APIRequestError
 from modules.device import PhysicalDevice
-from modules.config import load_config
-
-config = load_config()
+from modules.exceptions import SyncExternalError
 
 
-def mock_nb_device():
-    """Function to mock Netbox device"""
-    mock = MagicMock()
-    mock.id = 1
-    mock.url = "http://netbox:8000/api/dcim/devices/1/"
-    mock.display_url = "http://netbox:8000/dcim/devices/1/"
-    mock.display = "SW01"
-    mock.name = "SW01"
+class TestDeviceDeletion(unittest.TestCase):
+    """Test class for device deletion functionality."""
 
-    mock.device_type = MagicMock()
-    mock.device_type.display = "Catalyst 3750G-48TS-S"
-    mock.device_type.manufacturer = MagicMock()
-    mock.device_type.manufacturer.display = "Cisco"
-    mock.device_type.manufacturer.name = "Cisco"
-    mock.device_type.manufacturer.slug = "cisco"
-    mock.device_type.manufacturer.description = ""
-    mock.device_type.model = "Catalyst 3750G-48TS-S"
-    mock.device_type.slug = "cisco-ws-c3750g-48ts-s"
+    def setUp(self):
+        """Set up test fixtures."""
+        # Create mock NetBox device
+        self.mock_nb_device = MagicMock()
+        self.mock_nb_device.id = 123
+        self.mock_nb_device.name = "test-device"
+        self.mock_nb_device.status.label = "Decommissioning"
+        self.mock_nb_device.custom_fields = {"zabbix_hostid": "456"}
+        self.mock_nb_device.config_context = {}
 
-    mock.role = MagicMock()
-    mock.role.id = 1
-    mock.role.display = "Switch"
-    mock.role.name = "Switch"
-    mock.role.slug = "switch"
+        # Set up a primary IP
+        primary_ip = MagicMock()
+        primary_ip.address = "192.168.1.1/24"
+        self.mock_nb_device.primary_ip = primary_ip
 
-    mock.tenant = None
-    mock.platform = None
-    mock.serial = "0031876"
-    mock.asset_tag = None
+        # Create mock Zabbix API
+        self.mock_zabbix = MagicMock()
+        self.mock_zabbix.version = "6.0"
 
-    mock.site = MagicMock()
-    mock.site.display = "AMS01"
-    mock.site.name = "AMS01"
-    mock.site.slug = "ams01"
+        # Set up mock host.get response
+        self.mock_zabbix.host.get.return_value = [{"hostid": "456"}]
 
-    mock.location = None
-    mock.rack = None
-    mock.position = None
-    mock.face = None
-    mock.parent_device = None
+        # Mock NetBox journal class
+        self.mock_nb_journal = MagicMock()
 
-    mock.status = MagicMock()
-    mock.status.value = "decommissioning"
-    mock.status.label = "Decommissioning"
+        # Create logger mock
+        self.mock_logger = MagicMock()
 
-    mock.cluster = None
-    mock.virtual_chassis = None
-    mock.vc_position = None
-    mock.vc_priority = None
-    mock.description = ""
-    mock.comments = ""
-    mock.config_template = None
-    mock.config_context = {}
-    mock.local_context_data = None
+        # Create PhysicalDevice instance with mocks
+        with patch('modules.device.config', {"device_cf": "zabbix_hostid"}):
+            self.device = PhysicalDevice(
+                self.mock_nb_device,
+                self.mock_zabbix,
+                self.mock_nb_journal,
+                "3.0",
+                journal=True,
+                logger=self.mock_logger
+            )
 
-    mock.custom_fields = {"zabbix_hostid": 1956}
-    return mock
+    def test_cleanup_successful_deletion(self):
+        """Test successful device deletion from Zabbix."""
+        # Setup
+        self.mock_zabbix.host.get.return_value = [{"hostid": "456"}]
+        self.mock_zabbix.host.delete.return_value = {"hostids": ["456"]}
 
+        # Execute
+        self.device.cleanup()
 
-def mock_zabbix():
-    """Function to mock Zabbix"""
-    mock = MagicMock()
-    mock.host.get.return_value = [{}]
-    mock.host.delete.return_value = True
-    return mock
+        # Verify
+        self.mock_zabbix.host.get.assert_called_once_with(filter={'hostid': '456'}, output=[])
+        self.mock_zabbix.host.delete.assert_called_once_with('456')
+        self.mock_nb_device.save.assert_called_once()
+        self.assertIsNone(self.mock_nb_device.custom_fields["zabbix_hostid"])
+        self.mock_logger.info.assert_called_with(f"Host {self.device.name}: "
+                                                  "Deleted host from Zabbix.")
 
+    def test_cleanup_device_already_deleted(self):
+        """Test cleanup when device is already deleted from Zabbix."""
+        # Setup
+        self.mock_zabbix.host.get.return_value = []  # Empty list means host not found
 
-netbox_journals = MagicMock()
-NB_VERSION = '4.2'
-create_journal = MagicMock()
-logger = MagicMock()
+        # Execute
+        self.device.cleanup()
 
+        # Verify
+        self.mock_zabbix.host.get.assert_called_once_with(filter={'hostid': '456'}, output=[])
+        self.mock_zabbix.host.delete.assert_not_called()
+        self.mock_nb_device.save.assert_called_once()
+        self.assertIsNone(self.mock_nb_device.custom_fields["zabbix_hostid"])
+        self.mock_logger.info.assert_called_with(
+            f"Host {self.device.name}: was already deleted from Zabbix. Removed link in NetBox.")
 
-def test_check_cluster_status():
-    """Checks if the isCluster function is functioning properly"""
-    nb_device = mock_nb_device()
-    zabbix = mock_zabbix()
-    device = PhysicalDevice(nb_device, zabbix, None, None,
-                            None, logger)
-    assert device.isCluster() is False
+    def test_cleanup_api_error(self):
+        """Test cleanup when Zabbix API returns an error."""
+        # Setup
+        self.mock_zabbix.host.get.return_value = [{"hostid": "456"}]
+        self.mock_zabbix.host.delete.side_effect = APIRequestError("API Error")
 
+        # Execute and verify
+        with self.assertRaises(SyncExternalError):
+            self.device.cleanup()
 
-def test_device_deletion_host_exists():
-    """Checks device deletion process"""
-    nb_device = mock_nb_device()
-    zabbix = mock_zabbix()
-    with patch.object(PhysicalDevice, 'create_journal_entry') as mock_journal:
-        # Create device
-        device = PhysicalDevice(nb_device, zabbix, netbox_journals, NB_VERSION,
-                                create_journal, logger)
-        device.cleanup()
-        # Check if Zabbix HostID is empty
-        assert device.nb.custom_fields[config["device_cf"]] is None
-        # Check if API calls are executed
-        device.zabbix.host.get.assert_called_once_with(filter={'hostid': 1956},
-                                                       output=[])
-        device.zabbix.host.delete.assert_called_once_with(1956)
-        # check logger
-        mock_journal.assert_called_once_with("warning",
-                                             "Deleted host from Zabbix")
-        device.logger.info.assert_called_once_with("Host SW01: Deleted "
-                                                   "host from Zabbix.")
+        # Verify correct calls were made
+        self.mock_zabbix.host.get.assert_called_once_with(filter={'hostid': '456'}, output=[])
+        self.mock_zabbix.host.delete.assert_called_once_with('456')
+        self.mock_nb_device.save.assert_not_called()
+        self.mock_logger.error.assert_called()
 
+    def test_zeroize_cf(self):
+        """Test _zeroize_cf method that clears the custom field."""
+        # Execute
+        self.device._zeroize_cf() #  pylint: disable=protected-access
 
-def test_device_deletion_host_not_exists():
-    """
-    Test if device in Netbox gets unlinked
-    when host is not present in Zabbix
-    """
-    nb_device = mock_nb_device()
-    zabbix = mock_zabbix()
-    zabbix.host.get.return_value = None
+        # Verify
+        self.assertIsNone(self.mock_nb_device.custom_fields["zabbix_hostid"])
+        self.mock_nb_device.save.assert_called_once()
 
-    with patch.object(PhysicalDevice, 'create_journal_entry') as mock_journal:
-        # Create new device
-        device = PhysicalDevice(nb_device, zabbix, netbox_journals, NB_VERSION,
-                                create_journal, logger)
-        # Try to clean the device up in Zabbix
-        device.cleanup()
-        # Confirm that a call was issued to Zabbix to check if the host exists
-        device.zabbix.host.get.assert_called_once_with(filter={'hostid': 1956},
-                                                       output=[])
-        # Confirm that no device was deleted in Zabbix
-        device.zabbix.host.delete.assert_not_called()
-        # Test logging
-        log_calls = [
-            call('Host SW01: Deleted host from Zabbix.'),
-            call('Host SW01: was already deleted from Zabbix. '
-                 'Removed link in NetBox.')
-        ]
-        logger.info.assert_has_calls(log_calls)
-        assert logger.info.call_count == 2
-        mock_journal.assert_called_once_with("warning",
-                                             "Deleted host from Zabbix")
+    def test_create_journal_entry(self):
+        """Test create_journal_entry method."""
+        # Setup
+        test_message = "Test journal entry"
+
+        # Execute
+        result = self.device.create_journal_entry("info", test_message)
+
+        # Verify
+        self.assertTrue(result)
+        self.mock_nb_journal.create.assert_called_once()
+        journal_entry = self.mock_nb_journal.create.call_args[0][0]
+        self.assertEqual(journal_entry["assigned_object_type"], "dcim.device")
+        self.assertEqual(journal_entry["assigned_object_id"], 123)
+        self.assertEqual(journal_entry["kind"], "info")
+        self.assertEqual(journal_entry["comments"], test_message)
+
+    def test_create_journal_entry_invalid_severity(self):
+        """Test create_journal_entry with invalid severity."""
+        # Execute
+        result = self.device.create_journal_entry("invalid", "Test message")
+
+        # Verify
+        self.assertFalse(result)
+        self.mock_nb_journal.create.assert_not_called()
+        self.mock_logger.warning.assert_called()
+
+    def test_create_journal_entry_when_disabled(self):
+        """Test create_journal_entry when journaling is disabled."""
+        # Setup - create device with journal=False
+        with patch('modules.device.config', {"device_cf": "zabbix_hostid"}):
+            device = PhysicalDevice(
+                self.mock_nb_device,
+                self.mock_zabbix,
+                self.mock_nb_journal,
+                "3.0",
+                journal=False,  # Disable journaling
+                logger=self.mock_logger
+            )
+
+        # Execute
+        result = device.create_journal_entry("info", "Test message")
+
+        # Verify
+        self.assertFalse(result)
+        self.mock_nb_journal.create.assert_not_called()
+
+    def test_cleanup_updates_journal(self):
+        """Test that cleanup method creates a journal entry."""
+        # Setup
+        self.mock_zabbix.host.get.return_value = [{"hostid": "456"}]
+
+        # Execute
+        with patch.object(self.device, 'create_journal_entry') as mock_journal_entry:
+            self.device.cleanup()
+
+        # Verify
+        mock_journal_entry.assert_called_once_with("warning", "Deleted host from Zabbix")

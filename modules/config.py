@@ -18,7 +18,8 @@ DEFAULT_CONFIG = {
     "create_journal": False,
     "sync_vms": False,
     "zabbix_device_removal": ["Decommissioning", "Inventory"],
-    "zabbix_device_disable": ["Offline", "Planned", "Staged", "Failed"]
+    "zabbix_device_disable": ["Offline", "Planned", "Staged", "Failed"],
+    "inventory_mode": "disabled"
 }
 
 
@@ -36,7 +37,7 @@ def load_config():
 
 def load_env_variable(config_environvar):
     """Returns config from environment variable"""
-    prefix = "NZS_"
+    prefix = "NBZX_"
     config_environvar = prefix + config_environvar.upper()
     if config_environvar in environ:
         return environ[config_environvar]
