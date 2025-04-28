@@ -1,11 +1,12 @@
 ---
 name: Pylint Quality control
 
-on: 
-  workflow_call
+on:
+  push:
+  pull_request:
 
 jobs:
-  build:
+  python_quality_testing:
     runs-on: ubuntu-latest
     strategy:
       matrix:

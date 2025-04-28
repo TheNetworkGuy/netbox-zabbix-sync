@@ -17,7 +17,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest pytest-mock
         pip install -r requirements.txt
-    - name: Analysing the code with pylint
+    - name: Testing the code with PyTest
       run: |
         cp config.py.example config.py
         pytest tests

@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-      - dockertest
-#    tags: 
-#      - [0-9]+.*
 
 env:
   REGISTRY: ghcr.io
