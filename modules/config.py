@@ -36,6 +36,8 @@ def load_config():
 
 def load_env_variable(config_environvar):
     """Returns config from environment variable"""
+    prefix = "NZS_"
+    config_environvar = prefix + config_environvar.upper()
     if config_environvar in environ:
         return environ[config_environvar]
     return None
