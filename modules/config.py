@@ -6,6 +6,8 @@ from importlib import util
 from os import environ
 from logging import getLogger
 
+logger = getLogger(__name__)
+
 DEFAULT_CONFIG = {
     "templates_config_context": False,
     "templates_config_context_overrule": False,
@@ -56,7 +58,7 @@ def load_config_file(config_default, config_file="config.py"):
                 dconf[key] = getattr(config_module, key)
         return dconf
     else:
-        getLogger(__name__).warning(
+        logger.warning(
             "Config file %s not found. Using default config "
             "and environment variables.", config_file)
     return None
