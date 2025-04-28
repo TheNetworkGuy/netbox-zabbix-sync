@@ -57,8 +57,7 @@ def load_config_file(config_default, config_file="config.py"):
             if hasattr(config_module, key):
                 dconf[key] = getattr(config_module, key)
         return dconf
-    else:
-        logger.warning(
-            "Config file %s not found. Using default config "
-            "and environment variables.", config_file)
+    logger.warning(
+        "Config file %s not found. Using default config "
+        "and environment variables.", config_file)
     return None

@@ -69,7 +69,7 @@ class PhysicalDevice():
         if config["device_cf"] in self.nb.custom_fields:
             self.zabbix_id = self.nb.custom_fields[config["device_cf"]]
         else:
-            e = f"Host {self.name}: Custom field {config["device_cf"]} not present"
+            e = f'Host {self.name}: Custom field {config["device_cf"]} not present'
             self.logger.warning(e)
             raise SyncInventoryError(e)
 
@@ -131,10 +131,12 @@ class PhysicalDevice():
             # Set value to template
             return [device_type_cfs[config["template_cf"]]]
         # Custom field not found, return error
-        e = (f"Custom field {config["template_cf"]} not "
+        e = (f'Custom field {config["template_cf"]} not '
              f"found for {self.nb.device_type.manufacturer.name}"
              f" - {self.nb.device_type.display}.")
         raise TemplateError(e)
+
+
 
     def get_templates_context(self):
         """ Get Zabbix templates from the device context """
@@ -165,8 +167,8 @@ class PhysicalDevice():
         elif config["inventory_mode"] == "automatic":
             self.inventory_mode = 1
         else:
-            self.logger.error(f"Host {self.name}: Specified value for inventory mode in"
-                              f" config is not valid. Got value {config["inventory_mode"]}")
+            self.logger.error(f"Host {self.name}: Specified value for inventory mode in "
+                              f'config is not valid. Got value {config["inventory_mode"]}')
             return False
         self.inventory = {}
         if config["inventory_sync"] and self.inventory_mode in [0, 1]:

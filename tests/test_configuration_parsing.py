@@ -1,6 +1,5 @@
 """Tests for configuration parsing in the modules.config module."""
 from unittest.mock import patch, MagicMock
-from pathlib import Path
 import os
 from modules.config import load_config, DEFAULT_CONFIG, load_config_file, load_env_variable
 
@@ -20,7 +19,7 @@ def test_load_config_file():
     mock_config = DEFAULT_CONFIG.copy()
     mock_config["templates_config_context"] = True
     mock_config["sync_vms"] = True
-    
+
     with patch('modules.config.load_config_file', return_value=mock_config), \
          patch('modules.config.load_env_variable', return_value=None):
         config = load_config()
@@ -39,7 +38,7 @@ def test_load_env_variables():
         if key == "create_journal":
             return True
         return None
-    
+
     with patch('modules.config.load_config_file', return_value=DEFAULT_CONFIG.copy()), \
          patch('modules.config.load_env_variable', side_effect=mock_load_env):
         config = load_config()
@@ -54,13 +53,13 @@ def test_env_vars_override_config_file():
     mock_config = DEFAULT_CONFIG.copy()
     mock_config["templates_config_context"] = True
     mock_config["sync_vms"] = False
-    
+
     # Mock env variable that will override the config file value
     def mock_load_env(key):
         if key == "sync_vms":
             return True
         return None
-    
+
     with patch('modules.config.load_config_file', return_value=mock_config), \
          patch('modules.config.load_env_variable', side_effect=mock_load_env):
         config = load_config()
@@ -79,12 +78,12 @@ def test_load_config_file_function():
         mock_module = MagicMock()
         mock_module.templates_config_context = True
         mock_module.sync_vms = True
-        
+
         # Setup the mock spec
         mock_spec_instance = MagicMock()
         mock_spec.return_value = mock_spec_instance
         mock_spec_instance.loader.exec_module = lambda x: None
-        
+
         # Patch module_from_spec to return our mock module
         with patch('importlib.util.module_from_spec', return_value=mock_module):
             config = load_config_file(DEFAULT_CONFIG.copy())
@@ -94,7 +93,7 @@ def test_load_config_file_function():
 
 def test_load_config_file_not_found():
     """Test load_config_file when the config file doesn't exist"""
-    # Instead of trying to assert on the logger call, we'll just check the return value 
+    # Instead of trying to assert on the logger call, we'll just check the return value
     # and verify the function works as expected in this case
     with patch('pathlib.Path.exists', return_value=False):
         result = load_config_file(DEFAULT_CONFIG.copy())
@@ -107,7 +106,7 @@ def test_load_env_variable_function():
     with patch.dict(os.environ, {"templates_config_context": "True"}):
         value = load_env_variable("templates_config_context")
         assert value == "True"
-    
+
     # Test when the environment variable doesn't exist
     with patch.dict(os.environ, {}, clear=True):
         value = load_env_variable("nonexistent_variable")
@@ -123,8 +122,8 @@ def test_load_config_file_exception_handling():
         # Since the current implementation doesn't handle exceptions, we should
         # expect an exception to be raised
         try:
-            result = load_config_file(DEFAULT_CONFIG.copy())
+            load_config_file(DEFAULT_CONFIG.copy())
             assert False, "An exception should have been raised"
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             # This is expected
             pass
