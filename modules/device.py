@@ -337,15 +337,13 @@ class PhysicalDevice:
         OUTPUT: True / False
         """
         # Go through all groups
-        self.logger.debug(self.hostgroups)
-
         for hg in self.hostgroups:
             for group in groups:
                 if group["name"] == hg:
                     self.group_ids.append({"groupid": group["groupid"]})
-                    e = f"Host {self.name}: matched group {group['name']}"
+                    e = f"Host {self.name}: matched group \"{group['name']}\" (ID:{group['groupid']})"
                     self.logger.debug(e)
-        if self.group_ids:
+        if len(self.group_ids) == len(self.hostgroups):
             return True
         return False
 
