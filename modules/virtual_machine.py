@@ -58,7 +58,10 @@ class VirtualMachine(PhysicalDevice):
             nb_regions=nb_regions,
         )
         # Generate hostgroup based on hostgroup format
-        self.hostgroup = hg.generate(hg_format)
+        if isinstance(hg_format, list):
+            self.hostgroups = [hg.generate(f) for f in hg_format]
+        else:
+            self.hostgroups.append(hg.generate(hg_format))
 
     def set_vm_template(self):
         """Set Template for VMs. Overwrites default class

@@ -85,7 +85,13 @@ def main(arguments):
     # Set NetBox API
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Check if the provided Hostgroup layout is valid
-    hg_objects = hostgroup_format.split("/")
+    hg_objects = []
+    if isinstance(hostgroup_format,list):
+        for l in hostgroup_format:
+            hg_objects = hg_objects + l.split("/")
+    else:
+        hg_objects = hostgroup_format.split("/")
+    hg_objects = sorted(set(hg_objects))
     allowed_objects = [
         "location",
         "role",
@@ -116,7 +122,7 @@ def main(arguments):
         if hg_object not in allowed_objects:
             e = (
                 f"Hostgroup item {hg_object} is not valid. Make sure you"
-                " use valid items and seperate them with '/'."
+                " use valid items and separate them with '/'."
             )
             logger.error(e)
             raise HostgroupError(e)
@@ -215,7 +221,7 @@ def main(arguments):
                     create_hostgroups,
                 )
                 continue
-            # Add hostgroup is config is set
+            # Add hostgroup if config is set
             if create_hostgroups:
                 # Create new hostgroup. Potentially multiple groups if nested
                 hostgroups = vm.createZabbixHostgroup(zabbix_groups)
@@ -243,7 +249,7 @@ def main(arguments):
                 continue
             device.set_hostgroup(hostgroup_format, netbox_site_groups, netbox_regions)
             # Check if a valid hostgroup has been found for this VM.
-            if not device.hostgroup:
+            if not device.hostgroups:
                 continue
             device.set_inventory(nb_device)
             device.set_usermacros()
