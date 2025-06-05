@@ -1,5 +1,5 @@
 """A collection of tools used by several classes"""
-
+from modules.exceptions import HostgroupError
 
 def convert_recordset(recordset):
     """Converts netbox RedcordSet to list of dicts."""
@@ -99,3 +99,47 @@ def remove_duplicates(input_list, sortkey=None):
     if sortkey and isinstance(sortkey, str):
         output_list.sort(key=lambda x: x[sortkey])
     return output_list
+
+def verify_hg_format(hg_format, hg_type="dev", logger=None):
+    """
+    Verifies hostgroup field format
+    """
+    allowed_objects = {"dev": ["location",
+                              "rack",
+                              "role",
+                              "manufacturer",
+                              "region",
+                              "site",
+                              "site_group",
+                              "tenant",
+                              "tenant_group",
+                              "platform",
+                              "cluster"]
+                      ,"vm": ["location",
+                              "role",
+                              "manufacturer",
+                              "region",
+                              "site",
+                              "site_group",
+                              "tenant",
+                              "tenant_group",
+                              "cluster",
+                              "device",
+                              "platform"]
+                      }
+    hg_objects = []
+    if isinstance(hg_format,list):
+        for f in hg_format:
+            hg_objects = hg_objects + f.split("/")
+    else:
+        hg_objects = hg_format.split("/")
+    hg_objects = sorted(set(hg_objects))
+    for hg_object in hg_objects:
+        if hg_object not in allowed_objects[hg_type]:
+            e = (
+                f"Hostgroup item {hg_object} is not valid. Make sure you"
+                " use valid items and separate them with '/'."
+            )
+            logger.error(e)
+            raise HostgroupError(e)
+       

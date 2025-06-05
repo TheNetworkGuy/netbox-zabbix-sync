@@ -13,9 +13,9 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 
 from modules.device import PhysicalDevice
-from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
+from modules.exceptions import EnvironmentVarError, SyncError
 from modules.logging import get_logger, set_log_levels, setup_logger
-from modules.tools import convert_recordset, proxy_prepper
+from modules.tools import convert_recordset, proxy_prepper, verify_hg_format
 from modules.virtual_machine import VirtualMachine
 
 try:
@@ -84,24 +84,6 @@ def main(arguments):
     netbox_token = environ.get("NETBOX_TOKEN")
     # Set NetBox API
     netbox = api(netbox_host, token=netbox_token, threading=True)
-    # Check if the provided Hostgroup layout is valid
-    hg_objects = []
-    if isinstance(hostgroup_format,list):
-        for l in hostgroup_format:
-            hg_objects = hg_objects + l.split("/")
-    else:
-        hg_objects = hostgroup_format.split("/")
-    hg_objects = sorted(set(hg_objects))
-    allowed_objects = [
-        "location",
-        "role",
-        "manufacturer",
-        "region",
-        "site",
-        "site_group",
-        "tenant",
-        "tenant_group",
-    ]
     # Create API call to get all custom fields which are on the device objects
     try:
         device_cfs = list(
@@ -118,14 +100,10 @@ def main(arguments):
         sys.exit(1)
     for cf in device_cfs:
         allowed_objects.append(cf.name)
-    for hg_object in hg_objects:
-        if hg_object not in allowed_objects:
-            e = (
-                f"Hostgroup item {hg_object} is not valid. Make sure you"
-                " use valid items and separate them with '/'."
-            )
-            logger.error(e)
-            raise HostgroupError(e)
+    # Check if the provided Hostgroup layout is valid
+    verify_hg_format(hostgroup_format, hg_type="dev", logger=logger)
+    verify_hg_format(vm_hostgroup_format, hg_type="vm", logger=logger)
+ 
     # Set Zabbix API
     try:
         ssl_ctx = ssl.create_default_context()
