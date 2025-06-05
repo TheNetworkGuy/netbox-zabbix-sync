@@ -166,7 +166,7 @@ def main(arguments):
                 continue
             vm.set_hostgroup(vm_hostgroup_format, netbox_site_groups, netbox_regions)
             # Check if a valid hostgroup has been found for this VM.
-            if not vm.hostgroup:
+            if not vm.hostgroups:
                 continue
             vm.set_inventory(nb_vm)
             vm.set_usermacros()
