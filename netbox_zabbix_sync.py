@@ -11,35 +11,14 @@ from pynetbox import api
 from pynetbox.core.query import RequestError as NBRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
-
+from modules.config import load_config
 from modules.device import PhysicalDevice
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
 from modules.logging import get_logger, set_log_levels, setup_logger
 from modules.tools import convert_recordset, proxy_prepper
 from modules.virtual_machine import VirtualMachine
 
-try:
-    from config import (
-        clustering,
-        create_hostgroups,
-        create_journal,
-        full_proxy_sync,
-        hostgroup_format,
-        nb_device_filter,
-        nb_vm_filter,
-        sync_vms,
-        templates_config_context,
-        templates_config_context_overrule,
-        vm_hostgroup_format,
-        zabbix_device_disable,
-        zabbix_device_removal,
-    )
-except ModuleNotFoundError:
-    print(
-        "Configuration file config.py not found in main directory."
-        "Please create the file or rename the config.py.example file to config.py."
-    )
-    sys.exit(1)
+config = load_config()
 
 
 setup_logger()
@@ -85,7 +64,7 @@ def main(arguments):
     # Set NetBox API
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Check if the provided Hostgroup layout is valid
-    hg_objects = hostgroup_format.split("/")
+    hg_objects = config["hostgroup_format"].split("/")
     allowed_objects = [
         "location",
         "role",
@@ -145,10 +124,11 @@ def main(arguments):
     else:
         proxy_name = "name"
     # Get all Zabbix and NetBox data
-    netbox_devices = list(netbox.dcim.devices.filter(**nb_device_filter))
+    netbox_devices = list(netbox.dcim.devices.filter(**config["nb_device_filter"]))
     netbox_vms = []
-    if sync_vms:
-        netbox_vms = list(netbox.virtualization.virtual_machines.filter(**nb_vm_filter))
+    if config["sync_vms"]:
+        netbox_vms = list(
+            netbox.virtualization.virtual_machines.filter(**config["nb_vm_filter"]))
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
@@ -172,15 +152,15 @@ def main(arguments):
     # Go through all NetBox devices
     for nb_vm in netbox_vms:
         try:
-            vm = VirtualMachine(
-                nb_vm, zabbix, netbox_journals, nb_version, create_journal, logger
-            )
-            logger.debug(f"Host {vm.name}: Started operations on VM.")
+            vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
+                                config["create_journal"], logger)
+            logger.debug(f"Host {vm.name}: started operations on VM.")
             vm.set_vm_template()
             # Check if a valid template has been found for this VM.
             if not vm.zbx_template_names:
                 continue
-            vm.set_hostgroup(vm_hostgroup_format, netbox_site_groups, netbox_regions)
+            vm.set_hostgroup(config["vm_hostgroup_format"],
+                             netbox_site_groups, netbox_regions)
             # Check if a valid hostgroup has been found for this VM.
             if not vm.hostgroup:
                 continue
@@ -188,7 +168,7 @@ def main(arguments):
             vm.set_usermacros()
             vm.set_tags()
             # Checks if device is in cleanup state
-            if vm.status in zabbix_device_removal:
+            if vm.status in config["zabbix_device_removal"]:
                 if vm.zabbix_id:
                     # Delete device from Zabbix
                     # and remove hostID from NetBox.
@@ -203,7 +183,7 @@ def main(arguments):
                 )
                 continue
             # Check if the VM is in the disabled state
-            if vm.status in zabbix_device_disable:
+            if vm.status in config["zabbix_device_disable"]:
                 vm.zabbix_state = 1
             # Check if VM is already in Zabbix
             if vm.zabbix_id:
@@ -211,12 +191,12 @@ def main(arguments):
                     zabbix_groups,
                     zabbix_templates,
                     zabbix_proxy_list,
-                    full_proxy_sync,
-                    create_hostgroups,
+                    config["full_proxy_sync"],
+                    config["create_hostgroups"],
                 )
                 continue
             # Add hostgroup is config is set
-            if create_hostgroups:
+            if config["create_hostgroups"]:
                 # Create new hostgroup. Potentially multiple groups if nested
                 hostgroups = vm.createZabbixHostgroup(zabbix_groups)
                 # go through all newly created hostgroups
@@ -231,17 +211,16 @@ def main(arguments):
     for nb_device in netbox_devices:
         try:
             # Set device instance set data such as hostgroup and template information.
-            device = PhysicalDevice(
-                nb_device, zabbix, netbox_journals, nb_version, create_journal, logger
-            )
+            device = PhysicalDevice(nb_device, zabbix, netbox_journals, nb_version,
+                                    config["create_journal"], logger)
             logger.debug(f"Host {device.name}: started operations on device.")
-            device.set_template(
-                templates_config_context, templates_config_context_overrule
-            )
+            device.set_template(config["templates_config_context"],
+                                config["templates_config_context_overrule"])
             # Check if a valid template has been found for this VM.
             if not device.zbx_template_names:
                 continue
-            device.set_hostgroup(hostgroup_format, netbox_site_groups, netbox_regions)
+            device.set_hostgroup(
+                config["hostgroup_format"], netbox_site_groups, netbox_regions)
             # Check if a valid hostgroup has been found for this VM.
             if not device.hostgroup:
                 continue
@@ -250,7 +229,7 @@ def main(arguments):
             device.set_tags()
             # Checks if device is part of cluster.
             # Requires clustering variable
-            if device.isCluster() and clustering:
+            if device.isCluster() and config["clustering"]:
                 # Check if device is primary or secondary
                 if device.promoteMasterDevice():
                     e = f"Device {device.name}: is " f"part of cluster and primary."
@@ -265,7 +244,7 @@ def main(arguments):
                     logger.info(e)
                     continue
             # Checks if device is in cleanup state
-            if device.status in zabbix_device_removal:
+            if device.status in config["zabbix_device_removal"]:
                 if device.zabbix_id:
                     # Delete device from Zabbix
                     # and remove hostID from NetBox.
@@ -280,7 +259,7 @@ def main(arguments):
                 )
                 continue
             # Check if the device is in the disabled state
-            if device.status in zabbix_device_disable:
+            if device.status in config["zabbix_device_disable"]:
                 device.zabbix_state = 1
             # Check if device is already in Zabbix
             if device.zabbix_id:
@@ -288,12 +267,12 @@ def main(arguments):
                     zabbix_groups,
                     zabbix_templates,
                     zabbix_proxy_list,
-                    full_proxy_sync,
-                    create_hostgroups,
+                    config["full_proxy_sync"],
+                    config["create_hostgroups"],
                 )
                 continue
             # Add hostgroup is config is set
-            if create_hostgroups:
+            if config["create_hostgroups"]:
                 # Create new hostgroup. Potentially multiple groups if nested
                 hostgroups = device.createZabbixHostgroup(zabbix_groups)
                 # go through all newly created hostgroups

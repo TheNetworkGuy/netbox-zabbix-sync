@@ -1,6 +1,7 @@
 # NetBox to Zabbix synchronization
 
 A script to create, update and delete Zabbix hosts using NetBox device objects.
+Currently compatible with Zabbix 7.0. Zabbix 7.2 is unfortunately not supported and will result in the script failing.
 
 ## Installation via Docker
 
@@ -48,9 +49,15 @@ Make sure that you have a python environment with the following packages
 installed. You can also use the `requirements.txt` file for installation with
 pip.
 
-```
+```sh
+# Packages:
 pynetbox
 pyzabbix
+
+# Install them through requirements.txt from a venv:
+virtualenv .venv
+source .venv/bin/activate
+.venv/bin/pip --require-virtualenv install -r requirements.txt
 ```
 
 ### Config file
@@ -58,7 +65,7 @@ pyzabbix
 First time user? Copy the `config.py.example` file to `config.py`. This file is
 used for modifying filters and setting variables such as custom field names.
 
-```
+```sh
 cp config.py.example config.py
 ```
 
@@ -84,8 +91,8 @@ ZABBIX_TOKEN=othersecrettoken
 If you are using custom SSL certificates for NetBox and/or Zabbix, you can set
 the following environment variable to the path of your CA bundle file:
 
-```bash
-REQUEST_CA_BUNDLE=/path/to/your/ca-bundle.crt
+```sh
+export REQUESTS_CA_BUNDLE=/path/to/your/ca-bundle.crt
 ```
 
 ### NetBox custom fields

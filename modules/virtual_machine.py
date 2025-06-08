@@ -1,27 +1,12 @@
 # pylint: disable=duplicate-code
 """Module that hosts all functions for virtual machine processing"""
-
-from os import sys
-
 from modules.device import PhysicalDevice
 from modules.exceptions import InterfaceConfigError, SyncInventoryError, TemplateError
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
-
-try:
-    from config import (
-        traverse_regions,
-        traverse_site_groups,
-        vm_inventory_map,
-        vm_tag_map,
-        vm_usermacro_map,
-    )
-except ModuleNotFoundError:
-    print(
-        "Configuration file config.py not found in main directory."
-        "Please create the file or rename the config.py.example file to config.py."
-    )
-    sys.exit(0)
+from modules.config import load_config
+# Load config
+config = load_config()
 
 
 class VirtualMachine(PhysicalDevice):
@@ -34,15 +19,15 @@ class VirtualMachine(PhysicalDevice):
 
     def _inventory_map(self):
         """use VM inventory maps"""
-        return vm_inventory_map
+        return config["vm_inventory_map"]
 
     def _usermacro_map(self):
         """use VM usermacro maps"""
-        return vm_usermacro_map
+        return config["vm_usermacro_map"]
 
     def _tag_map(self):
         """use VM tag maps"""
-        return vm_tag_map
+        return config["vm_tag_map"]
 
     def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
@@ -52,8 +37,8 @@ class VirtualMachine(PhysicalDevice):
             self.nb,
             self.nb_api_version,
             logger=self.logger,
-            nested_sitegroup_flag=traverse_site_groups,
-            nested_region_flag=traverse_regions,
+            nested_sitegroup_flag=config["traverse_site_groups"],
+            nested_region_flag=config["traverse_regions"],
             nb_groups=nb_site_groups,
             nb_regions=nb_regions,
         )
