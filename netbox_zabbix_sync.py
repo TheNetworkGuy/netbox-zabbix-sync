@@ -2,38 +2,27 @@
 # pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation
 
 """NetBox to Zabbix sync script."""
-import logging
 import argparse
+import logging
 import ssl
-from os import environ, path, sys
+from os import environ, sys
+
 from pynetbox import api
 from pynetbox.core.query import RequestError as NBRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
-from zabbix_utils import ZabbixAPI, APIRequestError, ProcessingError
+from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 from modules.config import load_config
 from modules.device import PhysicalDevice
-from modules.virtual_machine import VirtualMachine
-from modules.tools import convert_recordset, proxy_prepper
 from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
+from modules.logging import get_logger, set_log_levels, setup_logger
+from modules.tools import convert_recordset, proxy_prepper
+from modules.virtual_machine import VirtualMachine
 
 config = load_config()
 
-# Set logging
-log_format = logging.Formatter('%(asctime)s - %(name)s - '
-                               '%(levelname)s - %(message)s')
-lgout = logging.StreamHandler()
-lgout.setFormatter(log_format)
-lgout.setLevel(logging.DEBUG)
 
-lgfile = logging.FileHandler(path.join(path.dirname(
-                             path.realpath(__file__)), "sync.log"))
-lgfile.setFormatter(log_format)
-lgfile.setLevel(logging.DEBUG)
-
-logger = logging.getLogger("NetBox-Zabbix-sync")
-logger.addHandler(lgout)
-logger.addHandler(lgfile)
-logger.setLevel(logging.WARNING)
+setup_logger()
+logger = get_logger()
 
 
 def main(arguments):
@@ -41,7 +30,14 @@ def main(arguments):
     # pylint: disable=too-many-branches, too-many-statements
     # set environment variables
     if arguments.verbose:
-        logger.setLevel(logging.DEBUG)
+        set_log_levels(logging.WARNING, logging.INFO)
+    if arguments.debug:
+        set_log_levels(logging.WARNING, logging.DEBUG)
+    if arguments.debug_all:
+        set_log_levels(logging.DEBUG, logging.DEBUG)
+    if arguments.quiet:
+        set_log_levels(logging.ERROR, logging.ERROR)
+
     env_vars = ["ZABBIX_HOST", "NETBOX_HOST", "NETBOX_TOKEN"]
     if "ZABBIX_TOKEN" in environ:
         env_vars.append("ZABBIX_TOKEN")
@@ -69,15 +65,26 @@ def main(arguments):
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Check if the provided Hostgroup layout is valid
     hg_objects = config["hostgroup_format"].split("/")
-    allowed_objects = ["location", "role", "manufacturer", "region",
-                       "site", "site_group", "tenant", "tenant_group"]
+    allowed_objects = [
+        "location",
+        "role",
+        "manufacturer",
+        "region",
+        "site",
+        "site_group",
+        "tenant",
+        "tenant_group",
+    ]
     # Create API call to get all custom fields which are on the device objects
     try:
-        device_cfs = list(netbox.extras.custom_fields.filter(
-            type="text", content_type_id=23))
+        device_cfs = list(
+            netbox.extras.custom_fields.filter(type="text", content_type_id=23)
+        )
     except RequestsConnectionError:
-        logger.error(f"Unable to connect to NetBox with URL {netbox_host}."
-                     " Please check the URL and status of NetBox.")
+        logger.error(
+            f"Unable to connect to NetBox with URL {netbox_host}."
+            " Please check the URL and status of NetBox."
+        )
         sys.exit(1)
     except NBRequestError as e:
         logger.error(f"NetBox error: {e}")
@@ -86,8 +93,10 @@ def main(arguments):
         allowed_objects.append(cf.name)
     for hg_object in hg_objects:
         if hg_object not in allowed_objects:
-            e = (f"Hostgroup item {hg_object} is not valid. Make sure you"
-                 " use valid items and seperate them with '/'.")
+            e = (
+                f"Hostgroup item {hg_object} is not valid. Make sure you"
+                " use valid items and seperate them with '/'."
+            )
             logger.error(e)
             raise HostgroupError(e)
     # Set Zabbix API
@@ -99,18 +108,18 @@ def main(arguments):
             ssl_ctx.load_verify_locations(environ["REQUESTS_CA_BUNDLE"])
 
         if not zabbix_token:
-            zabbix = ZabbixAPI(zabbix_host, user=zabbix_user,
-                               password=zabbix_pass, ssl_context=ssl_ctx)
-        else:
             zabbix = ZabbixAPI(
-                zabbix_host, token=zabbix_token, ssl_context=ssl_ctx)
+                zabbix_host, user=zabbix_user, password=zabbix_pass, ssl_context=ssl_ctx
+            )
+        else:
+            zabbix = ZabbixAPI(zabbix_host, token=zabbix_token, ssl_context=ssl_ctx)
         zabbix.check_auth()
     except (APIRequestError, ProcessingError) as e:
         e = f"Zabbix returned the following error: {str(e)}"
         logger.error(e)
         sys.exit(1)
     # Set API parameter mapping based on API version
-    if not str(zabbix.version).startswith('7'):
+    if not str(zabbix.version).startswith("7"):
         proxy_name = "host"
     else:
         proxy_name = "name"
@@ -123,18 +132,17 @@ def main(arguments):
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
-    zabbix_groups = zabbix.hostgroup.get(output=['groupid', 'name'])
-    zabbix_templates = zabbix.template.get(output=['templateid', 'name'])
-    zabbix_proxies = zabbix.proxy.get(output=['proxyid', proxy_name])
+    zabbix_groups = zabbix.hostgroup.get(output=["groupid", "name"])
+    zabbix_templates = zabbix.template.get(output=["templateid", "name"])
+    zabbix_proxies = zabbix.proxy.get(output=["proxyid", proxy_name])
     # Set empty list for proxy processing Zabbix <= 6
     zabbix_proxygroups = []
-    if str(zabbix.version).startswith('7'):
-        zabbix_proxygroups = zabbix.proxygroup.get(
-            output=["proxy_groupid", "name"])
+    if str(zabbix.version).startswith("7"):
+        zabbix_proxygroups = zabbix.proxygroup.get(output=["proxy_groupid", "name"])
     # Sanitize proxy data
     if proxy_name == "host":
         for proxy in zabbix_proxies:
-            proxy['name'] = proxy.pop('host')
+            proxy["name"] = proxy.pop("host")
     # Prepare list of all proxy and proxy_groups
     zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
 
@@ -156,27 +164,36 @@ def main(arguments):
             # Check if a valid hostgroup has been found for this VM.
             if not vm.hostgroup:
                 continue
+            vm.set_inventory(nb_vm)
+            vm.set_usermacros()
+            vm.set_tags()
             # Checks if device is in cleanup state
             if vm.status in config["zabbix_device_removal"]:
                 if vm.zabbix_id:
                     # Delete device from Zabbix
                     # and remove hostID from NetBox.
                     vm.cleanup()
-                    logger.info(f"VM {vm.name}: cleanup complete")
+                    logger.debug(f"VM {vm.name}: cleanup complete")
                     continue
                 # Device has been added to NetBox
                 # but is not in Activate state
-                logger.info(f"VM {vm.name}: skipping since this VM is "
-                            f"not in the active state.")
+                logger.info(
+                    f"VM {vm.name}: skipping since this VM is "
+                    f"not in the active state."
+                )
                 continue
             # Check if the VM is in the disabled state
             if vm.status in config["zabbix_device_disable"]:
                 vm.zabbix_state = 1
             # Check if VM is already in Zabbix
             if vm.zabbix_id:
-                vm.ConsistencyCheck(zabbix_groups, zabbix_templates,
-                                    zabbix_proxy_list, config["full_proxy_sync"],
-                                    config["create_hostgroups"])
+                vm.ConsistencyCheck(
+                    zabbix_groups,
+                    zabbix_templates,
+                    zabbix_proxy_list,
+                    config["full_proxy_sync"],
+                    config["create_hostgroups"],
+                )
                 continue
             # Add hostgroup is config is set
             if config["create_hostgroups"]:
@@ -187,8 +204,7 @@ def main(arguments):
                     # Add new hostgroups to zabbix group list
                     zabbix_groups.append(group)
             # Add VM to Zabbix
-            vm.createInZabbix(zabbix_groups, zabbix_templates,
-                              zabbix_proxy_list)
+            vm.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
         except SyncError:
             pass
 
@@ -209,19 +225,22 @@ def main(arguments):
             if not device.hostgroup:
                 continue
             device.set_inventory(nb_device)
+            device.set_usermacros()
+            device.set_tags()
             # Checks if device is part of cluster.
             # Requires clustering variable
             if device.isCluster() and config["clustering"]:
                 # Check if device is primary or secondary
                 if device.promoteMasterDevice():
-                    e = (f"Device {device.name}: is "
-                         f"part of cluster and primary.")
+                    e = f"Device {device.name}: is " f"part of cluster and primary."
                     logger.info(e)
                 else:
                     # Device is secondary in cluster.
                     # Don't continue with this device.
-                    e = (f"Device {device.name}: is part of cluster "
-                         f"but not primary. Skipping this host...")
+                    e = (
+                        f"Device {device.name}: is part of cluster "
+                        f"but not primary. Skipping this host..."
+                    )
                     logger.info(e)
                     continue
             # Checks if device is in cleanup state
@@ -234,17 +253,23 @@ def main(arguments):
                     continue
                 # Device has been added to NetBox
                 # but is not in Activate state
-                logger.info(f"Device {device.name}: skipping since this device is "
-                            f"not in the active state.")
+                logger.info(
+                    f"Device {device.name}: skipping since this device is "
+                    f"not in the active state."
+                )
                 continue
             # Check if the device is in the disabled state
             if device.status in config["zabbix_device_disable"]:
                 device.zabbix_state = 1
             # Check if device is already in Zabbix
             if device.zabbix_id:
-                device.ConsistencyCheck(zabbix_groups, zabbix_templates,
-                                        zabbix_proxy_list, config["full_proxy_sync"],
-                                        config["create_hostgroups"])
+                device.ConsistencyCheck(
+                    zabbix_groups,
+                    zabbix_templates,
+                    zabbix_proxy_list,
+                    config["full_proxy_sync"],
+                    config["create_hostgroups"],
+                )
                 continue
             # Add hostgroup is config is set
             if config["create_hostgroups"]:
@@ -255,17 +280,27 @@ def main(arguments):
                     # Add new hostgroups to zabbix group list
                     zabbix_groups.append(group)
             # Add device to Zabbix
-            device.createInZabbix(zabbix_groups, zabbix_templates,
-                                  zabbix_proxy_list)
+            device.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
         except SyncError:
             pass
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='A script to sync Zabbix with NetBox device data.'
+        description="A script to sync Zabbix with NetBox device data."
     )
-    parser.add_argument("-v", "--verbose", help="Turn on debugging.",
-                        action="store_true")
+    parser.add_argument(
+        "-v", "--verbose", help="Turn on debugging.", action="store_true"
+    )
+    parser.add_argument(
+        "-vv", "--debug", help="Turn on debugging.", action="store_true"
+    )
+    parser.add_argument(
+        "-vvv",
+        "--debug-all",
+        help="Turn on debugging for all modules.",
+        action="store_true",
+    )
+    parser.add_argument("-q", "--quiet", help="Turn off warnings.", action="store_true")
     args = parser.parse_args()
     main(args)
