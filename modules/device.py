@@ -124,8 +124,8 @@ class PhysicalDevice:
             self.nb,
             self.nb_api_version,
             logger=self.logger,
-            nested_sitegroup_flag=traverse_site_groups,
-            nested_region_flag=traverse_regions,
+            nested_sitegroup_flag=config['traverse_site_groups'],
+            nested_region_flag=config['traverse_regions'],
             nb_groups=nb_site_groups,
             nb_regions=nb_regions,
         )
@@ -166,7 +166,7 @@ class PhysicalDevice:
             return [device_type_cfs[config["template_cf"]]]
         # Custom field not found, return error
         e = (
-            f"Custom field {template_cf} not "
+            f"Custom field {config['template_cf']} not "
             f"found for {self.nb.device_type.manufacturer.name}"
             f" - {self.nb.device_type.display}."
         )
@@ -394,7 +394,7 @@ class PhysicalDevice:
         macros = ZabbixUsermacros(
             self.nb,
             self._usermacro_map(),
-            usermacro_sync,
+            config['usermacro_sync'],
             logger=self.logger,
             host=self.name,
         )
@@ -411,10 +411,10 @@ class PhysicalDevice:
         tags = ZabbixTags(
             self.nb,
             self._tag_map(),
-            tag_sync,
-            tag_lower,
-            tag_name=tag_name,
-            tag_value=tag_value,
+            config['tag_sync'],
+            config['tag_lower'],
+            tag_name=config['tag_name'],
+            tag_value=config['tag_value'],
             logger=self.logger,
             host=self.name,
         )
@@ -771,15 +771,11 @@ class PhysicalDevice:
                 self.updateZabbixHost(inventory=self.inventory)
 
         # Check host usermacros
-        if usermacro_sync:
+        if config['usermacro_sync']:
             macros_filtered = []
             # Do not re-sync secret usermacros unless sync is set to 'full'
-            if str(usermacro_sync).lower() != "full":
-                for m in 
-                
-                
-                
-                (self.usermacros):
+            if str(config['usermacro_sync']).lower() != "full":
+                for m in deepcopy(self.usermacros):
                     if m["type"] == str(1):
                         # Remove the value as the api doesn't return it
                         # this will allow us to only update usermacros that don't exist
@@ -792,7 +788,7 @@ class PhysicalDevice:
                 self.updateZabbixHost(macros=self.usermacros)
 
         # Check host usermacros
-        if tag_sync:
+        if config['tag_sync']:
             if remove_duplicates(host["tags"], sortkey="tag") == self.tags:
                 self.logger.debug(f"Host {self.name}: tags in-sync.")
             else:

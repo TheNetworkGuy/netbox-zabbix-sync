@@ -43,7 +43,7 @@ class TestPhysicalDevice(unittest.TestCase):
                    "traverse_site_groups": False,
                    "inventory_mode": "disabled",
                    "inventory_sync": False,
-                   "inventory_map": {}
+                   "device_inventory_map": {}
                   }):
             self.device = PhysicalDevice(
                 self.mock_nb_device,
@@ -303,7 +303,7 @@ class TestPhysicalDevice(unittest.TestCase):
             "device_cf": "zabbix_hostid",
             "inventory_mode": "manual",
             "inventory_sync": True,
-            "inventory_map": {
+            "device_inventory_map": {
                 "name": "name",
                 "serial": "serialno_a"
             }
