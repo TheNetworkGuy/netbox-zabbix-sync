@@ -1,5 +1,5 @@
 """
-Module for parsing configuration from the top level config.yaml file
+Module for parsing configuration from the top level config.py file
 """
 from pathlib import Path
 from importlib import util
@@ -8,7 +8,8 @@ from logging import getLogger
 
 logger = getLogger(__name__)
 
-# PLEASE NOTE: This is a sample config file. You should create your own config.py
+# PLEASE NOTE: This is a sample config file. Please do NOT make any edits in this file!
+# You should create your own config.py and it will overwrite the default config.
 
 DEFAULT_CONFIG = {
     "templates_config_context": False,
@@ -30,7 +31,7 @@ DEFAULT_CONFIG = {
     "nb_vm_filter": {"name__n": "null"},
     "inventory_mode": "disabled",
     "inventory_sync": False,
-    "inventory_map": {
+    "device_inventory_map": {
         "asset_tag": "asset_tag",
         "virtual_chassis/name": "chassis",
         "status/label": "deployment_status",
@@ -44,6 +45,38 @@ DEFAULT_CONFIG = {
         "device_type/model": "type",
         "device_type/manufacturer/name": "vendor",
         "oob_ip/address": "oob_ip"
+    },
+    "vm_inventory_map": {
+        "status/label": "deployment_status",
+        "comments": "notes",
+        "name": "name"
+    },
+    "usermacro_sync": False,
+    "device_usermacro_map": {
+        "serial": "{$HW_SERIAL}",
+        "role/name": "{$DEV_ROLE}",
+        "url": "{$NB_URL}",
+        "id": "{$NB_ID}"
+    },
+    "vm_usermacro_map": {
+        "memory": "{$TOTAL_MEMORY}",
+        "role/name": "{$DEV_ROLE}",
+        "url": "{$NB_URL}",
+        "id": "{$NB_ID}"
+    },
+    "tag_sync": False,
+    "tag_lower": True,
+    "tag_name": 'NetBox',
+    "tag_value": "name",
+    "device_tag_map": {
+        "site/name": "site",
+        "rack/name": "rack",
+        "platform/name": "target"
+    },
+    "vm_tag_map": {
+        "site/name": "site",
+        "cluster/name": "cluster",
+        "platform/name": "target"
     }
 }
 
