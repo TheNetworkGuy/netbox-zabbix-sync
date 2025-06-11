@@ -720,7 +720,7 @@ I would recommend using usermacros for sensitive data such as community strings
 since the data in NetBox is plain-text.
 
 > **_NOTE:_** Not all SNMP data is required for a working configuration.
-> [The following parameters are allowed](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed")but
+> [The following parameters are allowed](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed") but
 > are not all required, depending on your environment.
 
 

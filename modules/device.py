@@ -55,7 +55,7 @@ class PhysicalDevice:
         self.nb_journals = nb_journal_class
         self.inventory_mode = -1
         self.inventory = {}
-        self.usermacros = {}
+        self.usermacros = []
         self.tags = {}
         self.logger = logger if logger else getLogger(__name__)
         self._setBasics()
@@ -400,6 +400,7 @@ class PhysicalDevice:
         )
         if macros.sync is False:
             self.usermacros = []
+            return True
 
         self.usermacros = macros.generate()
         return True
@@ -772,22 +773,31 @@ class PhysicalDevice:
 
         # Check host usermacros
         if config['usermacro_sync']:
-            macros_filtered = []
-            # Do not re-sync secret usermacros unless sync is set to 'full'
-            if str(config['usermacro_sync']).lower() != "full":
-                for m in deepcopy(self.usermacros):
-                    if m["type"] == str(1):
-                        # Remove the value as the api doesn't return it
-                        # this will allow us to only update usermacros that don't exist
-                        m.pop("value")
-                    macros_filtered.append(m)
-            if host["macros"] == self.usermacros or host["macros"] == macros_filtered:
+            # Make a full copy synce we dont want to lose the original value
+            # of secret type macros from Netbox
+            netbox_macros = deepcopy(self.usermacros)
+            # Set the sync bit
+            full_sync_bit = bool(str(config['usermacro_sync']).lower() == "full")
+            for macro in netbox_macros:
+                # If the Macro is a secret and full sync is NOT activated
+                if macro["type"] == str(1) and not full_sync_bit:
+                    # Remove the value as the Zabbix api does not return the value key
+                    # This is required when you want to do a diff between both lists
+                    macro.pop("value")
+            # Sort all lists
+            def filter_with_macros(macro):
+                return macro["macro"]
+            host["macros"].sort(key=filter_with_macros)
+            netbox_macros.sort(key=filter_with_macros)
+            # Check if both lists are the same
+            if host["macros"] == netbox_macros:
                 self.logger.debug(f"Host {self.name}: usermacros in-sync.")
             else:
                 self.logger.warning(f"Host {self.name}: usermacros OUT of sync.")
+                # Update Zabbix with NetBox usermacros
                 self.updateZabbixHost(macros=self.usermacros)
 
-        # Check host usermacros
+        # Check host tags
         if config['tag_sync']:
             if remove_duplicates(host["tags"], sortkey="tag") == self.tags:
                 self.logger.debug(f"Host {self.name}: tags in-sync.")
