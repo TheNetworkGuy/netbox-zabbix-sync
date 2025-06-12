@@ -1,6 +1,6 @@
 # NetBox to Zabbix synchronization
 
-A script to create, update and delete Zabbix hosts using NetBox device objects. Tested and compabible with all [currently supported Zabbix releases](https://www.zabbix.com/life_cycle_and_release_policy).
+A script to create, update and delete Zabbix hosts using NetBox device objects. Tested and compatible with all [currently supported Zabbix releases](https://www.zabbix.com/life_cycle_and_release_policy).
 
 ## Installation via Docker
 
@@ -23,10 +23,10 @@ docker run -d -t -i -e ZABBIX_HOST='https://zabbix.local' \
 --name netbox-zabbix-sync ghcr.io/thenetworkguy/netbox-zabbix-sync:main
 ```
 
-This should run a one-time sync, you can check the sync with
+This should run a one-time sync. You can check the sync with
 `docker logs netbox-zabbix-sync`.
 
-The image uses the default `config.py` for it's configuration, you can use a
+The image uses the default `config.py` for its configuration, you can use a
 volume mount in the docker run command to override with your own config file if
 needed (see [config file](#config-file)):
 
@@ -118,8 +118,8 @@ the template information then the zabbix_template field is not required):
 You can make the `zabbix_hostid` field hidden or read-only to prevent human
 intervention.
 
-This is optional and there is a use case for leaving it read-write in the UI to
-manually change the ID. For example to re-run a sync.
+This is optional, but there may be cases where you want to leave it 
+read-write in the UI. For example to manually change or clear the ID and re-run a sync.
 
 ## Virtual Machine (VM) Syncing
 
@@ -146,7 +146,7 @@ creation for devices in a new category. I would recommend setting this variable
 to `True` since leaving it on `False` results in a lot of manual work.
 
 The format can be set with the `hostgroup_format` variable for devices and
-`vm_hostgroup_format` for devices.
+`vm_hostgroup_format` for virtual machines.
 
 Any nested parent hostgroups will also be created automatically. For instance
 the region `Berlin` with parent region `Germany` will create the hostgroup
@@ -189,10 +189,10 @@ used:
 | cluster      | VM cluster name |
 | cluster_type | VM cluster type |
 
-You can specify the value seperated by a "/" like so:
+You can specify the value separated by a "/" like so:
 
 ```python
-hostgroup_format = "tenant/site/dev_location/role"
+hostgroup_format = "tenant/site/location/role"
 ```
 
 **Group traversal**
@@ -239,7 +239,7 @@ have a relationship with a tenant.
 - Site: HQ-AMS
 
 ```python
-hostgroup_format = "site/tenant/device_role"
+hostgroup_format = "site/tenant/role"
 ```
 
 When running the script like above, the following hostgroup (HG) will be
@@ -312,7 +312,7 @@ device_inventory_map = {"custom_fields/mycustomfield/name": "alias"}
 vm_inventory_map = {"custom_fields/mycustomfield/name": "alias"}
 ```
 
-See `config.py.example` for an extensive example map. Any Zabix Inventory fields
+See `config.py.example` for an extensive example map. Any Zabbix Inventory fields
 that are not included in the map will not be touched by the script, so you can
 safely add manual values or use items to automatically add values to other
 fields.
@@ -367,7 +367,7 @@ SLA calculations and event correlation.
 Tags can be synced from the following sources:
 
 1. NetBox device/vm tags
-2. NetBox config ontext
+2. NetBox config context
 3. NetBox fields
 
 Syncing tags will override any tags that were set manually on the host,
@@ -385,10 +385,10 @@ tag_lower = True
 #### Device tags
 
 As NetBox doesn't follow the tag/value pattern for tags, we will need a tag
-name set to register the netwbox tags.
+name set to register the netbox tags.
 
 By default the tag name is "NetBox", but you can change this to whatever you want.
-The value for the tag can be choosen from 'name', 'display' or 'slug'.
+The value for the tag can be set to 'name', 'display', or 'slug', which refers to the property of the NetBox tag object that will be used as the value in Zabbix.
 
 ```python
 tag_name = 'NetBox'
@@ -503,8 +503,8 @@ Examples:
 ```
 
 Please be aware that secret usermacros are only synced _once_ by default.
-This is the default behaviour because Zabbix API won't return the value of 
-secrets so the script cannot compare the values with the ones set in NetBox.
+This is the default behavior because Zabbix API won't return the value of 
+secrets so the script cannot compare the values with those set in NetBox.
 
 If you update a secret usermacro value, just remove the value from the host
 in Zabbix and the new value will be synced during the next run.
@@ -601,7 +601,7 @@ You can set the proxy for a device using the 'proxy' key in config context.
 }
 ```
 
-It is now posible to specify proxy groups with the introduction of Proxy groups
+It is now possible to specify proxy groups with the introduction of Proxy groups
 in Zabbix 7. Specifying a group in the config context on older Zabbix releases
 will have no impact and the script will ignore the statement.
 
@@ -614,9 +614,9 @@ will have no impact and the script will ignore the statement.
 ```
 
 The script will prefer groups when specifying both a proxy and group. This is
-done with the assumption that groups are more resiliant and HA ready, making it
+done with the assumption that groups are more resilient and HA ready, making it
 a more logical choice to use for proxy linkage. This also makes migrating from a
-proxy to proxy group easier since the group take priority over the invidivual
+proxy to proxy group easier since the group take priority over the individual
 proxy.
 
 ```json
@@ -630,13 +630,7 @@ proxy.
 
 In the example above the host will use the group on Zabbix 7. On Zabbix 6 and
 below the host will use the proxy. Zabbix 7 will use the proxy value when
-ommiting the proxy_group value.
-
-Because of the possible amount of destruction when setting up NetBox but
-forgetting the proxy command, the sync works a bit different. By default
-everything is synced except in a situation where the Zabbix host has a proxy
-configured but nothing is configured in NetBox. To force deletion and a full
-sync, set the `full_proxy_sync` variable in the config file.
+omitting the proxy_group value.
 
 ### Set interface parameters within NetBox
 
@@ -653,7 +647,7 @@ Due to Zabbix limitations of changing interface type with a linked template,
 changing the interface type from within NetBox is not supported and the script
 will generate an error.
 
-For example when changing a SNMP interface to an Agent interface:
+For example, when changing a SNMP interface to an Agent interface:
 
 ```
 NetBox-Zabbix-sync - WARNING - Device: Interface OUT of sync.
@@ -661,11 +655,11 @@ NetBox-Zabbix-sync - ERROR - Device: changing interface type to 1 is not support
 ```
 
 To configure the interface parameters you'll need to use custom context. Custom
-context was used to make this script as customizable as posible for each
+context was used to make this script as customizable as possible for each
 environment. For example, you could:
 
 - Set the custom context directly on a device
-- Set the custom context on a label, which you would add to a device (for
+- Set the custom context on a tag, which you would add to a device (for
   instance, SNMPv3)
 - Set the custom context on a device role
 - Set the custom context on a site or region
