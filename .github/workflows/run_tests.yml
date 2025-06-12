@@ -19,7 +19,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest pytest-mock
         pip install -r requirements.txt
+    - name: Install coverage
+      run: pip install coverage pytest-cov
     - name: Testing the code with PyTest
       run: |
         cp config.py.example config.py
         pytest tests
+    - name: Run tests with coverage
+      run: |
+        cp config.py.example config.py
+        coverage run -m pytest tests
+    - name: Check coverage percentage
+      run: |
+        coverage report --fail-under=70

@@ -8,3 +8,4 @@ __pycache__/
 *.py[cod]
 .vscode
 .flake
+.coverage
