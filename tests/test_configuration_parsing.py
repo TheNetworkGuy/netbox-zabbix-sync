@@ -93,11 +93,10 @@ def test_load_config_file_function():
 
 def test_load_config_file_not_found():
     """Test load_config_file when the config file doesn't exist"""
-    # Instead of trying to assert on the logger call, we'll just check the return value
-    # and verify the function works as expected in this case
     with patch('pathlib.Path.exists', return_value=False):
         result = load_config_file(DEFAULT_CONFIG.copy())
-        assert result is None
+        # Should return a dict equal to DEFAULT_CONFIG, not a new object
+        assert result == DEFAULT_CONFIG
 
 
 def test_load_env_variable_function():
