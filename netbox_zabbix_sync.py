@@ -283,6 +283,7 @@ def main(arguments):
             device.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
         except SyncError:
             pass
+    zabbix.logout()
 
 
 if __name__ == "__main__":
