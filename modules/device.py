@@ -8,10 +8,10 @@ from logging import getLogger
 from re import search
 
 from zabbix_utils import APIRequestError
+from pynetbox import RequestError as NetboxRequestError
 
 from modules.exceptions import (
     InterfaceConfigError,
-    JournalError,
     SyncExternalError,
     SyncInventoryError,
     TemplateError,
@@ -896,7 +896,7 @@ class PhysicalDevice:
                 self.nb_journals.create(journal)
                 self.logger.debug(f"Host {self.name}: Created journal entry in NetBox")
                 return True
-            except JournalError(e) as e:
+            except NetboxRequestError as e:
                 self.logger.warning(
                     "Unable to create journal entry for "
                     f"{self.name}: NB returned {e}"
