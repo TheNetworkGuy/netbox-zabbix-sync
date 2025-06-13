@@ -132,7 +132,6 @@ def verify_hg_format(hg_format, device_cfs=[], vm_cfs=[], hg_type="dev", logger=
         allowed_objects['cfs']['dev'].append(cf.name)  
     for cf in vm_cfs:
         allowed_objects['cfs']['vm'].append(cf.name)  
-    logger.debug(allowed_objects)
     hg_objects = []
     if isinstance(hg_format,list):
         for f in hg_format:
