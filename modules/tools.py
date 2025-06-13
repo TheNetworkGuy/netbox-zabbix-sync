@@ -100,7 +100,7 @@ def remove_duplicates(input_list, sortkey=None):
         output_list.sort(key=lambda x: x[sortkey])
     return output_list
 
-def verify_hg_format(hg_format, hg_type="dev", logger=None):
+def verify_hg_format(hg_format, device_cfs=[], vm_cfs=[], hg_type="dev", logger=None):
     """
     Verifies hostgroup field format
     """
@@ -126,7 +126,13 @@ def verify_hg_format(hg_format, hg_type="dev", logger=None):
                               "cluster",
                               "device",
                               "platform"]
+                       ,"cfs": {"dev": [], "vm": []}
                       }
+    for cf in device_cfs:
+        allowed_objects['cfs']['dev'].append(cf.name)  
+    for cf in vm_cfs:
+        allowed_objects['cfs']['vm'].append(cf.name)  
+    logger.debug(allowed_objects)
     hg_objects = []
     if isinstance(hg_format,list):
         for f in hg_format:
@@ -135,7 +141,8 @@ def verify_hg_format(hg_format, hg_type="dev", logger=None):
         hg_objects = hg_format.split("/")
     hg_objects = sorted(set(hg_objects))
     for hg_object in hg_objects:
-        if hg_object not in allowed_objects[hg_type]:
+        if (hg_object not in allowed_objects[hg_type] and
+            hg_object not in allowed_objects['cfs'][hg_type]):
             e = (
                 f"Hostgroup item {hg_object} is not valid. Make sure you"
                 " use valid items and separate them with '/'."

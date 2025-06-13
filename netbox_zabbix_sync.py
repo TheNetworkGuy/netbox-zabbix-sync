@@ -85,9 +85,13 @@ def main(arguments):
     # Set NetBox API
     netbox = api(netbox_host, token=netbox_token, threading=True)
     # Create API call to get all custom fields which are on the device objects
+    device_cfs = []
     try:
         device_cfs = list(
-            netbox.extras.custom_fields.filter(type="text", content_type_id=23)
+            netbox.extras.custom_fields.filter(type="text", content_types="dcim.device")
+        )
+        vm_cfs = list(
+            netbox.extras.custom_fields.filter(type="text", content_types="virtualization.virtualmachine")
         )
     except RequestsConnectionError:
         logger.error(
@@ -98,12 +102,10 @@ def main(arguments):
     except NBRequestError as e:
         logger.error(f"NetBox error: {e}")
         sys.exit(1)
-    for cf in device_cfs:
-        allowed_objects.append(cf.name)
+    logger.debug(device_cfs)
     # Check if the provided Hostgroup layout is valid
-    verify_hg_format(hostgroup_format, hg_type="dev", logger=logger)
-    verify_hg_format(vm_hostgroup_format, hg_type="vm", logger=logger)
- 
+    verify_hg_format(hostgroup_format, device_cfs=device_cfs, hg_type="dev", logger=logger)
+    verify_hg_format(vm_hostgroup_format, vm_cfs=vm_cfs, hg_type="vm", logger=logger) 
     # Set Zabbix API
     try:
         ssl_ctx = ssl.create_default_context()

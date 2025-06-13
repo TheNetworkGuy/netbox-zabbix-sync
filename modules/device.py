@@ -724,7 +724,7 @@ class PhysicalDevice:
         # Check if hostgroups match
         if (sorted(host[group_dictname], key=itemgetter('groupid')) == 
              sorted(self.group_ids, key=itemgetter('groupid'))):
-                self.logger.debug(f"Host {self.name}: hostgroups in-sync.")
+             self.logger.debug(f"Host {self.name}: hostgroups in-sync.")
         else:
             self.logger.warning(f"Host {self.name}: hostgroups OUT of sync.")
             self.updateZabbixHost(groups=self.group_ids)
