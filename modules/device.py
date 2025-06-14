@@ -19,7 +19,7 @@ from modules.exceptions import (
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
 from modules.tags import ZabbixTags
-from modules.tools import field_mapper, remove_duplicates
+from modules.tools import field_mapper, remove_duplicates, sanatize_log_output
 from modules.usermacros import ZabbixUsermacros
 from modules.config import load_config
 
@@ -594,7 +594,7 @@ class PhysicalDevice:
             )
             self.logger.error(e)
             raise SyncExternalError(e) from None
-        self.logger.info(f"Updated host {self.name} with data {kwargs}.")
+        self.logger.info(f"Host {self.name}: updated with data {sanatize_log_output(kwargs)}.")
         self.create_journal_entry("info", "Updated host in Zabbix with latest NB data.")
 
     def ConsistencyCheck(
@@ -854,7 +854,7 @@ class PhysicalDevice:
                 try:
                     # API call to Zabbix
                     self.zabbix.hostinterface.update(updates)
-                    e = f"Host {self.name}: solved interface conflict."
+                    e = f"Host {self.name}: updated interface with data {sanatize_log_output(updates)}."
                     self.logger.info(e)
                     self.create_journal_entry("info", e)
                 except APIRequestError as e:
