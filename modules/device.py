@@ -854,7 +854,8 @@ class PhysicalDevice:
                 try:
                     # API call to Zabbix
                     self.zabbix.hostinterface.update(updates)
-                    e = f"Host {self.name}: updated interface with data {sanatize_log_output(updates)}."
+                    e = (f"Host {self.name}: updated interface "
+                         f"with data {sanatize_log_output(updates)}.")
                     self.logger.info(e)
                     self.create_journal_entry("info", e)
                 except APIRequestError as e:

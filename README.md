@@ -518,8 +518,8 @@ usermacro_sync = "full"
 This will force a full usermacro sync on every run on hosts that have secret usermacros set.
 That way, you will know for sure the secret values are always up to date.
 
-Keep in mind that NetBox (and the log output of this script) will show your secrets
-in plain text. If true secrecy is required, consider switching to
+Keep in mind that NetBox will show your secrets in plain text. 
+If true secrecy is required, consider switching to
 [vault](https://www.zabbix.com/documentation/current/en/manual/config/macros/secret_macros#vault-secret) 
 usermacros.
 
