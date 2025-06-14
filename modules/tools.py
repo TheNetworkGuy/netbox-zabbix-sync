@@ -118,8 +118,8 @@ def sanatize_log_output(data):
             macro["value"] = "********"
     # Check for interface data
     if "interfaceid" in data:
-        # Interface tID is a value which is most likely not helpful
-        # in logging output or for roubleshooting.
+        # Interface ID is a value which is most likely not helpful
+        # in logging output or for troubleshooting.
         del sanitized_data["interfaceid"]
         # InterfaceID also hints that this is a interface update.
         # A check is required if there are no macro's used for SNMP security parameters.
