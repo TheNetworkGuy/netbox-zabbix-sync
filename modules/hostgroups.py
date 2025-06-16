@@ -91,7 +91,6 @@ class Hostgroup:
             if self.nb.cluster:
                 format_options["cluster"] = self.nb.cluster.name
                 format_options["cluster_type"] = self.nb.cluster.type.name
-
         self.format_options = format_options
 
     def set_nesting(

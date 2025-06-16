@@ -181,19 +181,27 @@ used:
 | ------------ | ------------------------ |
 | location     | The device location name |
 | manufacturer | Device manufacturer name |
+| rack         | Rack                     |
 
 **Only for VMs**
 
 | name         | description     |
 | ------------ | --------------- |
 | cluster      | VM cluster name |
-| cluster_type | VM cluster type |
+| device       | parent device   |
 
 You can specify the value separated by a "/" like so:
 
 ```python
 hostgroup_format = "tenant/site/location/role"
 ```
+
+You can also provice a list of groups like so:
+
+```python
+hostgroup_format = ["region/site_group/site", "role", "tenant_group/tenant"]
+``` 
+
 
 **Group traversal**
 

@@ -6,6 +6,7 @@ Device specific handeling for NetBox to Zabbix
 from copy import deepcopy
 from logging import getLogger
 from re import search
+from operator import itemgetter
 
 from zabbix_utils import APIRequestError
 from pynetbox import RequestError as NetboxRequestError
@@ -42,11 +43,11 @@ class PhysicalDevice:
         self.status = nb.status.label
         self.zabbix = zabbix
         self.zabbix_id = None
-        self.group_id = None
+        self.group_ids = []
         self.nb_api_version = nb_version
         self.zbx_template_names = []
         self.zbx_templates = []
-        self.hostgroup = None
+        self.hostgroups = []
         self.tenant = nb.tenant
         self.config_context = nb.config_context
         self.zbxproxy = None
@@ -130,7 +131,10 @@ class PhysicalDevice:
             nb_regions=nb_regions,
         )
         # Generate hostgroup based on hostgroup format
-        self.hostgroup = hg.generate(hg_format)
+        if isinstance(hg_format, list):
+            self.hostgroups = [hg.generate(f) for f in hg_format]
+        else:
+            self.hostgroups.append(hg.generate(hg_format))
 
     def set_template(self, prefer_config_context, overrule_custom):
         """Set Template"""
@@ -312,12 +316,17 @@ class PhysicalDevice:
         OUTPUT: True / False
         """
         # Go through all groups
-        for group in groups:
-            if group["name"] == self.hostgroup:
-                self.group_id = group["groupid"]
-                e = f"Host {self.name}: matched group {group['name']}"
-                self.logger.debug(e)
-                return True
+        for hg in self.hostgroups:
+            for group in groups:
+                if group["name"] == hg:
+                    self.group_ids.append({"groupid": group["groupid"]})
+                    e = (
+                        f"Host {self.name}: matched group "
+                        f"\"{group['name']}\" (ID:{group['groupid']})"
+                    )
+                    self.logger.debug(e)
+        if len(self.group_ids) == len(self.hostgroups):
+            return True
         return False
 
     def cleanup(self):
@@ -494,7 +503,7 @@ class PhysicalDevice:
                 templateids.append({"templateid": template["templateid"]})
             # Set interface, group and template configuration
             interfaces = self.setInterfaceDetails()
-            groups = [{"groupid": self.group_id}]
+            groups = self.group_ids
             # Set Zabbix proxy if defined
             self.setProxy(proxies)
             # Set basic data for host creation
@@ -547,25 +556,26 @@ class PhysicalDevice:
         """
         final_data = []
         # Check if the hostgroup is in a nested format and check each parent
-        for pos in range(len(self.hostgroup.split("/"))):
-            zabbix_hg = self.hostgroup.rsplit("/", pos)[0]
-            if self.lookupZabbixHostgroup(hostgroups, zabbix_hg):
-                # Hostgroup already exists
-                continue
-            # Create new group
-            try:
-                # API call to Zabbix
-                groupid = self.zabbix.hostgroup.create(name=zabbix_hg)
-                e = f"Hostgroup '{zabbix_hg}': created in Zabbix."
-                self.logger.info(e)
-                # Add group to final data
-                final_data.append(
-                    {"groupid": groupid["groupids"][0], "name": zabbix_hg}
-                )
-            except APIRequestError as e:
-                msg = f"Hostgroup '{zabbix_hg}': unable to create. Zabbix returned {str(e)}."
-                self.logger.error(msg)
-                raise SyncExternalError(msg) from e
+        for hostgroup in self.hostgroups:
+            for pos in range(len(hostgroup.split("/"))):
+                zabbix_hg = hostgroup.rsplit("/", pos)[0]
+                if self.lookupZabbixHostgroup(hostgroups, zabbix_hg):
+                    # Hostgroup already exists
+                    continue
+                # Create new group
+                try:
+                    # API call to Zabbix
+                    groupid = self.zabbix.hostgroup.create(name=zabbix_hg)
+                    e = f"Hostgroup '{zabbix_hg}': created in Zabbix."
+                    self.logger.info(e)
+                    # Add group to final data
+                    final_data.append(
+                        {"groupid": groupid["groupids"][0], "name": zabbix_hg}
+                    )
+                except APIRequestError as e:
+                    msg = f"Hostgroup '{zabbix_hg}': unable to create. Zabbix returned {str(e)}."
+                    self.logger.error(msg)
+                    raise SyncExternalError(msg) from e
         return final_data
 
     def lookupZabbixHostgroup(self, group_list, lookup_group):
@@ -605,7 +615,7 @@ class PhysicalDevice:
         Checks if Zabbix object is still valid with NetBox parameters.
         """
         # If group is found or if the hostgroup is nested
-        if not self.setZabbixGroupID(groups) or len(self.hostgroup.split("/")) > 1:
+        if not self.setZabbixGroupID(groups): # or len(self.hostgroups.split("/")) > 1:
             if create_hostgroups:
                 # Script is allowed to create a new hostgroup
                 new_groups = self.createZabbixHostgroup(groups)
@@ -613,7 +623,7 @@ class PhysicalDevice:
                     # Add all new groups to the list of groups
                     groups.append(group)
             # check if the initial group was not already found (and this is a nested folder check)
-            if not self.group_id:
+            if not self.group_ids:
                 # Function returns true / false but also sets GroupID
                 if not self.setZabbixGroupID(groups) and not create_hostgroups:
                     e = (
@@ -622,6 +632,9 @@ class PhysicalDevice:
                     )
                     self.logger.warning(e)
                     raise SyncInventoryError(e)
+        #if self.group_ids:
+        #   self.group_ids.append(self.pri_group_id)
+
         # Prepare templates and proxy config
         self.zbxTemplatePrepper(templates)
         self.setProxy(proxies)
@@ -660,6 +673,7 @@ class PhysicalDevice:
                 f"Received value: {host['host']}"
             )
             self.updateZabbixHost(host=self.name)
+
         # Execute check depending on wether the name is special or not
         if self.use_visible_name:
             if host["name"] == self.visible_name:
@@ -689,18 +703,20 @@ class PhysicalDevice:
         group_dictname = "hostgroups"
         if str(self.zabbix.version).startswith(("6", "5")):
             group_dictname = "groups"
-        for group in host[group_dictname]:
-            if group["groupid"] == self.group_id:
-                self.logger.debug(f"Host {self.name}: hostgroup in-sync.")
-                break
-            self.logger.warning(f"Host {self.name}: hostgroup OUT of sync.")
-            self.updateZabbixHost(groups={"groupid": self.group_id})
+        # Check if hostgroups match
+        if (sorted(host[group_dictname], key=itemgetter('groupid')) ==
+            sorted(self.group_ids, key=itemgetter('groupid'))):
+            self.logger.debug(f"Host {self.name}: hostgroups in-sync.")
+        else:
+            self.logger.warning(f"Host {self.name}: hostgroups OUT of sync.")
+            self.updateZabbixHost(groups=self.group_ids)
 
         if int(host["status"]) == self.zabbix_state:
             self.logger.debug(f"Host {self.name}: status in-sync.")
         else:
             self.logger.warning(f"Host {self.name}: status OUT of sync.")
             self.updateZabbixHost(status=str(self.zabbix_state))
+
         # Check if a proxy has been defined
         if self.zbxproxy:
             # Check if proxy or proxy group is defined
@@ -870,7 +886,7 @@ class PhysicalDevice:
             e = (
                 f"Host {self.name} has unsupported interface configuration."
                 f" Host has total of {len(host['interfaces'])} interfaces. "
-                "Manual interfention required."
+                "Manual intervention required."
             )
             self.logger.error(e)
             raise SyncInventoryError(e)

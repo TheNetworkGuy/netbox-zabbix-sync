@@ -13,9 +13,9 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 from modules.config import load_config
 from modules.device import PhysicalDevice
-from modules.exceptions import EnvironmentVarError, HostgroupError, SyncError
+from modules.exceptions import EnvironmentVarError, SyncError
 from modules.logging import get_logger, set_log_levels, setup_logger
-from modules.tools import convert_recordset, proxy_prepper
+from modules.tools import convert_recordset, proxy_prepper, verify_hg_format
 from modules.virtual_machine import VirtualMachine
 
 config = load_config()
@@ -63,23 +63,11 @@ def main(arguments):
     netbox_token = environ.get("NETBOX_TOKEN")
     # Set NetBox API
     netbox = api(netbox_host, token=netbox_token, threading=True)
-    # Check if the provided Hostgroup layout is valid
-    hg_objects = config["hostgroup_format"].split("/")
-    allowed_objects = [
-        "location",
-        "role",
-        "manufacturer",
-        "region",
-        "site",
-        "site_group",
-        "tenant",
-        "tenant_group",
-    ]
     # Create API call to get all custom fields which are on the device objects
     try:
-        device_cfs = list(
-            netbox.extras.custom_fields.filter(type="text", content_type_id=23)
-        )
+        # Get NetBox version
+        nb_version = netbox.version
+        logger.debug(f"NetBox version is {nb_version}.")
     except RequestsConnectionError:
         logger.error(
             f"Unable to connect to NetBox with URL {netbox_host}."
@@ -89,16 +77,20 @@ def main(arguments):
     except NBRequestError as e:
         logger.error(f"NetBox error: {e}")
         sys.exit(1)
-    for cf in device_cfs:
-        allowed_objects.append(cf.name)
-    for hg_object in hg_objects:
-        if hg_object not in allowed_objects:
-            e = (
-                f"Hostgroup item {hg_object} is not valid. Make sure you"
-                " use valid items and seperate them with '/'."
-            )
-            logger.error(e)
-            raise HostgroupError(e)
+    # Check if the provided Hostgroup layout is valid
+    device_cfs = []
+    vm_cfs = []
+    device_cfs = list(
+        netbox.extras.custom_fields.filter(type="text", content_types="dcim.device")
+    )
+    verify_hg_format(config["hostgroup_format"],
+                     device_cfs=device_cfs, hg_type="dev", logger=logger)
+    if config["sync_vms"]:
+        vm_cfs = list(
+            netbox.extras.custom_fields.filter(type="text",
+                                               content_types="virtualization.virtualmachine")
+        )
+        verify_hg_format(config["vm_hostgroup_format"], vm_cfs=vm_cfs, hg_type="vm", logger=logger)
     # Set Zabbix API
     try:
         ssl_ctx = ssl.create_default_context()
@@ -146,9 +138,6 @@ def main(arguments):
     # Prepare list of all proxy and proxy_groups
     zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
 
-    # Get NetBox API version
-    nb_version = netbox.version
-
     # Go through all NetBox devices
     for nb_vm in netbox_vms:
         try:
@@ -162,7 +151,7 @@ def main(arguments):
             vm.set_hostgroup(config["vm_hostgroup_format"],
                              netbox_site_groups, netbox_regions)
             # Check if a valid hostgroup has been found for this VM.
-            if not vm.hostgroup:
+            if not vm.hostgroups:
                 continue
             vm.set_inventory(nb_vm)
             vm.set_usermacros()
@@ -185,6 +174,14 @@ def main(arguments):
             # Check if the VM is in the disabled state
             if vm.status in config["zabbix_device_disable"]:
                 vm.zabbix_state = 1
+            # Add hostgroup if config is set
+            if config["create_hostgroups"]:
+                # Create new hostgroup. Potentially multiple groups if nested
+                hostgroups = vm.createZabbixHostgroup(zabbix_groups)
+                # go through all newly created hostgroups
+                for group in hostgroups:
+                    # Add new hostgroups to zabbix group list
+                    zabbix_groups.append(group)
             # Check if VM is already in Zabbix
             if vm.zabbix_id:
                 vm.ConsistencyCheck(
@@ -195,14 +192,6 @@ def main(arguments):
                     config["create_hostgroups"],
                 )
                 continue
-            # Add hostgroup is config is set
-            if config["create_hostgroups"]:
-                # Create new hostgroup. Potentially multiple groups if nested
-                hostgroups = vm.createZabbixHostgroup(zabbix_groups)
-                # go through all newly created hostgroups
-                for group in hostgroups:
-                    # Add new hostgroups to zabbix group list
-                    zabbix_groups.append(group)
             # Add VM to Zabbix
             vm.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
         except SyncError:
@@ -222,7 +211,7 @@ def main(arguments):
             device.set_hostgroup(
                 config["hostgroup_format"], netbox_site_groups, netbox_regions)
             # Check if a valid hostgroup has been found for this VM.
-            if not device.hostgroup:
+            if not device.hostgroups:
                 continue
             device.set_inventory(nb_device)
             device.set_usermacros()
@@ -261,6 +250,14 @@ def main(arguments):
             # Check if the device is in the disabled state
             if device.status in config["zabbix_device_disable"]:
                 device.zabbix_state = 1
+            # Add hostgroup is config is set
+            if config["create_hostgroups"]:
+                # Create new hostgroup. Potentially multiple groups if nested
+                hostgroups = device.createZabbixHostgroup(zabbix_groups)
+                # go through all newly created hostgroups
+                for group in hostgroups:
+                    # Add new hostgroups to zabbix group list
+                    zabbix_groups.append(group)
             # Check if device is already in Zabbix
             if device.zabbix_id:
                 device.ConsistencyCheck(
@@ -271,14 +268,6 @@ def main(arguments):
                     config["create_hostgroups"],
                 )
                 continue
-            # Add hostgroup is config is set
-            if config["create_hostgroups"]:
-                # Create new hostgroup. Potentially multiple groups if nested
-                hostgroups = device.createZabbixHostgroup(zabbix_groups)
-                # go through all newly created hostgroups
-                for group in hostgroups:
-                    # Add new hostgroups to zabbix group list
-                    zabbix_groups.append(group)
             # Add device to Zabbix
             device.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
         except SyncError:
