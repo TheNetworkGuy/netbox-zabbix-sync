@@ -83,12 +83,14 @@ def main(arguments):
     device_cfs = list(
         netbox.extras.custom_fields.filter(type="text", content_types="dcim.device")
     )
-    verify_hg_format(hostgroup_format, device_cfs=device_cfs, hg_type="dev", logger=logger)
-    if sync_vms:
+    verify_hg_format(config["hostgroup_format"],
+                     device_cfs=device_cfs, hg_type="dev", logger=logger)
+    if config["sync_vms"]:
         vm_cfs = list(
-            netbox.extras.custom_fields.filter(type="text", content_types="virtualization.virtualmachine")
+            netbox.extras.custom_fields.filter(type="text",
+                                               content_types="virtualization.virtualmachine")
         )
-        verify_hg_format(vm_hostgroup_format, vm_cfs=vm_cfs, hg_type="vm", logger=logger) 
+        verify_hg_format(config["vm_hostgroup_format"], vm_cfs=vm_cfs, hg_type="vm", logger=logger)
     # Set Zabbix API
     try:
         ssl_ctx = ssl.create_default_context()
@@ -173,7 +175,7 @@ def main(arguments):
             if vm.status in config["zabbix_device_disable"]:
                 vm.zabbix_state = 1
             # Add hostgroup if config is set
-            if create_hostgroups:
+            if config["create_hostgroups"]:
                 # Create new hostgroup. Potentially multiple groups if nested
                 hostgroups = vm.createZabbixHostgroup(zabbix_groups)
                 # go through all newly created hostgroups
@@ -249,7 +251,7 @@ def main(arguments):
             if device.status in config["zabbix_device_disable"]:
                 device.zabbix_state = 1
             # Add hostgroup is config is set
-            if create_hostgroups:
+            if config["create_hostgroups"]:
                 # Create new hostgroup. Potentially multiple groups if nested
                 hostgroups = device.createZabbixHostgroup(zabbix_groups)
                 # go through all newly created hostgroups

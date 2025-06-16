@@ -320,7 +320,10 @@ class PhysicalDevice:
             for group in groups:
                 if group["name"] == hg:
                     self.group_ids.append({"groupid": group["groupid"]})
-                    e = f"Host {self.name}: matched group \"{group['name']}\" (ID:{group['groupid']})"
+                    e = (
+                        f"Host {self.name}: matched group "
+                        f"\"{group['name']}\" (ID:{group['groupid']})"
+                    )
                     self.logger.debug(e)
         if len(self.group_ids) == len(self.hostgroups):
             return True
@@ -500,7 +503,6 @@ class PhysicalDevice:
                 templateids.append({"templateid": template["templateid"]})
             # Set interface, group and template configuration
             interfaces = self.setInterfaceDetails()
-           
             groups = self.group_ids
             # Set Zabbix proxy if defined
             self.setProxy(proxies)
@@ -702,9 +704,9 @@ class PhysicalDevice:
         if str(self.zabbix.version).startswith(("6", "5")):
             group_dictname = "groups"
         # Check if hostgroups match
-        if (sorted(host[group_dictname], key=itemgetter('groupid')) == 
-             sorted(self.group_ids, key=itemgetter('groupid'))):
-             self.logger.debug(f"Host {self.name}: hostgroups in-sync.")
+        if (sorted(host[group_dictname], key=itemgetter('groupid')) ==
+            sorted(self.group_ids, key=itemgetter('groupid'))):
+            self.logger.debug(f"Host {self.name}: hostgroups in-sync.")
         else:
             self.logger.warning(f"Host {self.name}: hostgroups OUT of sync.")
             self.updateZabbixHost(groups=self.group_ids)

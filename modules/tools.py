@@ -101,10 +101,14 @@ def remove_duplicates(input_list, sortkey=None):
     return output_list
 
 
-def verify_hg_format(hg_format, device_cfs=[], vm_cfs=[], hg_type="dev", logger=None):
+def verify_hg_format(hg_format, device_cfs=None, vm_cfs=None, hg_type="dev", logger=None):
     """
     Verifies hostgroup field format
     """
+    if not device_cfs:
+        device_cfs = []
+    if not vm_cfs:
+        vm_cfs = []
     allowed_objects = {"dev": ["location",
                               "rack",
                               "role",
@@ -130,9 +134,9 @@ def verify_hg_format(hg_format, device_cfs=[], vm_cfs=[], hg_type="dev", logger=
                        ,"cfs": {"dev": [], "vm": []}
                       }
     for cf in device_cfs:
-        allowed_objects['cfs']['dev'].append(cf.name)  
+        allowed_objects['cfs']['dev'].append(cf.name)
     for cf in vm_cfs:
-        allowed_objects['cfs']['vm'].append(cf.name)  
+        allowed_objects['cfs']['vm'].append(cf.name)
     hg_objects = []
     if isinstance(hg_format,list):
         for f in hg_format:
