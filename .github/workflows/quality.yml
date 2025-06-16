@@ -1,15 +1,16 @@
 ---
 name: Pylint Quality control
 
-on: 
-  workflow_call
+on:
+  push:
+  pull_request:
 
 jobs:
-  build:
+  python_quality_testing:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11","3.12"]
+        python-version: ["3.12","3.13"]
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
@@ -23,4 +24,4 @@ jobs:
         pip install -r requirements.txt
     - name: Analysing the code with pylint
       run: |
-        pylint --module-naming-style=any $(git ls-files '*.py')
+        pylint --module-naming-style=any modules/* netbox_zabbix_sync.py

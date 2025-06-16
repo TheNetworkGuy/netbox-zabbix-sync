@@ -100,6 +100,7 @@ def remove_duplicates(input_list, sortkey=None):
         output_list.sort(key=lambda x: x[sortkey])
     return output_list
 
+
 def verify_hg_format(hg_format, device_cfs=[], vm_cfs=[], hg_type="dev", logger=None):
     """
     Verifies hostgroup field format
@@ -148,4 +149,40 @@ def verify_hg_format(hg_format, device_cfs=[], vm_cfs=[], hg_type="dev", logger=
             )
             logger.error(e)
             raise HostgroupError(e)
-       
+
+
+def sanatize_log_output(data):
+    """
+    Used for the update function to Zabbix which
+    shows the data that its using to update the host.
+    Removes and sensitive data from the input.
+    """
+    if not isinstance(data, dict):
+        return data
+    sanitized_data = data.copy()
+    # Check if there are any sensitive macros defined in the data
+    if "macros" in data:
+        for macro in sanitized_data["macros"]:
+            # Check if macro is secret type
+            if not macro["type"] == str(1):
+                continue
+            macro["value"] = "********"
+    # Check for interface data
+    if "interfaceid" in data:
+        # Interface ID is a value which is most likely not helpful
+        # in logging output or for troubleshooting.
+        del sanitized_data["interfaceid"]
+        # InterfaceID also hints that this is a interface update.
+        # A check is required if there are no macro's used for SNMP security parameters.
+        if not "details" in data:
+            return sanitized_data
+        for key, detail in sanitized_data["details"].items():
+            # If the detail is a secret, we don't want to log it.
+            if key in ("authpassphrase", "privpassphrase", "securityname", "community"):
+                # Check if a macro is used.
+                # If so then logging the output is not a security issue.
+                if detail.startswith("{$") and detail.endswith("}"):
+                    continue
+                # A macro is not used, so we sanitize the value.
+                sanitized_data["details"][key] = "********"
+    return sanitized_data

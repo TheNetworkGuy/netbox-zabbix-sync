@@ -10,7 +10,7 @@ from modules.tools import field_mapper
 
 
 class ZabbixUsermacros:
-    """Class that represents a Zabbix interface."""
+    """Class that represents Zabbix usermacros."""
 
     def __init__(self, nb, usermacro_map, usermacro_sync, logger=None, host=None):
         self.nb = nb
@@ -57,7 +57,8 @@ class ZabbixUsermacros:
             macro["macro"] = str(macro_name)
             if isinstance(macro_properties, dict):
                 if not "value" in macro_properties:
-                    self.logger.error(f"Usermacro {macro_name} has no value, skipping.")
+                    self.logger.warning(f"Host {self.name}: Usermacro {macro_name} has "
+                                        "no value in Netbox, skipping.")
                     return False
                 macro["value"] = macro_properties["value"]
 
@@ -76,13 +77,18 @@ class ZabbixUsermacros:
                 else:
                     macro["description"] = ""
 
-            elif isinstance(macro_properties, str):
+            elif isinstance(macro_properties, str) and macro_properties:
                 macro["value"] = macro_properties
                 macro["type"] = str(0)
                 macro["description"] = ""
+
+            else:
+                self.logger.warning(f"Host {self.name}: Usermacro {macro_name} "
+                                    "has no value, skipping.")
+                return False
         else:
             self.logger.error(
-                f"Usermacro {macro_name} is not a valid usermacro name, skipping."
+                f"Host {self.name}: Usermacro {macro_name} is not a valid usermacro name, skipping."
             )
             return False
         return macro

@@ -1,14 +1,10 @@
+---
 name: Build and Push Docker Image
 
-permissions:
-  contents: read
-  packages: write
-
 on:
-  release:
-    types: [published]
-  pull_request:
-    types: [opened, synchronize]
+  push:
+    branches:
+      - main
 
 jobs:
   test_quality:
