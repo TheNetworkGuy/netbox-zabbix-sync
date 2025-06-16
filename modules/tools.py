@@ -120,7 +120,7 @@ def verify_hg_format(hg_format, device_cfs=None, vm_cfs=None, hg_type="dev", log
                               "tenant_group",
                               "platform",
                               "cluster"]
-                      ,"vm": ["location",
+                      ,"vm": ["cluster_type",
                               "role",
                               "manufacturer",
                               "region",
