@@ -1,14 +1,13 @@
 # NetBox to Zabbix synchronization
 
-A script to create, update and delete Zabbix hosts using NetBox device objects.
-Currently compatible with Zabbix 7.0. Zabbix 7.2 is unfortunately not supported and will result in the script failing.
+A script to create, update and delete Zabbix hosts using NetBox device objects. Tested and compatible with all [currently supported Zabbix releases](https://www.zabbix.com/life_cycle_and_release_policy).
 
 ## Installation via Docker
 
 To pull the latest stable version to your local cache, use the following docker
 pull command:
 
-```sh
+```bash
 docker pull ghcr.io/thenetworkguy/netbox-zabbix-sync:main
 ```
 
@@ -16,7 +15,7 @@ Make sure to specify the needed environment variables for the script to work
 (see [here](#set-environment-variables)) on the command line or use an
 [env file](https://docs.docker.com/reference/cli/docker/container/run/#env).
 
-```sh
+```bash
 docker run -d -t -i -e ZABBIX_HOST='https://zabbix.local' \ 
 -e ZABBIX_TOKEN='othersecrettoken' \
 -e NETBOX_HOST='https://netbox.local' \
@@ -24,14 +23,14 @@ docker run -d -t -i -e ZABBIX_HOST='https://zabbix.local' \
 --name netbox-zabbix-sync ghcr.io/thenetworkguy/netbox-zabbix-sync:main
 ```
 
-This should run a one-time sync, you can check the sync with
+This should run a one-time sync. You can check the sync with
 `docker logs netbox-zabbix-sync`.
 
-The image uses the default `config.py` for it's configuration, you can use a
+The image uses the default `config.py` for its configuration, you can use a
 volume mount in the docker run command to override with your own config file if
 needed (see [config file](#config-file)):
 
-```sh
+```bash
 docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ...
 ```
 
@@ -39,7 +38,7 @@ docker run -d -t -i -v $(pwd)/config.py:/opt/netbox-zabbix/config.py ...
 
 ### Cloning the repository
 
-```sh
+```bash
 git clone https://github.com/TheNetworkGuy/netbox-zabbix-sync.git
 ```
 
@@ -73,19 +72,19 @@ cp config.py.example config.py
 
 Set the following environment variables:
 
-```sh
-export ZABBIX_HOST="https://zabbix.local"
-export ZABBIX_USER="username"
-export ZABBIX_PASS="Password"
-export NETBOX_HOST="https://netbox.local"
-export NETBOX_TOKEN="secrettoken"
+```bash
+ZABBIX_HOST="https://zabbix.local"
+ZABBIX_USER="username"
+ZABBIX_PASS="Password"
+NETBOX_HOST="https://netbox.local"
+NETBOX_TOKEN="secrettoken"
 ```
 
 Or, you can use a Zabbix API token to login instead of using a username and
 password. In that case `ZABBIX_USER` and `ZABBIX_PASS` will be ignored.
 
-```sh
-export ZABBIX_TOKEN=othersecrettoken
+```bash
+ZABBIX_TOKEN=othersecrettoken
 ```
 
 If you are using custom SSL certificates for NetBox and/or Zabbix, you can set
@@ -119,8 +118,8 @@ the template information then the zabbix_template field is not required):
 You can make the `zabbix_hostid` field hidden or read-only to prevent human
 intervention.
 
-This is optional and there is a use case for leaving it read-write in the UI to
-manually change the ID. For example to re-run a sync.
+This is optional, but there may be cases where you want to leave it 
+read-write in the UI. For example to manually change or clear the ID and re-run a sync.
 
 ## Virtual Machine (VM) Syncing
 
@@ -147,7 +146,7 @@ creation for devices in a new category. I would recommend setting this variable
 to `True` since leaving it on `False` results in a lot of manual work.
 
 The format can be set with the `hostgroup_format` variable for devices and
-`vm_hostgroup_format` for devices.
+`vm_hostgroup_format` for virtual machines.
 
 Any nested parent hostgroups will also be created automatically. For instance
 the region `Berlin` with parent region `Germany` will create the hostgroup
@@ -182,19 +181,27 @@ used:
 | ------------ | ------------------------ |
 | location     | The device location name |
 | manufacturer | Device manufacturer name |
+| rack         | Rack                     |
 
 **Only for VMs**
 
 | name         | description     |
 | ------------ | --------------- |
 | cluster      | VM cluster name |
-| cluster_type | VM cluster type |
+| device       | parent device   |
 
-You can specify the value sperated by a "/" like so:
+You can specify the value separated by a "/" like so:
 
+```python
+hostgroup_format = "tenant/site/location/role"
 ```
-hostgroup_format = "tenant/site/dev_location/role"
-```
+
+You can also provice a list of groups like so:
+
+```python
+hostgroup_format = ["region/site_group/site", "role", "tenant_group/tenant"]
+``` 
+
 
 **Group traversal**
 
@@ -239,8 +246,8 @@ have a relationship with a tenant.
 - Device_role: PDU
 - Site: HQ-AMS
 
-```
-hostgroup_format = "site/tenant/device_role"
+```python
+hostgroup_format = "site/tenant/role"
 ```
 
 When running the script like above, the following hostgroup (HG) will be
@@ -252,7 +259,7 @@ generated for both hosts:
 
 The same logic applies to custom fields being used in the HG format:
 
-```
+```python
 hostgroup_format = "site/mycustomfieldname"
 ```
 
@@ -299,18 +306,21 @@ You can set the inventory mode to "disabled", "manual" or "automatic" with the
 [Zabbix Manual](https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory)
 for more information about the modes.
 
-Use the `inventory_map` variable to map which NetBox properties are used in
+Use the `device_inventory_map` variable to map which NetBox properties are used in
 which Zabbix Inventory fields. For nested properties, you can use the '/'
 seperator. For example, the following map will assign the custom field
 'mycustomfield' to the 'alias' Zabbix inventory field:
 
-```
+For Virtual Machines, use `vm_inventory_map`.
+
+```python
 inventory_sync = True
 inventory_mode = "manual"
-inventory_map = { "custom_fields/mycustomfield/name": "alias"}
+device_inventory_map = {"custom_fields/mycustomfield/name": "alias"}
+vm_inventory_map = {"custom_fields/mycustomfield/name": "alias"}
 ```
 
-See `config.py.example` for an extensive example map. Any Zabix Inventory fields
+See `config.py.example` for an extensive example map. Any Zabbix Inventory fields
 that are not included in the map will not be touched by the script, so you can
 safely add manual values or use items to automatically add values to other
 fields.
@@ -328,14 +338,14 @@ sticking to the custom field.
 You can change the behaviour in the config file. By default this setting is
 false but you can set it to true to use config context:
 
-```
+```python
 templates_config_context = True
 ```
 
 After that make sure that for each host there is at least one template defined
 in the config context in this format:
 
-```
+```json
 {
     "zabbix": {
         "templates": [
@@ -353,9 +363,195 @@ added benefit of overwriting the template should a device in NetBox have a
 device specific context defined. In this case the device specific context
 template(s) will take priority over the device type custom field template.
 
-```
+```python
 templates_config_context_overrule = True
 ```
+
+### Tags
+
+This script can sync host tags to your Zabbix hosts for use in filtering,
+SLA calculations and event correlation.
+
+Tags can be synced from the following sources:
+
+1. NetBox device/vm tags
+2. NetBox config context
+3. NetBox fields
+
+Syncing tags will override any tags that were set manually on the host,
+making NetBox the single source-of-truth for managing tags.
+
+To enable syncing, turn on tag_sync in the config file.
+By default, this script will modify tag names and tag values to lowercase.
+You can change this behaviour by setting tag_lower to False.
+
+```python
+tag_sync = True
+tag_lower = True
+```
+
+#### Device tags
+
+As NetBox doesn't follow the tag/value pattern for tags, we will need a tag
+name set to register the netbox tags.
+
+By default the tag name is "NetBox", but you can change this to whatever you want.
+The value for the tag can be set to 'name', 'display', or 'slug', which refers to the property of the NetBox tag object that will be used as the value in Zabbix.
+
+```python
+tag_name = 'NetBox'
+tag_value = 'name'
+```
+
+#### Config context
+
+You can supply custom tags via config context by adding the following:
+
+```json
+{
+    "zabbix": {
+        "tags": [
+            {
+                "MyTagName": "MyTagValue"
+            },
+            {
+                "environment": "production"
+            }
+        ],
+    }
+}
+```
+
+This will allow you to assign tags based on the config context rules.
+
+#### NetBox Field
+
+NetBox field can also be used as input for tags, just like inventory and usermacros.
+To enable syncing from fields, make sure to configure a `device_tag_map` and/or a `vm_tag_map`.
+
+```python
+device_tag_map = {"site/name": "site",
+                  "rack/name": "rack",
+                  "platform/name": "target"}
+
+vm_tag_map = {"site/name": "site",
+              "cluster/name": "cluster",
+              "platform/name": "target"}
+```
+
+To turn off field syncing, set the maps to empty dictionaries:
+
+```python
+device_tag_map = {}
+vm_tag_map = {}
+```
+
+
+### Usermacros
+
+You can choose to use NetBox as a source for Host usermacros by 
+enabling the following option in the configuration file:
+
+```python
+usermacro_sync = True
+```
+
+Please be advised that enabling this option will _clear_ any usermacros
+manually set on the managed hosts and override them with the usermacros
+from NetBox.
+
+There are two NetBox sources that can be used to populate usermacros:
+
+1. NetBox config context
+2. NetBox fields
+
+#### Config context
+
+By defining a dictionary `usermacros` within the `zabbix` key in 
+config context, you can dynamically assign usermacro values based on 
+anything that you can target based on 
+[config contexts](https://netboxlabs.com/docs/netbox/en/stable/features/context-data/)
+within NetBox.
+
+Through this method, it is possible to define the following types of usermacros:
+
+1. Text
+2. Secret
+3. Vault
+
+The default macro type is text if no `type` and `value` have been set.
+It is also possible to create usermacros with
+[context](https://www.zabbix.com/documentation/7.0/en/manual/config/macros/user_macros_context).
+
+Examples:
+
+```json
+{
+    "zabbix": {
+        "usermacros": {
+            "{$USER_MACRO}": "test value",
+            "{$CONTEXT_MACRO:\"test\"}": "test value",
+            "{$CONTEXT_REGEX_MACRO:regex:\".*\"}": "test value",
+            "{$SECRET_MACRO}": {
+                "type": "secret",
+                "value": "PaSsPhRaSe"
+            },
+            "{$VAULT_MACRO}": {
+                "type": "vault",
+                "value": "secret/vmware:password"
+            },
+            "{$USER_MACRO2}": {
+                "type": "text",
+                "value": "another test value"
+            }
+        }
+    }
+}
+
+```
+
+Please be aware that secret usermacros are only synced _once_ by default.
+This is the default behavior because Zabbix API won't return the value of 
+secrets so the script cannot compare the values with those set in NetBox.
+
+If you update a secret usermacro value, just remove the value from the host
+in Zabbix and the new value will be synced during the next run.
+
+Alternatively, you can set the following option in the config file:
+
+```python
+usermacro_sync = "full"
+```
+
+This will force a full usermacro sync on every run on hosts that have secret usermacros set.
+That way, you will know for sure the secret values are always up to date.
+
+Keep in mind that NetBox will show your secrets in plain text. 
+If true secrecy is required, consider switching to
+[vault](https://www.zabbix.com/documentation/current/en/manual/config/macros/secret_macros#vault-secret) 
+usermacros.
+
+#### Netbox Fields
+
+To use NetBox fields as a source for usermacros, you will need to set up usermacro maps
+for devices and/or virtual machines in the configuration file.
+This method only supports `text` type usermacros.
+
+For example:
+
+```python
+usermacro_sync = True
+device_usermacro_map = {"serial": "{$HW_SERIAL}",
+                        "role/name": "{$DEV_ROLE}", 
+                        "url": "{$NB_URL}",
+                        "id": "{$NB_ID}"}
+vm_usermacro_map = {"memory": "{$TOTAL_MEMORY}",
+                    "role/name": "{$DEV_ROLE}", 
+                    "url": "{$NB_URL}",
+                    "id": "{$NB_ID}"}
+```
+
+
 
 ## Permissions
 
@@ -393,9 +589,11 @@ python3 netbox_zabbix_sync.py
 
 ### Flags
 
-| Flag | Option  | Description            |
-| ---- | ------- | ---------------------- |
-| -v   | verbose | Log with debugging on. |
+| Flag | Option    | Description                           |
+| ---- | --------- | ------------------------------------- |
+| -v   | verbose   | Log with info on.                     |
+| -vv  | debug     | Log with debugging on.                |
+| -vvv | debug-all | Log with debugging on for all modules |
 
 ## Config context
 
@@ -411,7 +609,7 @@ You can set the proxy for a device using the 'proxy' key in config context.
 }
 ```
 
-It is now posible to specify proxy groups with the introduction of Proxy groups
+It is now possible to specify proxy groups with the introduction of Proxy groups
 in Zabbix 7. Specifying a group in the config context on older Zabbix releases
 will have no impact and the script will ignore the statement.
 
@@ -424,9 +622,9 @@ will have no impact and the script will ignore the statement.
 ```
 
 The script will prefer groups when specifying both a proxy and group. This is
-done with the assumption that groups are more resiliant and HA ready, making it
+done with the assumption that groups are more resilient and HA ready, making it
 a more logical choice to use for proxy linkage. This also makes migrating from a
-proxy to proxy group easier since the group take priority over the invidivual
+proxy to proxy group easier since the group take priority over the individual
 proxy.
 
 ```json
@@ -440,13 +638,7 @@ proxy.
 
 In the example above the host will use the group on Zabbix 7. On Zabbix 6 and
 below the host will use the proxy. Zabbix 7 will use the proxy value when
-ommiting the proxy_group value.
-
-Because of the possible amount of destruction when setting up NetBox but
-forgetting the proxy command, the sync works a bit different. By default
-everything is synced except in a situation where the Zabbix host has a proxy
-configured but nothing is configured in NetBox. To force deletion and a full
-sync, set the `full_proxy_sync` variable in the config file.
+omitting the proxy_group value.
 
 ### Set interface parameters within NetBox
 
@@ -463,7 +655,7 @@ Due to Zabbix limitations of changing interface type with a linked template,
 changing the interface type from within NetBox is not supported and the script
 will generate an error.
 
-For example when changing a SNMP interface to an Agent interface:
+For example, when changing a SNMP interface to an Agent interface:
 
 ```
 NetBox-Zabbix-sync - WARNING - Device: Interface OUT of sync.
@@ -471,11 +663,11 @@ NetBox-Zabbix-sync - ERROR - Device: changing interface type to 1 is not support
 ```
 
 To configure the interface parameters you'll need to use custom context. Custom
-context was used to make this script as customizable as posible for each
+context was used to make this script as customizable as possible for each
 environment. For example, you could:
 
 - Set the custom context directly on a device
-- Set the custom context on a label, which you would add to a device (for
+- Set the custom context on a tag, which you would add to a device (for
   instance, SNMPv3)
 - Set the custom context on a device role
 - Set the custom context on a site or region
@@ -525,9 +717,13 @@ environment. For example, you could:
 }
 ```
 
-I would recommend using macros for sensitive data such as community strings
+I would recommend using usermacros for sensitive data such as community strings
 since the data in NetBox is plain-text.
 
 > **_NOTE:_** Not all SNMP data is required for a working configuration.
-> [The following parameters are allowed](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed")but
+> [The following parameters are allowed](https://www.zabbix.com/documentation/current/manual/api/reference/hostinterface/object#details_tag "The following parameters are allowed") but
 > are not all required, depending on your environment.
+
+
+
+

@@ -1,0 +1,32 @@
+---
+name: Pytest code testing
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test_code:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.12
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-mock coverage pytest-cov
+        pip install -r requirements.txt
+    - name: Testing the code with PyTest
+      run: |
+        cp config.py.example config.py
+        pytest tests
+    - name: Run tests with coverage
+      run: |
+        cp config.py.example config.py
+        coverage run -m pytest tests
+    - name: Check coverage percentage
+      run: |
+        coverage report --fail-under=60

@@ -1,14 +1,27 @@
 """Module for all hostgroup related code"""
+
 from logging import getLogger
+
 from modules.exceptions import HostgroupError
 from modules.tools import build_path
 
-class Hostgroup():
+
+class Hostgroup:
     """Hostgroup class for devices and VM's
     Takes type (vm or dev) and NB object"""
-    def __init__(self, obj_type, nb_obj, version, logger=None, #pylint: disable=too-many-arguments, too-many-positional-arguments
-                 nested_sitegroup_flag=False, nested_region_flag=False,
-                 nb_regions=None, nb_groups=None):
+
+    # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
+    def __init__(
+        self,
+        obj_type,
+        nb_obj,
+        version,
+        logger=None,
+        nested_sitegroup_flag=False,
+        nested_region_flag=False,
+        nb_regions=None,
+        nb_groups=None,
+    ):
         self.logger = logger if logger else getLogger(__name__)
         if obj_type not in ("vm", "dev"):
             msg = f"Unable to create hostgroup with type {type}"
@@ -19,8 +32,9 @@ class Hostgroup():
         self.name = self.nb.name
         self.nb_version = version
         # Used for nested data objects
-        self.set_nesting(nested_sitegroup_flag, nested_region_flag,
-                         nb_groups, nb_regions)
+        self.set_nesting(
+            nested_sitegroup_flag, nested_region_flag, nb_groups, nb_regions
+        )
         self._set_format_options()
 
     def __str__(self):
@@ -49,40 +63,52 @@ class Hostgroup():
             format_options["site_group"] = None
             if self.nb.site:
                 if self.nb.site.region:
-                    format_options["region"] = self.generate_parents("region",
-                                                                     str(self.nb.site.region))
+                    format_options["region"] = self.generate_parents(
+                        "region", str(self.nb.site.region)
+                    )
                 if self.nb.site.group:
-                    format_options["site_group"] = self.generate_parents("site_group",
-                                                                         str(self.nb.site.group))
+                    format_options["site_group"] = self.generate_parents(
+                        "site_group", str(self.nb.site.group)
+                    )
             format_options["role"] = role
             format_options["site"] = self.nb.site.name if self.nb.site else None
             format_options["tenant"] = str(self.nb.tenant) if self.nb.tenant else None
-            format_options["tenant_group"] = str(self.nb.tenant.group) if self.nb.tenant else None
-            format_options["platform"] = self.nb.platform.name if self.nb.platform else None
+            format_options["tenant_group"] = (
+                str(self.nb.tenant.group) if self.nb.tenant else None
+            )
+            format_options["platform"] = (
+                self.nb.platform.name if self.nb.platform else None
+            )
         # Variables only applicable for devices
         if self.type == "dev":
             format_options["manufacturer"] = self.nb.device_type.manufacturer.name
-            format_options["location"] = str(self.nb.location) if self.nb.location else None
+            format_options["location"] = (
+                str(self.nb.location) if self.nb.location else None
+            )
         # Variables only applicable for VM's
         if self.type == "vm":
             # Check if a cluster is configured. Could also be configured in a site.
             if self.nb.cluster:
                 format_options["cluster"] = self.nb.cluster.name
                 format_options["cluster_type"] = self.nb.cluster.type.name
-
         self.format_options = format_options
 
-    def set_nesting(self, nested_sitegroup_flag, nested_region_flag,
-                    nb_groups, nb_regions):
+    def set_nesting(
+        self, nested_sitegroup_flag, nested_region_flag, nb_groups, nb_regions
+    ):
         """Set nesting options for this Hostgroup"""
-        self.nested_objects = {"site_group": {"flag": nested_sitegroup_flag, "data": nb_groups},
-                               "region": {"flag": nested_region_flag, "data": nb_regions}}
+        self.nested_objects = {
+            "site_group": {"flag": nested_sitegroup_flag, "data": nb_groups},
+            "region": {"flag": nested_region_flag, "data": nb_regions},
+        }
 
     def generate(self, hg_format=None):
         """Generate hostgroup based on a provided format"""
         # Set format to default in case its not specified
         if not hg_format:
-            hg_format = "site/manufacturer/role" if self.type == "dev" else "cluster/role"
+            hg_format = (
+                "site/manufacturer/role" if self.type == "dev" else "cluster/role"
+            )
         # Split all given names
         hg_output = []
         hg_items = hg_format.split("/")
@@ -93,8 +119,10 @@ class Hostgroup():
                 cf_data = self.custom_field_lookup(hg_item)
                 # CF does not exist
                 if not cf_data["result"]:
-                    msg = (f"Unable to generate hostgroup for host {self.name}. "
-                           f"Item type {hg_item} not supported.")
+                    msg = (
+                        f"Unable to generate hostgroup for host {self.name}. "
+                        f"Item type {hg_item} not supported."
+                    )
                     self.logger.error(msg)
                     raise HostgroupError(msg)
                 # CF data is populated
@@ -109,10 +137,12 @@ class Hostgroup():
         # Check if the hostgroup is populated with at least one item.
         if bool(hg_output):
             return "/".join(hg_output)
-        msg = (f"Unable to generate hostgroup for host {self.name}."
-               " Not enough valid items. This is most likely"
-               " due to the use of custom fields that are empty"
-               " or an invalid hostgroup format.")
+        msg = (
+            f"Unable to generate hostgroup for host {self.name}."
+            " Not enough valid items. This is most likely"
+            " due to the use of custom fields that are empty"
+            " or an invalid hostgroup format."
+        )
         self.logger.error(msg)
         raise HostgroupError(msg)
 
@@ -157,7 +187,9 @@ class Hostgroup():
             return child_object
         # If the nested flag is True, perform parent calculation
         if self.nested_objects[nest_type]["flag"]:
-            final_nested_object = build_path(child_object, self.nested_objects[nest_type]["data"])
+            final_nested_object = build_path(
+                child_object, self.nested_objects[nest_type]["data"]
+            )
             return "/".join(final_nested_object)
         # Nesting is not allowed for this object. Return child_object
         return child_object

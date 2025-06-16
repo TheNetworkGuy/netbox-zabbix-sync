@@ -1,46 +1,49 @@
-name: Publish Docker image to GHCR on a new version
+---
+name: Build and Push Docker Image
 
 on:
   push:
     branches:
       - main
-      - dockertest
-#    tags: 
-#      - [0-9]+.*
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   test_quality:
     uses: ./.github/workflows/quality.yml 
-  build_and_publish:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-      - name: Log in to the container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{ version }}
-            type=ref,event=branch
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
-            type=sha
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+    - name: Checkout repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@ca877d9245402d1537745e0e356eab47c3520991
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        platforms: linux/amd64,linux/arm64
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        annotations: |
+          index:org.opencontainers.image.description=Python script to synchronise NetBox devices to Zabbix.

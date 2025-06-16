@@ -4,7 +4,8 @@ All of the Zabbix interface related configuration
 """
 from modules.exceptions import InterfaceConfigError
 
-class ZabbixInterface():
+
+class ZabbixInterface:
     """Class that represents a Zabbix interface."""
 
     def __init__(self, context, ip):
@@ -15,21 +16,16 @@ class ZabbixInterface():
 
     def _set_default_port(self):
         """Sets default TCP / UDP port for different interface types"""
-        interface_mapping = {
-            1: 10050,
-            2: 161,
-            3: 623,
-            4: 12345
-        }
+        interface_mapping = {1: 10050, 2: 161, 3: 623, 4: 12345}
         # Check if interface type is listed in mapper.
-        if self.interface['type'] not in interface_mapping:
+        if self.interface["type"] not in interface_mapping:
             return False
         # Set default port to interface
-        self.interface["port"] = str(interface_mapping[self.interface['type']])
+        self.interface["port"] = str(interface_mapping[self.interface["type"]])
         return True
 
     def get_context(self):
-        """ check if NetBox custom context has been defined. """
+        """check if NetBox custom context has been defined."""
         if "zabbix" in self.context:
             zabbix = self.context["zabbix"]
             if "interface_type" in zabbix:
@@ -43,7 +39,7 @@ class ZabbixInterface():
         return False
 
     def set_snmp(self):
-        """ Check if interface is type SNMP """
+        """Check if interface is type SNMP"""
         # pylint: disable=too-many-branches
         if self.interface["type"] == 2:
             # Checks if SNMP settings are defined in NetBox
@@ -63,7 +59,7 @@ class ZabbixInterface():
                     e = "SNMP version option is not defined."
                     raise InterfaceConfigError(e)
                 # If version 1 or 2 is used, get community string
-                if self.interface["details"]["version"] in ['1','2']:
+                if self.interface["details"]["version"] in ["1", "2"]:
                     if "community" in snmp:
                         # Set SNMP community to confix context value
                         community = snmp["community"]
@@ -73,10 +69,16 @@ class ZabbixInterface():
                     self.interface["details"]["community"] = str(community)
                 # If version 3 has been used, get all
                 # SNMPv3 NetBox related configs
-                elif self.interface["details"]["version"] == '3':
-                    items = ["securityname", "securitylevel", "authpassphrase",
-                             "privpassphrase", "authprotocol", "privprotocol",
-                             "contextname"]
+                elif self.interface["details"]["version"] == "3":
+                    items = [
+                        "securityname",
+                        "securitylevel",
+                        "authpassphrase",
+                        "privpassphrase",
+                        "authprotocol",
+                        "privprotocol",
+                        "contextname",
+                    ]
                     for key, item in snmp.items():
                         if key in items:
                             self.interface["details"][key] = str(item)
@@ -91,13 +93,15 @@ class ZabbixInterface():
             raise InterfaceConfigError(e)
 
     def set_default_snmp(self):
-        """ Set default config to SNMPv2, port 161 and community macro. """
+        """Set default config to SNMPv2, port 161 and community macro."""
         self.interface = self.skelet
         self.interface["type"] = "2"
         self.interface["port"] = "161"
-        self.interface["details"] = {"version": "2",
-                                     "community": "{$SNMP_COMMUNITY}",
-                                     "bulk": "1"}
+        self.interface["details"] = {
+            "version": "2",
+            "community": "{$SNMP_COMMUNITY}",
+            "bulk": "1",
+        }
 
     def set_default_agent(self):
         """Sets interface to Zabbix agent defaults"""
