@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+  release:
+    types: [published]
+  pull_request:
+    types: [opened, synchronize]
 
 jobs:
   test_quality:
