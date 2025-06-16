@@ -4,6 +4,7 @@ name: Pylint Quality control
 on:
   push:
   pull_request:
+  workflow_call:
 
 jobs:
   python_quality_testing:
