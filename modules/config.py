@@ -3,7 +3,7 @@ Module for parsing configuration from the top level config.py file
 """
 from pathlib import Path
 from importlib import util
-from os import environ
+from os import environ, path
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -104,18 +104,25 @@ def load_env_variable(config_environvar):
 
 def load_config_file(config_default, config_file="config.py"):
     """Returns config from config.py file"""
-    # Check if config.py exists and load it
-    # If it does not exist, return the default config
-    config_path = Path(config_file)
-    if config_path.exists():
-        dconf = config_default.copy()
-        # Dynamically import the config module
-        spec = util.spec_from_file_location("config", config_path)
-        config_module = util.module_from_spec(spec)
-        spec.loader.exec_module(config_module)
-        # Update DEFAULT_CONFIG with variables from the config module
-        for key in dconf:
-            if hasattr(config_module, key):
-                dconf[key] = getattr(config_module, key)
-        return dconf
-    return config_default
+    # Find the script path and config file next to it.
+    script_dir = path.dirname(path.dirname(path.abspath(__file__)))
+    config_path = Path(path.join(script_dir, config_file))
+
+    # If the script directory is not found, try the current working directory
+    if not config_path.exists():
+        config_path = Path(config_file)
+
+    # If both checks fail then fallback to the default config
+    if not config_path.exists():
+        return config_default
+
+    dconf = config_default.copy()
+    # Dynamically import the config module
+    spec = util.spec_from_file_location("config", config_path)
+    config_module = util.module_from_spec(spec)
+    spec.loader.exec_module(config_module)
+    # Update DEFAULT_CONFIG with variables from the config module
+    for key in dconf:
+        if hasattr(config_module, key):
+            dconf[key] = getattr(config_module, key)
+    return dconf
