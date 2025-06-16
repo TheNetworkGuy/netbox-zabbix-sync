@@ -8,7 +8,9 @@ on:
 
 jobs:
   test_quality:
-    uses: ./.github/workflows/quality.yml 
+    uses: ./.github/workflows/quality.yml
+  test_code:
+    uses: ./.github/workflows/run_tests.yml
   build:
     runs-on: ubuntu-latest
     steps:
