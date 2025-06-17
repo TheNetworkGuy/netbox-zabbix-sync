@@ -85,6 +85,7 @@ class Hostgroup:
             format_options["location"] = (
                 str(self.nb.location) if self.nb.location else None
             )
+            format_options["rack"] = self.nb.rack.name if self.nb.rack else None
         # Variables only applicable for VM's
         if self.type == "vm":
             # Check if a cluster is configured. Could also be configured in a site.
