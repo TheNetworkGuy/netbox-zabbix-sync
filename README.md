@@ -185,10 +185,11 @@ used:
 
 **Only for VMs**
 
-| name         | description     |
-| ------------ | --------------- |
-| cluster      | VM cluster name |
-| device       | parent device   |
+| name         | description      |
+| ------------ | ---------------  |
+| cluster      | VM cluster name  |
+| cluster_type | VM cluster type  |
+| device       | parent device    |
 
 You can specify the value separated by a "/" like so:
 
