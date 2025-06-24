@@ -106,13 +106,8 @@ class Hostgroup:
             "region": {"flag": nested_region_flag, "data": nb_regions},
         }
 
-    def generate(self, hg_format=None):
+    def generate(self, hg_format):
         """Generate hostgroup based on a provided format"""
-        # Set format to default in case its not specified
-        if not hg_format:
-            hg_format = (
-                "site/manufacturer/role" if self.type == "dev" else "cluster/role"
-            )
         # Split all given names
         hg_output = []
         hg_items = hg_format.split("/")
@@ -149,7 +144,6 @@ class Hostgroup:
         )
         self.logger.warning(msg)
         return None
-        #raise HostgroupError(msg)
 
     def list_formatoptions(self):
         """

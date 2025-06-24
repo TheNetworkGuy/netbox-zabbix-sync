@@ -48,6 +48,7 @@ class PhysicalDevice:
         self.zbx_template_names = []
         self.zbx_templates = []
         self.hostgroups = []
+        self.hostgroup_type = "dev"
         self.tenant = nb.tenant
         self.config_context = nb.config_context
         self.zbxproxy = None
@@ -121,7 +122,7 @@ class PhysicalDevice:
         """Set the hostgroup for this device"""
         # Create new Hostgroup instance
         hg = Hostgroup(
-            "dev",
+            self.hostgroup_type,
             self.nb,
             self.nb_api_version,
             logger=self.logger,
