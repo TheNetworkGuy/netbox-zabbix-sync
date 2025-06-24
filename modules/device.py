@@ -229,6 +229,7 @@ class PhysicalDevice:
             self.inventory = field_mapper(
                 self.name, self._inventory_map(), nbdevice, self.logger
             )
+            self.logger.debug(f"Host {self.name}: Resolved inventory: {self.inventory}") 
         return True
 
     def isCluster(self):
