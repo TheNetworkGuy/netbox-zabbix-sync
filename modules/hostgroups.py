@@ -11,6 +11,7 @@ class Hostgroup:
     Takes type (vm or dev) and NB object"""
 
     # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
+    # pylint: disable=logging-fstring-interpolation
     def __init__(
         self,
         obj_type,
@@ -93,6 +94,8 @@ class Hostgroup:
                 format_options["cluster"] = self.nb.cluster.name
                 format_options["cluster_type"] = self.nb.cluster.type.name
         self.format_options = format_options
+        self.logger.debug(f"Host {self.name}: Resolved properties for use "
+                          f"in hostgroups: {self.format_options}")
 
     def set_nesting(
         self, nested_sitegroup_flag, nested_region_flag, nb_groups, nb_regions
@@ -135,17 +138,18 @@ class Hostgroup:
             hostgroup_value = self.format_options[hg_item]
             if hostgroup_value:
                 hg_output.append(hostgroup_value)
+            else:
+                self.logger.info(f"Host {self.name}: Used field '{hg_item}' has no value.")
         # Check if the hostgroup is populated with at least one item.
         if bool(hg_output):
             return "/".join(hg_output)
         msg = (
-            f"Unable to generate hostgroup for host {self.name}."
-            " Not enough valid items. This is most likely"
-            " due to the use of custom fields that are empty"
-            " or an invalid hostgroup format."
+            f"Host {self.name}: Generating hostgroup name for '{hg_format}' failed. "
+            f"This is most likely due to fields that have no value."
         )
-        self.logger.error(msg)
-        raise HostgroupError(msg)
+        self.logger.warning(msg)
+        return None
+        #raise HostgroupError(msg)
 
     def list_formatoptions(self):
         """

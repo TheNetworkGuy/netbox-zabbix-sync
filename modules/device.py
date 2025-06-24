@@ -135,6 +135,14 @@ class PhysicalDevice:
             self.hostgroups = [hg.generate(f) for f in hg_format]
         else:
             self.hostgroups.append(hg.generate(hg_format))
+        # Remove duplicates and None values
+        self.hostgroups = list(filter(None, list(set(self.hostgroups))))
+        if self.hostgroups:
+            self.logger.debug(f"Host {self.name}: Should be member "
+                              f"of groups: {self.hostgroups}")
+            return True
+        return False
+
 
     def set_template(self, prefer_config_context, overrule_custom):
         """Set Template"""
@@ -176,8 +184,6 @@ class PhysicalDevice:
         )
         self.logger.warning(e)
         raise TemplateError(e)
-
-
 
     def get_templates_context(self):
         """Get Zabbix templates from the device context"""
@@ -298,7 +304,8 @@ class PhysicalDevice:
                             "name": zbx_template["name"],
                         }
                     )
-                    e = f"Host {self.name}: found template {zbx_template['name']}"
+                    e = (f"Host {self.name}: Found template '{zbx_template['name']}' "
+                         f"(ID:{zbx_template['templateid']})")
                     self.logger.debug(e)
             # Return error should the template not be found in Zabbix
             if not template_match:
@@ -321,7 +328,7 @@ class PhysicalDevice:
                 if group["name"] == hg:
                     self.group_ids.append({"groupid": group["groupid"]})
                     e = (
-                        f"Host {self.name}: matched group "
+                        f"Host {self.name}: Matched group "
                         f"\"{group['name']}\" (ID:{group['groupid']})"
                     )
                     self.logger.debug(e)
@@ -503,7 +510,6 @@ class PhysicalDevice:
                 templateids.append({"templateid": template["templateid"]})
             # Set interface, group and template configuration
             interfaces = self.setInterfaceDetails()
-            groups = self.group_ids
             # Set Zabbix proxy if defined
             self.setProxy(proxies)
             # Set basic data for host creation
@@ -512,7 +518,7 @@ class PhysicalDevice:
                 "name": self.visible_name,
                 "status": self.zabbix_state,
                 "interfaces": interfaces,
-                "groups": groups,
+                "groups": self.group_ids,
                 "templates": templateids,
                 "description": description,
                 "inventory_mode": self.inventory_mode,
@@ -541,7 +547,7 @@ class PhysicalDevice:
             # Set NetBox custom field to hostID value.
             self.nb.custom_fields[config["device_cf"]] = int(self.zabbix_id)
             self.nb.save()
-            msg = f"Host {self.name}: Created host in Zabbix."
+            msg = f"Host {self.name}: Created host in Zabbix. (ID:{self.zabbix_id})"
             self.logger.info(msg)
             self.create_journal_entry("success", msg)
         else:
@@ -941,8 +947,8 @@ class PhysicalDevice:
                     tmpls_from_zabbix.pop(pos)
                     succesfull_templates.append(nb_tmpl)
                     self.logger.debug(
-                        f"Host {self.name}: template "
-                        f"{nb_tmpl['name']} is present in Zabbix."
+                        f"Host {self.name}: Template "
+                        f"'{nb_tmpl['name']}' is present in Zabbix."
                     )
                     break
         if (

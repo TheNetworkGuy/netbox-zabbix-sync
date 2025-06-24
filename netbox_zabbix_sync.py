@@ -212,6 +212,8 @@ def main(arguments):
                 config["hostgroup_format"], netbox_site_groups, netbox_regions)
             # Check if a valid hostgroup has been found for this VM.
             if not device.hostgroups:
+                logger.warning(f"Host {device.name}: Host has no valid "
+                               f"hostgroups, Skipping this host...")
                 continue
             device.set_inventory(nb_device)
             device.set_usermacros()
