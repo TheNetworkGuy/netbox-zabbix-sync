@@ -135,6 +135,9 @@ class PhysicalDevice:
             self.hostgroups = [hg.generate(f) for f in hg_format]
         else:
             self.hostgroups.append(hg.generate(hg_format))
+        self.hostgroups = list(set(self.hostgroups))
+        self.logger.debug(f"Host {self.name}: Should be member " 
+                          f"of groups: {self.hostgroups}")
 
     def set_template(self, prefer_config_context, overrule_custom):
         """Set Template"""
