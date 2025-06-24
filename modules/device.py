@@ -48,6 +48,7 @@ class PhysicalDevice:
         self.zbx_template_names = []
         self.zbx_templates = []
         self.hostgroups = []
+        self.hostgroup_type = "dev"
         self.tenant = nb.tenant
         self.config_context = nb.config_context
         self.zbxproxy = None
@@ -121,7 +122,7 @@ class PhysicalDevice:
         """Set the hostgroup for this device"""
         # Create new Hostgroup instance
         hg = Hostgroup(
-            "dev",
+            self.hostgroup_type,
             self.nb,
             self.nb_api_version,
             logger=self.logger,
@@ -564,9 +565,6 @@ class PhysicalDevice:
         final_data = []
         # Check if the hostgroup is in a nested format and check each parent
         for hostgroup in self.hostgroups:
-            # Check if hostgroup is string. If Nonetype skip hostgroup
-            if not isinstance(hostgroup, str):
-                continue
             for pos in range(len(hostgroup.split("/"))):
                 zabbix_hg = hostgroup.rsplit("/", pos)[0]
                 if self.lookupZabbixHostgroup(hostgroups, zabbix_hg):

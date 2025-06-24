@@ -144,7 +144,6 @@ class Hostgroup:
         )
         self.logger.warning(msg)
         return None
-        #raise HostgroupError(msg)
 
     def list_formatoptions(self):
         """

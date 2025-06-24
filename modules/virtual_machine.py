@@ -16,6 +16,7 @@ class VirtualMachine(PhysicalDevice):
         super().__init__(*args, **kwargs)
         self.hostgroup = None
         self.zbx_template_names = None
+        self.hostgroup_type = "vm"
 
     def _inventory_map(self):
         """use VM inventory maps"""
@@ -28,25 +29,6 @@ class VirtualMachine(PhysicalDevice):
     def _tag_map(self):
         """use VM tag maps"""
         return config["vm_tag_map"]
-
-    def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
-        """Set the hostgroup for this device"""
-        # Create new Hostgroup instance
-        hg = Hostgroup(
-            "vm",
-            self.nb,
-            self.nb_api_version,
-            logger=self.logger,
-            nested_sitegroup_flag=config["traverse_site_groups"],
-            nested_region_flag=config["traverse_regions"],
-            nb_groups=nb_site_groups,
-            nb_regions=nb_regions,
-        )
-        # Generate hostgroup based on hostgroup format
-        if isinstance(hg_format, list):
-            self.hostgroups = [hg.generate(f) for f in hg_format]
-        else:
-            self.hostgroups.append(hg.generate(hg_format))
 
     def set_vm_template(self):
         """Set Template for VMs. Overwrites default class
