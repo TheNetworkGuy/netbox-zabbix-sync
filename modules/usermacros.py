@@ -6,7 +6,7 @@ All of the Zabbix Usermacro related configuration
 from logging import getLogger
 from re import match
 
-from modules.tools import field_mapper
+from modules.tools import field_mapper, sanatize_log_output
 
 
 class ZabbixUsermacros:
@@ -98,6 +98,7 @@ class ZabbixUsermacros:
         Generate full set of Usermacros
         """
         macros = []
+        data={}
         # Parse the field mapper for usermacros
         if self.usermacro_map:
             self.logger.debug(f"Host {self.nb.name}: Starting usermacro mapper")
@@ -119,4 +120,6 @@ class ZabbixUsermacros:
                 m = self.render_macro(macro, properties)
                 if m:
                     macros.append(m)
+        data={'macros': macros}
+        self.logger.debug(f"Host {self.name}: Resolved macros: {sanatize_log_output(data)}")
         return macros

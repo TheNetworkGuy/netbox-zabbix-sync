@@ -159,7 +159,7 @@ def sanatize_log_output(data):
     """
     Used for the update function to Zabbix which
     shows the data that its using to update the host.
-    Removes and sensitive data from the input.
+    Removes any sensitive data from the input.
     """
     if not isinstance(data, dict):
         return data
@@ -168,7 +168,8 @@ def sanatize_log_output(data):
     if "macros" in data:
         for macro in sanitized_data["macros"]:
             # Check if macro is secret type
-            if not macro["type"] == str(1):
+            if not (macro["type"] == str(1) or
+                    macro["type"] == 1):
                 continue
             macro["value"] = "********"
     # Check for interface data

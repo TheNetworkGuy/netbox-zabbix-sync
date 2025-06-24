@@ -229,6 +229,7 @@ class PhysicalDevice:
             self.inventory = field_mapper(
                 self.name, self._inventory_map(), nbdevice, self.logger
             )
+            self.logger.debug(f"Host {self.name}: Resolved inventory: {self.inventory}")
         return True
 
     def isCluster(self):
@@ -428,16 +429,16 @@ class PhysicalDevice:
         tags = ZabbixTags(
             self.nb,
             self._tag_map(),
-            config['tag_sync'],
-            config['tag_lower'],
+            tag_sync=config['tag_sync'],
+            tag_lower=config['tag_lower'],
             tag_name=config['tag_name'],
             tag_value=config['tag_value'],
             logger=self.logger,
             host=self.name,
         )
-        if tags.sync is False:
+        if config['tag_sync'] is False:
             self.tags = []
-
+            return False
         self.tags = tags.generate()
         return True
 
