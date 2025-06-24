@@ -121,5 +121,5 @@ class ZabbixUsermacros:
                 if m:
                     macros.append(m)
         data={'macros': macros}
-        self.logger.debug(f"Host {self.name}: Resolved macros: {sanatize_log_output(data)}") 
+        self.logger.debug(f"Host {self.name}: Resolved macros: {sanatize_log_output(data)}")
         return macros

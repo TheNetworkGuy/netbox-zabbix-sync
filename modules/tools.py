@@ -168,7 +168,7 @@ def sanatize_log_output(data):
     if "macros" in data:
         for macro in sanitized_data["macros"]:
             # Check if macro is secret type
-            if not (macro["type"] == str(1) or 
+            if not (macro["type"] == str(1) or
                     macro["type"] == 1):
                 continue
             macro["value"] = "********"
