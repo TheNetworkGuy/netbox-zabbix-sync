@@ -106,7 +106,7 @@ class Hostgroup:
             "region": {"flag": nested_region_flag, "data": nb_regions},
         }
 
-    def generate(self, hg_format=None):
+    def generate(self, hg_format):
         """Generate hostgroup based on a provided format"""
         # Split all given names
         hg_output = []
