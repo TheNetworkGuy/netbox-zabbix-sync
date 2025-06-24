@@ -2,7 +2,6 @@
 """Module that hosts all functions for virtual machine processing"""
 from modules.device import PhysicalDevice
 from modules.exceptions import InterfaceConfigError, SyncInventoryError, TemplateError
-from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
 from modules.config import load_config
 # Load config
