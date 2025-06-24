@@ -11,6 +11,7 @@ class Hostgroup:
     Takes type (vm or dev) and NB object"""
 
     # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
+    # pylint: disable=logging-fstring-interpolation
     def __init__(
         self,
         obj_type,
@@ -93,7 +94,8 @@ class Hostgroup:
                 format_options["cluster"] = self.nb.cluster.name
                 format_options["cluster_type"] = self.nb.cluster.type.name
         self.format_options = format_options
-        self.logger.debug(f"Host {self.name}: Resolved properties for use in hostgroups: {self.format_options}")
+        self.logger.debug(f"Host {self.name}: Resolved properties for use "
+                          f"in hostgroups: {self.format_options}")
 
     def set_nesting(
         self, nested_sitegroup_flag, nested_region_flag, nb_groups, nb_regions
@@ -142,7 +144,7 @@ class Hostgroup:
         if bool(hg_output):
             return "/".join(hg_output)
         msg = (
-            f"Host {self.name}: Generating hostgroup name for '{hg_format}' failed. " 
+            f"Host {self.name}: Generating hostgroup name for '{hg_format}' failed. "
             f"This is most likely due to fields that have no value."
         )
         self.logger.warning(msg)

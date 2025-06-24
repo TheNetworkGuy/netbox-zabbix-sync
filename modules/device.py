@@ -138,7 +138,7 @@ class PhysicalDevice:
         # Remove duplicates and None values
         self.hostgroups = list(filter(None, list(set(self.hostgroups))))
         if self.hostgroups:
-            self.logger.debug(f"Host {self.name}: Should be member " 
+            self.logger.debug(f"Host {self.name}: Should be member "
                               f"of groups: {self.hostgroups}")
             return True
         return False
