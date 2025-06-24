@@ -15,7 +15,7 @@ class ZabbixTags:
         self,
         nb,
         tag_map,
-        tag_sync,
+        tag_sync=False,
         tag_lower=True,
         tag_name=None,
         tag_value=None,
@@ -130,4 +130,6 @@ class ZabbixTags:
                 if t:
                     tags.append(t)
 
-        return remove_duplicates(tags, sortkey="tag")
+        tags = remove_duplicates(tags, sortkey="tag")
+        self.logger.debug(f"Host {self.name}: Resolved tags: {tags}")
+        return tags
