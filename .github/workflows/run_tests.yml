@@ -4,6 +4,7 @@ name: Pytest code testing
 on:
   push:
   pull_request:
+  workflow_call:
 
 jobs:
   test_code:
@@ -29,4 +30,4 @@ jobs:
         coverage run -m pytest tests
     - name: Check coverage percentage
       run: |
-        coverage report --fail-under=60
+        coverage report --fail-under=70
