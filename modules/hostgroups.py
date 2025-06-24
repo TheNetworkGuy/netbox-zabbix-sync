@@ -108,11 +108,6 @@ class Hostgroup:
 
     def generate(self, hg_format=None):
         """Generate hostgroup based on a provided format"""
-        # Set format to default in case its not specified
-        if not hg_format:
-            hg_format = (
-                "site/manufacturer/role" if self.type == "dev" else "cluster/role"
-            )
         # Split all given names
         hg_output = []
         hg_items = hg_format.split("/")

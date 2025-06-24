@@ -564,6 +564,9 @@ class PhysicalDevice:
         final_data = []
         # Check if the hostgroup is in a nested format and check each parent
         for hostgroup in self.hostgroups:
+            # Check if hostgroup is string. If Nonetype skip hostgroup
+            if not isinstance(hostgroup, str):
+                continue
             for pos in range(len(hostgroup.split("/"))):
                 zabbix_hg = hostgroup.rsplit("/", pos)[0]
                 if self.lookupZabbixHostgroup(hostgroups, zabbix_hg):
