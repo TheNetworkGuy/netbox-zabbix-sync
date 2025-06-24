@@ -135,7 +135,7 @@ class PhysicalDevice:
             self.hostgroups = [hg.generate(f) for f in hg_format]
         else:
             self.hostgroups.append(hg.generate(hg_format))
-        # Remove dyuplicates and None values
+        # Remove duplicates and None values
         self.hostgroups = list(filter(None, list(set(self.hostgroups))))
         if self.hostgroups:
             self.logger.debug(f"Host {self.name}: Should be member " 
