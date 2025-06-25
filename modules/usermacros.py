@@ -3,6 +3,7 @@
 """
 All of the Zabbix Usermacro related configuration
 """
+
 from logging import getLogger
 from re import match
 
@@ -57,8 +58,11 @@ class ZabbixUsermacros:
             macro["macro"] = str(macro_name)
             if isinstance(macro_properties, dict):
                 if not "value" in macro_properties:
-                    self.logger.warning(f"Host {self.name}: Usermacro {macro_name} has "
-                                        "no value in Netbox, skipping.")
+                    self.logger.info(
+                        "Host %s: Usermacro %s has no value in Netbox, skipping.",
+                        self.name,
+                        macro_name,
+                    )
                     return False
                 macro["value"] = macro_properties["value"]
 
@@ -83,12 +87,17 @@ class ZabbixUsermacros:
                 macro["description"] = ""
 
             else:
-                self.logger.warning(f"Host {self.name}: Usermacro {macro_name} "
-                                    "has no value, skipping.")
+                self.logger.info(
+                    "Host %s: Usermacro %s has no value, skipping.",
+                    self.name,
+                    macro_name,
+                )
                 return False
         else:
-            self.logger.error(
-                f"Host {self.name}: Usermacro {macro_name} is not a valid usermacro name, skipping."
+            self.logger.warning(
+                "Host %s: Usermacro %s is not a valid usermacro name, skipping.",
+                self.name,
+                macro_name,
             )
             return False
         return macro
@@ -98,10 +107,10 @@ class ZabbixUsermacros:
         Generate full set of Usermacros
         """
         macros = []
-        data={}
+        data = {}
         # Parse the field mapper for usermacros
         if self.usermacro_map:
-            self.logger.debug(f"Host {self.nb.name}: Starting usermacro mapper")
+            self.logger.debug("Host %s: Starting usermacro mapper.", self.nb.name)
             field_macros = field_mapper(
                 self.nb.name, self.usermacro_map, self.nb, self.logger
             )
@@ -120,6 +129,8 @@ class ZabbixUsermacros:
                 m = self.render_macro(macro, properties)
                 if m:
                     macros.append(m)
-        data={'macros': macros}
-        self.logger.debug(f"Host {self.name}: Resolved macros: {sanatize_log_output(data)}")
+        data = {"macros": macros}
+        self.logger.debug(
+            "Host %s: Resolved macros: %s", self.name, sanatize_log_output(data)
+        )
         return macros
