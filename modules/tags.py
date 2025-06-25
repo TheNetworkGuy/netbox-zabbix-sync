@@ -3,6 +3,7 @@
 """
 All of the Zabbix Usermacro related configuration
 """
+
 from logging import getLogger
 
 from modules.tools import field_mapper, remove_duplicates
@@ -76,7 +77,7 @@ class ZabbixTags:
             else:
                 tag["tag"] = tag_name
         else:
-            self.logger.warning(f"Tag '{tag_name}' is not a valid tag name, skipping.")
+            self.logger.warning("Tag '%s' is not a valid tag name, skipping.", tag_name)
             return False
 
         if self.validate_value(tag_value):
@@ -86,7 +87,7 @@ class ZabbixTags:
                 tag["value"] = tag_value
         else:
             self.logger.info(
-                f"Tag '{tag_name}' has an invalid value: '{tag_value}', skipping."
+                "Tag '%s' has an invalid value: '%s', skipping.", tag_name, tag_value
             )
             return False
         return tag
@@ -99,7 +100,7 @@ class ZabbixTags:
         tags = []
         # Parse the field mapper for tags
         if self.tag_map:
-            self.logger.debug(f"Host {self.nb.name}: Starting tag mapper.")
+            self.logger.debug("Host %s: Starting tag mapper.", self.nb.name)
             field_tags = field_mapper(self.nb.name, self.tag_map, self.nb, self.logger)
             for tag, value in field_tags.items():
                 t = self.render_tag(tag, value)
@@ -131,5 +132,5 @@ class ZabbixTags:
                     tags.append(t)
 
         tags = remove_duplicates(tags, sortkey="tag")
-        self.logger.debug(f"Host {self.name}: Resolved tags: {tags}")
+        self.logger.debug("Host %s: Resolved tags: %s", self.name, tags)
         return tags

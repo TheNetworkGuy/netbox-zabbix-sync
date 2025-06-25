@@ -2,6 +2,7 @@
 # pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation
 
 """NetBox to Zabbix sync script."""
+
 import argparse
 import logging
 import ssl
@@ -67,15 +68,15 @@ def main(arguments):
     try:
         # Get NetBox version
         nb_version = netbox.version
-        logger.debug(f"NetBox version is {nb_version}.")
+        logger.debug("NetBox version is %s.", nb_version)
     except RequestsConnectionError:
         logger.error(
-            f"Unable to connect to NetBox with URL {netbox_host}."
-            " Please check the URL and status of NetBox."
+            "Unable to connect to NetBox with URL %s. Please check the URL and status of NetBox.",
+            netbox_host,
         )
         sys.exit(1)
     except NBRequestError as e:
-        logger.error(f"NetBox error: {e}")
+        logger.error("NetBox error: %s", e)
         sys.exit(1)
     # Check if the provided Hostgroup layout is valid
     device_cfs = []
@@ -83,14 +84,18 @@ def main(arguments):
     device_cfs = list(
         netbox.extras.custom_fields.filter(type="text", content_types="dcim.device")
     )
-    verify_hg_format(config["hostgroup_format"],
-                     device_cfs=device_cfs, hg_type="dev", logger=logger)
+    verify_hg_format(
+        config["hostgroup_format"], device_cfs=device_cfs, hg_type="dev", logger=logger
+    )
     if config["sync_vms"]:
         vm_cfs = list(
-            netbox.extras.custom_fields.filter(type="text",
-                                               content_types="virtualization.virtualmachine")
+            netbox.extras.custom_fields.filter(
+                type="text", content_types="virtualization.virtualmachine"
+            )
         )
-        verify_hg_format(config["vm_hostgroup_format"], vm_cfs=vm_cfs, hg_type="vm", logger=logger)
+        verify_hg_format(
+            config["vm_hostgroup_format"], vm_cfs=vm_cfs, hg_type="vm", logger=logger
+        )
     # Set Zabbix API
     try:
         ssl_ctx = ssl.create_default_context()
@@ -120,7 +125,8 @@ def main(arguments):
     netbox_vms = []
     if config["sync_vms"]:
         netbox_vms = list(
-            netbox.virtualization.virtual_machines.filter(**config["nb_vm_filter"]))
+            netbox.virtualization.virtual_machines.filter(**config["nb_vm_filter"])
+        )
     netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
@@ -141,15 +147,22 @@ def main(arguments):
     # Go through all NetBox devices
     for nb_vm in netbox_vms:
         try:
-            vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
-                                config["create_journal"], logger)
-            logger.debug(f"Host {vm.name}: Started operations on VM.")
+            vm = VirtualMachine(
+                nb_vm,
+                zabbix,
+                netbox_journals,
+                nb_version,
+                config["create_journal"],
+                logger,
+            )
+            logger.debug("Host %s: Started operations on VM.", vm.name)
             vm.set_vm_template()
             # Check if a valid template has been found for this VM.
             if not vm.zbx_template_names:
                 continue
-            vm.set_hostgroup(config["vm_hostgroup_format"],
-                             netbox_site_groups, netbox_regions)
+            vm.set_hostgroup(
+                config["vm_hostgroup_format"], netbox_site_groups, netbox_regions
+            )
             # Check if a valid hostgroup has been found for this VM.
             if not vm.hostgroups:
                 continue
@@ -162,13 +175,12 @@ def main(arguments):
                     # Delete device from Zabbix
                     # and remove hostID from NetBox.
                     vm.cleanup()
-                    logger.info(f"VM {vm.name}: cleanup complete")
+                    logger.info("VM %s: cleanup complete", vm.name)
                     continue
                 # Device has been added to NetBox
                 # but is not in Activate state
                 logger.info(
-                    f"VM {vm.name}: Skipping since this VM is "
-                    f"not in the active state."
+                    "VM %s: Skipping since this VM is not in the active state.", vm.name
                 )
                 continue
             # Check if the VM is in the disabled state
@@ -200,20 +212,31 @@ def main(arguments):
     for nb_device in netbox_devices:
         try:
             # Set device instance set data such as hostgroup and template information.
-            device = PhysicalDevice(nb_device, zabbix, netbox_journals, nb_version,
-                                    config["create_journal"], logger)
-            logger.debug(f"Host {device.name}: Started operations on device.")
-            device.set_template(config["templates_config_context"],
-                                config["templates_config_context_overrule"])
+            device = PhysicalDevice(
+                nb_device,
+                zabbix,
+                netbox_journals,
+                nb_version,
+                config["create_journal"],
+                logger,
+            )
+            logger.debug("Host %s: Started operations on device.", device.name)
+            device.set_template(
+                config["templates_config_context"],
+                config["templates_config_context_overrule"],
+            )
             # Check if a valid template has been found for this VM.
             if not device.zbx_template_names:
                 continue
             device.set_hostgroup(
-                config["hostgroup_format"], netbox_site_groups, netbox_regions)
+                config["hostgroup_format"], netbox_site_groups, netbox_regions
+            )
             # Check if a valid hostgroup has been found for this VM.
             if not device.hostgroups:
-                logger.warning(f"Host {device.name}: Host has no valid "
-                               f"hostgroups, Skipping this host...")
+                logger.warning(
+                    "Host %s: Host has no valid hostgroups, Skipping this host...",
+                    device.name,
+                )
                 continue
             device.set_inventory(nb_device)
             device.set_usermacros()
@@ -223,16 +246,16 @@ def main(arguments):
             if device.isCluster() and config["clustering"]:
                 # Check if device is primary or secondary
                 if device.promoteMasterDevice():
-                    e = f"Device {device.name}: is " f"part of cluster and primary."
-                    logger.info(e)
+                    logger.info(
+                        "Device %s: is part of cluster and primary.", device.name
+                    )
                 else:
                     # Device is secondary in cluster.
                     # Don't continue with this device.
-                    e = (
-                        f"Device {device.name}: Is part of cluster "
-                        f"but not primary. Skipping this host..."
+                    logger.info(
+                        "Device %s: Is part of cluster but not primary. Skipping this host...",
+                        device.name,
                     )
-                    logger.info(e)
                     continue
             # Checks if device is in cleanup state
             if device.status in config["zabbix_device_removal"]:
@@ -240,13 +263,13 @@ def main(arguments):
                     # Delete device from Zabbix
                     # and remove hostID from NetBox.
                     device.cleanup()
-                    logger.info(f"Device {device.name}: cleanup complete")
+                    logger.info("Device %s: cleanup complete", device.name)
                     continue
                 # Device has been added to NetBox
                 # but is not in Activate state
                 logger.info(
-                    f"Device {device.name}: Skipping since this device is "
-                    f"not in the active state."
+                    "Device %s: Skipping since this device is not in the active state.",
+                    device.name,
                 )
                 continue
             # Check if the device is in the disabled state
