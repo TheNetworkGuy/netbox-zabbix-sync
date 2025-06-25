@@ -212,6 +212,17 @@ in `config.py` the script will render a full region path of all parent regions
 for the hostgroup name. `traverse_site_groups` controls the same behaviour for
 site_groups.
 
+**Hardcoded text** 
+
+You can add hardcoded text in the hostgroup format by using quotes, this will
+insert the literal text:
+
+```python
+hostgroup_format = "'MyDevices'/location/role"
+```
+
+In this case, the prefix MyDevices will be used for all generated groups.
+
 **Custom fields**
 
 You can use the value of custom fields for hostgroup generation. This allows

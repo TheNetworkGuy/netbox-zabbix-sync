@@ -117,19 +117,24 @@ class Hostgroup:
         for hg_item in hg_items:
             # Check if requested data is available as option for this host
             if hg_item not in self.format_options:
-                # Check if a custom field exists with this name
-                cf_data = self.custom_field_lookup(hg_item)
-                # CF does not exist
-                if not cf_data["result"]:
-                    msg = (
-                        f"Unable to generate hostgroup for host {self.name}. "
-                        f"Item type {hg_item} not supported."
-                    )
-                    self.logger.error(msg)
-                    raise HostgroupError(msg)
-                # CF data is populated
-                if cf_data["cf"]:
-                    hg_output.append(cf_data["cf"])
+                if hg_item.startswith(("'", '"')) and hg_item.endswith(("'", '"')):
+                    hg_item = hg_item.strip("\'")
+                    hg_item = hg_item.strip('\"')
+                    hg_output.append(hg_item)
+                else:
+                    # Check if a custom field exists with this name
+                    cf_data = self.custom_field_lookup(hg_item)
+                    # CF does not exist
+                    if not cf_data["result"]:
+                        msg = (
+                            f"Unable to generate hostgroup for host {self.name}. "
+                            f"Item type {hg_item} not supported."
+                        )
+                        self.logger.error(msg)
+                        raise HostgroupError(msg)
+                    # CF data is populated
+                    if cf_data["cf"]:
+                        hg_output.append(cf_data["cf"])
                 continue
             # Check if there is a value associated to the variable.
             # For instance, if a device has no location, do not use it with hostgroup calculation
