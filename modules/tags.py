@@ -76,7 +76,7 @@ class ZabbixTags:
             else:
                 tag["tag"] = tag_name
         else:
-            self.logger.warning(f"Tag {tag_name} is not a valid tag name, skipping.")
+            self.logger.warning(f"Tag '{tag_name}' is not a valid tag name, skipping.")
             return False
 
         if self.validate_value(tag_value):
@@ -85,8 +85,8 @@ class ZabbixTags:
             else:
                 tag["value"] = tag_value
         else:
-            self.logger.warning(
-                f"Tag {tag_name} has an invalid value: '{tag_value}', skipping."
+            self.logger.info(
+                f"Tag '{tag_name}' has an invalid value: '{tag_value}', skipping."
             )
             return False
         return tag
@@ -99,7 +99,7 @@ class ZabbixTags:
         tags = []
         # Parse the field mapper for tags
         if self.tag_map:
-            self.logger.debug(f"Host {self.nb.name}: Starting tag mapper")
+            self.logger.debug(f"Host {self.nb.name}: Starting tag mapper.")
             field_tags = field_mapper(self.nb.name, self.tag_map, self.nb, self.logger)
             for tag, value in field_tags.items():
                 t = self.render_tag(tag, value)

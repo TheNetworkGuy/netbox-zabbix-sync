@@ -143,7 +143,7 @@ def main(arguments):
         try:
             vm = VirtualMachine(nb_vm, zabbix, netbox_journals, nb_version,
                                 config["create_journal"], logger)
-            logger.debug(f"Host {vm.name}: started operations on VM.")
+            logger.debug(f"Host {vm.name}: Started operations on VM.")
             vm.set_vm_template()
             # Check if a valid template has been found for this VM.
             if not vm.zbx_template_names:
@@ -162,12 +162,12 @@ def main(arguments):
                     # Delete device from Zabbix
                     # and remove hostID from NetBox.
                     vm.cleanup()
-                    logger.debug(f"VM {vm.name}: cleanup complete")
+                    logger.info(f"VM {vm.name}: cleanup complete")
                     continue
                 # Device has been added to NetBox
                 # but is not in Activate state
                 logger.info(
-                    f"VM {vm.name}: skipping since this VM is "
+                    f"VM {vm.name}: Skipping since this VM is "
                     f"not in the active state."
                 )
                 continue
@@ -202,7 +202,7 @@ def main(arguments):
             # Set device instance set data such as hostgroup and template information.
             device = PhysicalDevice(nb_device, zabbix, netbox_journals, nb_version,
                                     config["create_journal"], logger)
-            logger.debug(f"Host {device.name}: started operations on device.")
+            logger.debug(f"Host {device.name}: Started operations on device.")
             device.set_template(config["templates_config_context"],
                                 config["templates_config_context_overrule"])
             # Check if a valid template has been found for this VM.
@@ -229,7 +229,7 @@ def main(arguments):
                     # Device is secondary in cluster.
                     # Don't continue with this device.
                     e = (
-                        f"Device {device.name}: is part of cluster "
+                        f"Device {device.name}: Is part of cluster "
                         f"but not primary. Skipping this host..."
                     )
                     logger.info(e)
@@ -245,7 +245,7 @@ def main(arguments):
                 # Device has been added to NetBox
                 # but is not in Activate state
                 logger.info(
-                    f"Device {device.name}: skipping since this device is "
+                    f"Device {device.name}: Skipping since this device is "
                     f"not in the active state."
                 )
                 continue
@@ -282,7 +282,7 @@ if __name__ == "__main__":
         description="A script to sync Zabbix with NetBox device data."
     )
     parser.add_argument(
-        "-v", "--verbose", help="Turn on debugging.", action="store_true"
+        "-v", "--verbose", help="Turn on verbose logging.", action="store_true"
     )
     parser.add_argument(
         "-vv", "--debug", help="Turn on debugging.", action="store_true"

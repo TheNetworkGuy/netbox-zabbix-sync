@@ -57,7 +57,7 @@ class ZabbixUsermacros:
             macro["macro"] = str(macro_name)
             if isinstance(macro_properties, dict):
                 if not "value" in macro_properties:
-                    self.logger.warning(f"Host {self.name}: Usermacro {macro_name} has "
+                    self.logger.info(f"Host {self.name}: Usermacro {macro_name} has "
                                         "no value in Netbox, skipping.")
                     return False
                 macro["value"] = macro_properties["value"]
@@ -83,11 +83,11 @@ class ZabbixUsermacros:
                 macro["description"] = ""
 
             else:
-                self.logger.warning(f"Host {self.name}: Usermacro {macro_name} "
+                self.logger.info(f"Host {self.name}: Usermacro {macro_name} "
                                     "has no value, skipping.")
                 return False
         else:
-            self.logger.error(
+            self.logger.warning(
                 f"Host {self.name}: Usermacro {macro_name} is not a valid usermacro name, skipping."
             )
             return False
@@ -101,7 +101,7 @@ class ZabbixUsermacros:
         data={}
         # Parse the field mapper for usermacros
         if self.usermacro_map:
-            self.logger.debug(f"Host {self.nb.name}: Starting usermacro mapper")
+            self.logger.debug(f"Host {self.nb.name}: Starting usermacro mapper.")
             field_macros = field_mapper(
                 self.nb.name, self.usermacro_map, self.nb, self.logger
             )

@@ -71,20 +71,20 @@ def field_mapper(host, mapper, nbdevice, logger):
             data[zbx_field] = str(value)
         elif not value:
             # empty value should just be an empty string for API compatibility
-            logger.debug(
+            logger.info(
                 f"Host {host}: NetBox lookup for "
-                f"'{nb_field}' returned an empty value"
+                f"'{nb_field}' returned an empty value."
             )
             data[zbx_field] = ""
         else:
             # Value is not a string or numeral, probably not what the user expected.
-            logger.error(
+            logger.info(
                 f"Host {host}: Lookup for '{nb_field}'"
                 " returned an unexpected type: it will be skipped."
             )
     logger.debug(
         f"Host {host}: Field mapping complete. "
-        f"Mapped {len(list(filter(None, data.values())))} field(s)"
+        f"Mapped {len(list(filter(None, data.values())))} field(s)."
     )
     return data
 
@@ -151,7 +151,7 @@ def verify_hg_format(hg_format, device_cfs=None, vm_cfs=None, hg_type="dev", log
                 f"Hostgroup item {hg_object} is not valid. Make sure you"
                 " use valid items and separate them with '/'."
             )
-            logger.error(e)
+            logger.warning(e)
             raise HostgroupError(e)
 
 
