@@ -160,6 +160,7 @@ def verify_hg_format(
         if (
             hg_object not in allowed_objects[hg_type]
             and hg_object not in allowed_objects["cfs"][hg_type]
+            and not hg_object.startswith(('"',"'"))
         ):
             e = (
                 f"Hostgroup item {hg_object} is not valid. Make sure you"
