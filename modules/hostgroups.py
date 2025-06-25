@@ -120,7 +120,7 @@ class Hostgroup:
                 if hg_item.startswith(("'", '"')) and hg_item.endswith(("'", '"')):
                     hg_item = hg_item.strip("\'")
                     hg_item = hg_item.strip('\"')
-                    hg_output.append(hg_item) 
+                    hg_output.append(hg_item)
                 else:
                     # Check if a custom field exists with this name
                     cf_data = self.custom_field_lookup(hg_item)
