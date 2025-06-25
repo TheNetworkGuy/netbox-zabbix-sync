@@ -112,7 +112,8 @@ class PhysicalDevice:
             self.visible_name = self.nb.name
             self.use_visible_name = True
             self.logger.info(
-                "Host %s contains special characters. Using %s as name for the NetBox object and using %s as visible name in Zabbix.",
+                "Host %s contains special characters."
+                "Using %s as name for the NetBox object and using %s as visible name in Zabbix.",
                 self.visible_name,
                 self.name,
                 self.visible_name,
@@ -213,7 +214,8 @@ class PhysicalDevice:
         if config["inventory_mode"] == "disabled":
             if config["inventory_sync"]:
                 self.logger.error(
-                    "Host %s: Unable to map NetBox inventory to Zabbix. Inventory sync is enabled in  config but inventory mode is disabled",
+                    "Host %s: Unable to map NetBox inventory to Zabbix."
+                    "Inventory sync is enabled in  config but inventory mode is disabled",
                     self.name,
                 )
             return True
@@ -773,7 +775,8 @@ class PhysicalDevice:
             if proxy_power and proxy_set:
                 # Zabbix <= 6 fix
                 self.logger.warning(
-                    "Host %s: No proxy is configured in NetBox but is configured in Zabbix. Removing proxy config in Zabbix",
+                    "Host %s: No proxy is configured in NetBox but is configured in Zabbix."
+                    "Removing proxy config in Zabbix",
                     self.name,
                 )
                 if "proxy_hostid" in host and bool(host["proxy_hostid"]):
@@ -788,7 +791,8 @@ class PhysicalDevice:
             if proxy_set and not proxy_power:
                 # Display error message
                 self.logger.warning(
-                    "Host %s: Is configured with proxy in Zabbix but not in NetBox. The -p flag was ommited: no changes have been made.",
+                    "Host %s: Is configured with proxy in Zabbix but not in NetBox."
+                    "The -p flag was ommited: no changes have been made.",
                     self.name,
                 )
             if not proxy_set:
@@ -938,7 +942,9 @@ class PhysicalDevice:
                 return True
             except NetboxRequestError as e:
                 self.logger.warning(
-                    "Unable to create journal entry for %s: NB returned {e}", self.name
+                    "Unable to create journal entry for %s: NB returned %s",
+                    self.name,
+                    e,
                 )
             return False
         return False
