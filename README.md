@@ -51,7 +51,7 @@ pip.
 ```sh
 # Packages:
 pynetbox
-pyzabbix
+zabbix-utils
 
 # Install them through requirements.txt from a venv:
 virtualenv .venv
