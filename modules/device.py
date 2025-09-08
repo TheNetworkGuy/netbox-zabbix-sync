@@ -2,7 +2,6 @@
 """
 Device specific handeling for NetBox to Zabbix
 """
-from pprint import pprint
 
 from copy import deepcopy
 from logging import getLogger
