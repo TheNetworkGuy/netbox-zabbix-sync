@@ -53,6 +53,12 @@ hostgroup_format = "site/manufacturer/role"
 traverse_regions = False
 traverse_site_groups = False
 
+## Extended site properteis
+# By default, NetBox will only return basic site info for any device or VM.
+# By setting `extended_site_properties` to True, the script will query NetBox for additiopnal site info.
+# Be aware that this will increase the number of API queries to NetBox.
+extended_site_properties = False
+
 ## Filtering
 # Custom device filter, variable must be present but can be left empty with no filtering.
 # A couple of examples:
@@ -87,8 +93,8 @@ device_inventory_map = { "asset_tag": "asset_tag",
                          "virtual_chassis/name": "chassis",
                          "status/label": "deployment_status",
                          "location/name": "location",
-                         "latitude": "location_lat",
-                         "longitude": "location_lon",
+                         "site/latitude": "location_lat",
+                         "site/longitude": "location_lon",
                          "comments": "notes",
                          "name": "name",
                          "rack/name": "site_rack",
@@ -112,19 +118,19 @@ usermacro_sync = False
 # device usermacro_map to map NetBox fields to usermacros.
 device_usermacro_map = {"serial": "{$HW_SERIAL}",
                         "role/name": "{$DEV_ROLE}",
-                        "url": "{$NB_URL}",
+                        "display_url": "{$NB_URL}",
                         "id": "{$NB_ID}"}
 
 # virtual machine usermacro_map to map NetBox fields to usermacros.
 vm_usermacro_map = {"memory": "{$TOTAL_MEMORY}",
                     "role/name": "{$DEV_ROLE}",
-                    "url": "{$NB_URL}",
+                    "display_url": "{$NB_URL}",
                     "id": "{$NB_ID}"}
 
 # To sync host tags to Zabbix, set to True.
 tag_sync = False
 
-# Setting tag_lower to True will lower capital letters ain tag names and values
+# Setting tag_lower to True will lower capital letters in tag names and values
 # This is more inline with the Zabbix way of working with tags.
 #
 # You can however set this to False to ensure capital letters are synced to Zabbix tags.
@@ -132,8 +138,6 @@ tag_lower = True
 
 # We can sync NetBox device/VM tags to Zabbix, but as NetBox tags don't follow the key/value
 # pattern, we need to specify a tag name to register the NetBox tags in Zabbix.
-#
-#
 # 
 # If tag_name is set to False, we won't sync NetBox device/VM tags to Zabbix.
 tag_name = 'NetBox'
