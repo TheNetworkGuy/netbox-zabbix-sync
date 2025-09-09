@@ -289,6 +289,27 @@ hostgroup_format = "mycustomfieldname"
 NetBox-Zabbix-sync - ERROR - ESXI1 has no reliable hostgroup. This is most likely due to the use of custom fields that are empty.
 ```
 
+### Extended site properties
+
+By default, NetBox will only return the following properties under the 'site' key for a device:
+
+- site id
+- (api) url
+- display name
+- name
+- slug
+- description
+
+However, NetBox-Zabbix-Sync allows you to extend these site properties with the full site information
+so you can use this data in inventory fields, tags and usermacros.
+
+To enable this functionality, enable the following setting in your configuration file:
+
+`extended_site_properties = True`
+
+Keep in mind that enabling this option will increase the number of API calls to your NetBox instance, 
+this might impact performance on large syncs.
+
 ### Device status
 
 By setting a status on a NetBox device you determine how the host is added (or
