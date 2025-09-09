@@ -93,8 +93,8 @@ device_inventory_map = { "asset_tag": "asset_tag",
                          "virtual_chassis/name": "chassis",
                          "status/label": "deployment_status",
                          "location/name": "location",
-                         "site/latitude": "location_lat",
-                         "site/longitude": "location_lon",
+                         "latitude": "location_lat",
+                         "longitude": "location_lon",
                          "comments": "notes",
                          "name": "name",
                          "rack/name": "site_rack",
@@ -102,6 +102,8 @@ device_inventory_map = { "asset_tag": "asset_tag",
                          "device_type/model": "type",
                          "device_type/manufacturer/name": "vendor",
                          "oob_ip/address": "oob_ip" }
+# Replace latitude and longitude with site/latitude and and site/longitude to use
+# site geo data. Enable extended_site_properties for this to work!
 
 # We also support inventory mapping on Virtual Machines.
 vm_inventory_map = { "status/label": "deployment_status",
