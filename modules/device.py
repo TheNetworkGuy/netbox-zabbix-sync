@@ -458,9 +458,14 @@ class PhysicalDevice:
         """
         Sets proxy or proxy group if this
         value has been defined in config context
+        or custom fields.
 
         input: List of all proxies and proxy groups in standardized format
         """
+        proxy_name = None
+
+        #!!! FIX this check to still work if only CF is configurd.
+
         # check if the key Zabbix is defined in the config context
         if "zabbix" not in self.nb.config_context:
             return False
@@ -477,10 +482,21 @@ class PhysicalDevice:
             # Only insert groups in front of list for Zabbix7
             proxy_types.insert(0, "proxy_group")
         for proxy_type in proxy_types:
-            # Check if the key exists in NetBox CC
-            if proxy_type in self.nb.config_context["zabbix"]:
+            # Check if we should use custom fields for proxy config
+            field_config = "proxy_cf" if proxy_type=="proxy" else "proxy_group_cf" 
+            if config[field_config]: 
+                if config[field_config] in self.nb.custom_fields:
+                    if self.nb.custom_fields[config[field_config]]:
+                        proxy_name = self.nb.custom_fields[config[field_config]]
+                elif config[field_config] in self.nb.site.custom_fields:
+                    if self.nb.site.custom_fields[config[field_config]]:
+                       proxy_name = self.nb.site.custom_fields[config[field_config]]
+
+            # Otherwise check if the proxy is configured in NetBox CC
+            if not proxy_name and proxy_type in self.nb.config_context["zabbix"]:
                 proxy_name = self.nb.config_context["zabbix"][proxy_type]
                 # go through all proxies
+            if proxy_name:
                 for proxy in proxy_list:
                     # If the proxy does not match the type, ignore and continue
                     if not proxy["type"] == proxy_type:
