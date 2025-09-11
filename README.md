@@ -682,7 +682,7 @@ a Zabbix proxy or proxy group. The custom fields can be assigned to both
 Devices and VMs. 
 
 You can also assign these custom fields to a site to allow all devices/VMs
-in that site to be confured with the same proxy or proxy group.
+in that site to be configured with the same proxy or proxy group.
 In order for this to work, `extended_site_properties` needs to be enabled in
 the configuation as well.
 
@@ -696,8 +696,9 @@ proxy_group_cf = "zabbix_proxy_group"
 ```
 
 As with config context proxy configuration, proxy group will take precedence over 
-proxy when configured. 
-Proxy settings configured on the device or VM will take precedence over any site configuration.
+standalone proxy when configured. 
+Proxy settings configured on the device or VM will in their turn take precedence 
+over any site configuration.
 
 If the custom fields have no value but the proxy or proxy group is configured in config context,
 that setting will be used.
