@@ -7,6 +7,7 @@ from copy import deepcopy
 from logging import getLogger
 from re import search
 from operator import itemgetter
+from typing import Any
 
 from zabbix_utils import APIRequestError
 from pynetbox import RequestError as NetboxRequestError
@@ -454,7 +455,7 @@ class PhysicalDevice:
         self.tags = tags.generate()
         return True
 
-    def setProxy(self, proxy_list):
+    def _setProxy(self, proxy_list: list[dict[str, Any]]) -> bool:
         """
         Sets proxy or proxy group if this
         value has been defined in config context
@@ -467,7 +468,8 @@ class PhysicalDevice:
         # Includes proxy group fix since Zabbix <= 6 should ignore this
         proxy_types = ["proxy"]
         proxy_name = None
-        if str(self.zabbix.version).startswith("7"):
+        
+        if self.zabbix.version >= 7.0:
             # Only insert groups in front of list for Zabbix7
             proxy_types.insert(0, "proxy_group")
 
@@ -488,6 +490,7 @@ class PhysicalDevice:
                 proxy_type in self.nb.config_context["zabbix"]):
                 proxy_name = self.nb.config_context["zabbix"][proxy_type]
                 # go through all proxies
+                
             if proxy_name:
                 for proxy in proxy_list:
                     # If the proxy does not match the type, ignore and continue
@@ -500,6 +503,7 @@ class PhysicalDevice:
                         )
                         self.zbxproxy = proxy
                         return True
+                
                 self.logger.warning(
                     "Host %s: unable to find proxy %s", self.name, proxy_name
                 )
@@ -532,7 +536,7 @@ class PhysicalDevice:
             # Set interface, group and template configuration
             interfaces = self.setInterfaceDetails()
             # Set Zabbix proxy if defined
-            self.setProxy(proxies)
+            self._setProxy(proxies)
             # Set basic data for host creation
             create_data = {
                 "host": self.name,
@@ -664,7 +668,7 @@ class PhysicalDevice:
 
         # Prepare templates and proxy config
         self.zbxTemplatePrepper(templates)
-        self.setProxy(proxies)
+        self._setProxy(proxies)
         # Get host object from Zabbix
         host = self.zabbix.host.get(
             filter={"hostid": self.zabbix_id},
