@@ -1,5 +1,7 @@
 """A collection of tools used by several classes"""
+
 from modules.exceptions import HostgroupError
+
 
 def convert_recordset(recordset):
     """Converts netbox RedcordSet to list of dicts."""
@@ -48,6 +50,18 @@ def proxy_prepper(proxy_list, proxy_group_list):
     return output
 
 
+def cf_to_string(cf, key="name", logger=None):
+    """
+    Converts a dict custom fields to string
+    """
+    if isinstance(cf, dict):
+        if key in cf:
+            return cf[key]
+        logger.error("Conversion of custom field failed, '%s' not found in cf dict.", key)
+        return None
+    return cf
+
+
 def field_mapper(host, mapper, nbdevice, logger):
     """
     Maps NetBox field data to Zabbix properties.
@@ -71,20 +85,23 @@ def field_mapper(host, mapper, nbdevice, logger):
             data[zbx_field] = str(value)
         elif not value:
             # empty value should just be an empty string for API compatibility
-            logger.debug(
-                f"Host {host}: NetBox lookup for "
-                f"'{nb_field}' returned an empty value"
+            logger.info(
+                "Host %s: NetBox lookup for '%s' returned an empty value.",
+                host,
+                nb_field,
             )
             data[zbx_field] = ""
         else:
             # Value is not a string or numeral, probably not what the user expected.
-            logger.error(
-                f"Host {host}: Lookup for '{nb_field}'"
-                " returned an unexpected type: it will be skipped."
+            logger.info(
+                "Host %s: Lookup for '%s' returned an unexpected type: it will be skipped.",
+                host,
+                nb_field,
             )
     logger.debug(
-        f"Host {host}: Field mapping complete. "
-        f"Mapped {len(list(filter(None, data.values())))} field(s)"
+        "Host %s: Field mapping complete. Mapped %s field(s).",
+        host,
+        len(list(filter(None, data.values()))),
     )
     return data
 
@@ -101,7 +118,9 @@ def remove_duplicates(input_list, sortkey=None):
     return output_list
 
 
-def verify_hg_format(hg_format, device_cfs=None, vm_cfs=None, hg_type="dev", logger=None):
+def verify_hg_format(
+    hg_format, device_cfs=None, vm_cfs=None, hg_type="dev", logger=None
+):
     """
     Verifies hostgroup field format
     """
@@ -109,49 +128,57 @@ def verify_hg_format(hg_format, device_cfs=None, vm_cfs=None, hg_type="dev", log
         device_cfs = []
     if not vm_cfs:
         vm_cfs = []
-    allowed_objects = {"dev": ["location",
-                              "rack",
-                              "role",
-                              "manufacturer",
-                              "region",
-                              "site",
-                              "site_group",
-                              "tenant",
-                              "tenant_group",
-                              "platform",
-                              "cluster"]
-                      ,"vm": ["cluster_type",
-                              "role",
-                              "manufacturer",
-                              "region",
-                              "site",
-                              "site_group",
-                              "tenant",
-                              "tenant_group",
-                              "cluster",
-                              "device",
-                              "platform"]
-                       ,"cfs": {"dev": [], "vm": []}
-                      }
+    allowed_objects = {
+        "dev": [
+            "location",
+            "rack",
+            "role",
+            "manufacturer",
+            "region",
+            "site",
+            "site_group",
+            "tenant",
+            "tenant_group",
+            "platform",
+            "cluster",
+        ],
+        "vm": [
+            "cluster_type",
+            "role",
+            "manufacturer",
+            "region",
+            "site",
+            "site_group",
+            "tenant",
+            "tenant_group",
+            "cluster",
+            "device",
+            "platform",
+        ],
+        "cfs": {"dev": [], "vm": []},
+    }
     for cf in device_cfs:
-        allowed_objects['cfs']['dev'].append(cf.name)
+        allowed_objects["cfs"]["dev"].append(cf.name)
     for cf in vm_cfs:
-        allowed_objects['cfs']['vm'].append(cf.name)
+        allowed_objects["cfs"]["vm"].append(cf.name)
     hg_objects = []
-    if isinstance(hg_format,list):
+    if isinstance(hg_format, list):
         for f in hg_format:
             hg_objects = hg_objects + f.split("/")
     else:
         hg_objects = hg_format.split("/")
     hg_objects = sorted(set(hg_objects))
     for hg_object in hg_objects:
-        if (hg_object not in allowed_objects[hg_type] and
-            hg_object not in allowed_objects['cfs'][hg_type]):
+        if (
+            hg_object not in allowed_objects[hg_type]
+            and hg_object not in allowed_objects["cfs"][hg_type]
+            and not hg_object.startswith(('"',"'"))
+        ):
             e = (
                 f"Hostgroup item {hg_object} is not valid. Make sure you"
                 " use valid items and separate them with '/'."
             )
-            logger.error(e)
+            logger.warning(e)
             raise HostgroupError(e)
 
 
@@ -159,7 +186,7 @@ def sanatize_log_output(data):
     """
     Used for the update function to Zabbix which
     shows the data that its using to update the host.
-    Removes and sensitive data from the input.
+    Removes any sensitive data from the input.
     """
     if not isinstance(data, dict):
         return data
@@ -168,7 +195,7 @@ def sanatize_log_output(data):
     if "macros" in data:
         for macro in sanitized_data["macros"]:
             # Check if macro is secret type
-            if not macro["type"] == str(1):
+            if not (macro["type"] == str(1) or macro["type"] == 1):
                 continue
             macro["value"] = "********"
     # Check for interface data

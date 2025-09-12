@@ -16,6 +16,8 @@ DEFAULT_CONFIG = {
     "templates_config_context_overrule": False,
     "template_cf": "zabbix_template",
     "device_cf": "zabbix_hostid",
+    "proxy_cf": False,
+    "proxy_group_cf" : False,
     "clustering": False,
     "create_hostgroups": True,
     "create_journal": False,
@@ -31,6 +33,7 @@ DEFAULT_CONFIG = {
     "nb_vm_filter": {"name__n": "null"},
     "inventory_mode": "disabled",
     "inventory_sync": False,
+    "extended_site_properties": False,
     "device_inventory_map": {
         "asset_tag": "asset_tag",
         "virtual_chassis/name": "chassis",
