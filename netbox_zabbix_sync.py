@@ -12,6 +12,7 @@ from pynetbox import api
 from pynetbox.core.query import RequestError as NBRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
+
 from modules.config import load_config
 from modules.device import PhysicalDevice
 from modules.exceptions import EnvironmentVarError, SyncError
@@ -82,8 +83,9 @@ def main(arguments):
     device_cfs = []
     vm_cfs = []
     device_cfs = list(
-        netbox.extras.custom_fields.filter(type=["text","object","select"],
-                                           content_types="dcim.device")
+        netbox.extras.custom_fields.filter(
+            type=["text", "object", "select"], content_types="dcim.device"
+        )
     )
     verify_hg_format(
         config["hostgroup_format"], device_cfs=device_cfs, hg_type="dev", logger=logger
@@ -91,8 +93,8 @@ def main(arguments):
     if config["sync_vms"]:
         vm_cfs = list(
             netbox.extras.custom_fields.filter(
-                type=["text","object","select"],
-                content_types="virtualization.virtualmachine"
+                type=["text", "object", "select"],
+                content_types="virtualization.virtualmachine",
             )
         )
         verify_hg_format(
@@ -170,7 +172,7 @@ def main(arguments):
                 continue
             if config["extended_site_properties"] and nb_vm.site:
                 logger.debug("VM %s: extending site information.", vm.name)
-                vm.site=(convert_recordset(netbox.dcim.sites.filter(id=nb_vm.site.id)))
+                vm.site = convert_recordset(netbox.dcim.sites.filter(id=nb_vm.site.id))
             vm.set_inventory(nb_vm)
             vm.set_usermacros()
             vm.set_tags()
@@ -245,7 +247,9 @@ def main(arguments):
                 continue
             if config["extended_site_properties"] and nb_device.site:
                 logger.debug("Device %s: extending site information.", device.name)
-                device.site=(convert_recordset(netbox.dcim.sites.filter(id=nb_device.site.id)))
+                device.site = convert_recordset(
+                    netbox.dcim.sites.filter(id=nb_device.site.id)
+                )
             device.set_inventory(nb_device)
             device.set_usermacros()
             device.set_tags()
