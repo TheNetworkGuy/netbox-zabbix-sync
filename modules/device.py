@@ -468,7 +468,7 @@ class PhysicalDevice:
         # Includes proxy group fix since Zabbix <= 6 should ignore this
         proxy_types = ["proxy"]
         proxy_name = None
- 
+
         if self.zabbix.version >= 7.0:
             # Only insert groups in front of list for Zabbix7
             proxy_types.insert(0, "proxy_group")
