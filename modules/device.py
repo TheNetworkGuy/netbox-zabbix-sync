@@ -468,25 +468,25 @@ class PhysicalDevice:
         # Includes proxy group fix since Zabbix <= 6 should ignore this
         proxy_types = ["proxy"]
         proxy_name = None
-        
+ 
         if self.zabbix.version >= 7.0:
             # Only insert groups in front of list for Zabbix7
             proxy_types.insert(0, "proxy_group")
 
-        # loop through supported proxy-types    
+        # loop through supported proxy-types
         for proxy_type in proxy_types:
             # Check if we should use custom fields for proxy config
-            field_config = "proxy_cf" if proxy_type=="proxy" else "proxy_group_cf" 
-            if config[field_config]: 
+            field_config = "proxy_cf" if proxy_type=="proxy" else "proxy_group_cf"
+            if config[field_config]:
                 if config[field_config] in self.nb.custom_fields:
                     if self.nb.custom_fields[config[field_config]]:
                         proxy_name = cf_to_string(self.nb.custom_fields[config[field_config]])
                 elif config[field_config] in self.nb.site.custom_fields:
                     if self.nb.site.custom_fields[config[field_config]]:
-                       proxy_name = cf_to_string(self.nb.site.custom_fields[config[field_config]])
+                        proxy_name = cf_to_string(self.nb.site.custom_fields[config[field_config]])
 
             # Otherwise check if the proxy is configured in NetBox CC
-            if (not proxy_name and "zabbix" in self.nb.config_context and 
+            if (not proxy_name and "zabbix" in self.nb.config_context and
                 proxy_type in self.nb.config_context["zabbix"]):
                 proxy_name = self.nb.config_context["zabbix"][proxy_type]
 
@@ -503,7 +503,7 @@ class PhysicalDevice:
                         )
                         self.zbxproxy = proxy
                         return True
-                
+
                 self.logger.warning(
                     "Host %s: unable to find proxy %s", self.name, proxy_name
                 )

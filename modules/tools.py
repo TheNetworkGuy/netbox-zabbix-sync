@@ -55,11 +55,10 @@ def cf_to_string(cf, key="name", logger=None):
     Converts a dict custom fields to string
     """
     if isinstance(cf, dict):
-        if key:
+        if key in cf:
             return cf[key]
-        else:
-            logger.error("Conversion of custom field failed, '%s' not found in cf dict.", key)
-            return None
+        logger.error("Conversion of custom field failed, '%s' not found in cf dict.", key)
+        return None
     return cf
 
 
