@@ -82,7 +82,7 @@ def main(arguments):
     device_cfs = []
     vm_cfs = []
     device_cfs = list(
-        netbox.extras.custom_fields.filter(type="text", content_types="dcim.device")
+        netbox.extras.custom_fields.filter(type=["text","object","select"], content_types="dcim.device")
     )
     verify_hg_format(
         config["hostgroup_format"], device_cfs=device_cfs, hg_type="dev", logger=logger
@@ -90,7 +90,7 @@ def main(arguments):
     if config["sync_vms"]:
         vm_cfs = list(
             netbox.extras.custom_fields.filter(
-                type="text", content_types="virtualization.virtualmachine"
+                type=["text","object","select"], content_types="virtualization.virtualmachine"
             )
         )
         verify_hg_format(

@@ -21,7 +21,7 @@ from modules.exceptions import (
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
 from modules.tags import ZabbixTags
-from modules.tools import field_mapper, remove_duplicates, sanatize_log_output
+from modules.tools import field_mapper, cf_to_string, remove_duplicates, sanatize_log_output
 from modules.usermacros import ZabbixUsermacros
 from modules.config import load_config
 
@@ -480,17 +480,17 @@ class PhysicalDevice:
             if config[field_config]: 
                 if config[field_config] in self.nb.custom_fields:
                     if self.nb.custom_fields[config[field_config]]:
-                        proxy_name = self.nb.custom_fields[config[field_config]]
+                        proxy_name = cf_to_string(self.nb.custom_fields[config[field_config]])
                 elif config[field_config] in self.nb.site.custom_fields:
                     if self.nb.site.custom_fields[config[field_config]]:
-                       proxy_name = self.nb.site.custom_fields[config[field_config]]
+                       proxy_name = cf_to_string(self.nb.site.custom_fields[config[field_config]])
 
             # Otherwise check if the proxy is configured in NetBox CC
             if (not proxy_name and "zabbix" in self.nb.config_context and 
                 proxy_type in self.nb.config_context["zabbix"]):
                 proxy_name = self.nb.config_context["zabbix"][proxy_type]
-                # go through all proxies
-                
+
+            # If a proxy name was found, loop through all proxies to find a match
             if proxy_name:
                 for proxy in proxy_list:
                     # If the proxy does not match the type, ignore and continue
@@ -804,7 +804,7 @@ class PhysicalDevice:
                 # Display error message
                 self.logger.warning(
                     "Host %s: Is configured with proxy in Zabbix but not in NetBox."
-                    "The -p flag was ommited: no changes have been made.",
+                    "full_proxy_sync is not set: no changes have been made.",
                     self.name,
                 )
             if not proxy_set:

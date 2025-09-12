@@ -50,6 +50,19 @@ def proxy_prepper(proxy_list, proxy_group_list):
     return output
 
 
+def cf_to_string(cf, key="name", logger=None):
+    """
+    Converts a dict custom fields to string
+    """
+    if isinstance(cf, dict):
+        if key:
+            return cf[key]
+        else:
+            logger.error("Conversion of custom field failed, '%s' not found in cf dict.", key)
+            return None
+    return cf
+
+
 def field_mapper(host, mapper, nbdevice, logger):
     """
     Maps NetBox field data to Zabbix properties.

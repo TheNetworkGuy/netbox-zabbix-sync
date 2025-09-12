@@ -3,7 +3,7 @@
 from logging import getLogger
 
 from modules.exceptions import HostgroupError
-from modules.tools import build_path
+from modules.tools import build_path, cf_to_string
 
 
 class Hostgroup:
@@ -134,7 +134,7 @@ class Hostgroup:
                         raise HostgroupError(msg)
                     # CF data is populated
                     if cf_data["cf"]:
-                        hg_output.append(cf_data["cf"])
+                        hg_output.append(cf_to_string(cf_data["cf"]))
                 continue
             # Check if there is a value associated to the variable.
             # For instance, if a device has no location, do not use it with hostgroup calculation
