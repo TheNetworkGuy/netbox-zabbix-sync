@@ -5,13 +5,14 @@ Device specific handeling for NetBox to Zabbix
 
 from copy import deepcopy
 from logging import getLogger
+ from operator import itemgetter
 from re import search
-from operator import itemgetter
 from typing import Any
 
-from zabbix_utils import APIRequestError
 from pynetbox import RequestError as NetboxRequestError
+from zabbix_utils import APIRequestError
 
+from modules.config import load_config
 from modules.exceptions import (
     InterfaceConfigError,
     SyncExternalError,
@@ -21,9 +22,13 @@ from modules.exceptions import (
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
 from modules.tags import ZabbixTags
-from modules.tools import field_mapper, cf_to_string, remove_duplicates, sanatize_log_output
+from modules.tools import (
+    cf_to_string,
+    field_mapper,
+    remove_duplicates,
+    sanatize_log_output,
+)
 from modules.usermacros import ZabbixUsermacros
-from modules.config import load_config
 
 config = load_config()
 
@@ -476,18 +481,29 @@ class PhysicalDevice:
         # loop through supported proxy-types
         for proxy_type in proxy_types:
             # Check if we should use custom fields for proxy config
-            field_config = "proxy_cf" if proxy_type=="proxy" else "proxy_group_cf"
+            field_config = "proxy_cf" if proxy_type == "proxy" else "proxy_group_cf"
             if config[field_config]:
-                if config[field_config] in self.nb.custom_fields:
-                    if self.nb.custom_fields[config[field_config]]:
-                        proxy_name = cf_to_string(self.nb.custom_fields[config[field_config]])
-                elif config[field_config] in self.nb.site.custom_fields:
-                    if self.nb.site.custom_fields[config[field_config]]:
-                        proxy_name = cf_to_string(self.nb.site.custom_fields[config[field_config]])
+                if (
+                    config[field_config] in self.nb.custom_fields
+                    and self.nb.custom_fields[config[field_config]]
+                ):
+                    proxy_name = cf_to_string(
+                        self.nb.custom_fields[config[field_config]]
+                    )
+                elif (
+                    config[field_config] in self.nb.site.custom_fields
+                    and self.nb.site.custom_fields[config[field_config]]
+                ):
+                    proxy_name = cf_to_string(
+                        self.nb.site.custom_fields[config[field_config]]
+                    )
 
             # Otherwise check if the proxy is configured in NetBox CC
-            if (not proxy_name and "zabbix" in self.nb.config_context and
-                proxy_type in self.nb.config_context["zabbix"]):
+            if (
+                not proxy_name
+                and "zabbix" in self.nb.config_context
+                and proxy_type in self.nb.config_context["zabbix"]
+            ):
                 proxy_name = self.nb.config_context["zabbix"][proxy_type]
 
             # If a proxy name was found, loop through all proxies to find a match
