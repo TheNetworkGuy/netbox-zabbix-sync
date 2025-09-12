@@ -1,5 +1,6 @@
 *.log
 .venv
+.env
 config.py
 Pipfile
 Pipfile.lock
