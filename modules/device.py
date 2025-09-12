@@ -462,25 +462,16 @@ class PhysicalDevice:
 
         input: List of all proxies and proxy groups in standardized format
         """
-        proxy_name = None
-
-        #!!! FIX this check to still work if only CF is configurd.
-
-        # check if the key Zabbix is defined in the config context
-        if "zabbix" not in self.nb.config_context:
-            return False
-        if (
-            "proxy" in self.nb.config_context["zabbix"]
-            and not self.nb.config_context["zabbix"]["proxy"]
-        ):
-            return False
         # Proxy group takes priority over a proxy due
         # to it being HA and therefore being more reliable
         # Includes proxy group fix since Zabbix <= 6 should ignore this
         proxy_types = ["proxy"]
+        proxy_name = None
         if str(self.zabbix.version).startswith("7"):
             # Only insert groups in front of list for Zabbix7
             proxy_types.insert(0, "proxy_group")
+
+        # loop through supported proxy-types    
         for proxy_type in proxy_types:
             # Check if we should use custom fields for proxy config
             field_config = "proxy_cf" if proxy_type=="proxy" else "proxy_group_cf" 
@@ -493,7 +484,8 @@ class PhysicalDevice:
                        proxy_name = self.nb.site.custom_fields[config[field_config]]
 
             # Otherwise check if the proxy is configured in NetBox CC
-            if not proxy_name and proxy_type in self.nb.config_context["zabbix"]:
+            if (not proxy_name and "zabbix" in self.nb.config_context and 
+                proxy_type in self.nb.config_context["zabbix"]):
                 proxy_name = self.nb.config_context["zabbix"][proxy_type]
                 # go through all proxies
             if proxy_name:
