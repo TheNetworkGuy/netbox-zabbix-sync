@@ -5,7 +5,7 @@ Device specific handeling for NetBox to Zabbix
 
 from copy import deepcopy
 from logging import getLogger
- from operator import itemgetter
+from operator import itemgetter
 from re import search
 from typing import Any
 
