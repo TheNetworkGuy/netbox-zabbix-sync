@@ -163,10 +163,6 @@ class TestHostgroups(unittest.TestCase):
         """Test different hostgroup formats for devices."""
         hostgroup = Hostgroup("dev", self.mock_device, "4.0", self.mock_logger)
         
-        # Default format: site/manufacturer/role
-        default_result = hostgroup.generate()
-        self.assertEqual(default_result, "TestSite/TestManufacturer/TestRole")
-        
         # Custom format: site/region
         custom_result = hostgroup.generate("site/region")
         self.assertEqual(custom_result, "TestSite/TestRegion")
@@ -180,7 +176,7 @@ class TestHostgroups(unittest.TestCase):
         hostgroup = Hostgroup("vm", self.mock_vm, "4.0", self.mock_logger)
         
         # Default format: cluster/role
-        default_result = hostgroup.generate()
+        default_result = hostgroup.generate("cluster/role")
         self.assertEqual(default_result, "TestCluster/TestRole")
         
         # Custom format: site/tenant
@@ -251,31 +247,13 @@ class TestHostgroups(unittest.TestCase):
         hostgroup = Hostgroup("dev", minimal_device, "4.0", self.mock_logger)
         
         # Generate with default format
-        result = hostgroup.generate()
+        result = hostgroup.generate("site/manufacturer/role")
         # Site is missing, so only manufacturer and role should be included
         self.assertEqual(result, "MinimalManufacturer/MinimalRole")
         
         # Test with invalid format
         with self.assertRaises(HostgroupError):
             hostgroup.generate("site/nonexistent/role")
-    
-    def test_hostgroup_missing_required_attributes(self):
-        """Test handling when no valid hostgroup can be generated."""
-        # Create a VM with minimal attributes that won't satisfy any format
-        minimal_vm = MagicMock()
-        minimal_vm.name = "minimal-vm"
-        minimal_vm.site = None
-        minimal_vm.tenant = None
-        minimal_vm.platform = None
-        minimal_vm.role = None
-        minimal_vm.cluster = None
-        minimal_vm.custom_fields = {}
-        
-        hostgroup = Hostgroup("vm", minimal_vm, "4.0", self.mock_logger)
-        
-        # With default format of cluster/role, both are None, so should raise an error
-        with self.assertRaises(HostgroupError):
-            hostgroup.generate()
     
     def test_nested_region_hostgroups(self):
         """Test hostgroup generation with nested regions."""
@@ -334,6 +312,60 @@ class TestHostgroups(unittest.TestCase):
             calls = [call.write(f"The following options are available for host test-device"),
                     call.write('\n')]
             mock_stdout.assert_has_calls(calls, any_order=True)
+            
+    def test_vm_list_based_hostgroup_format(self):
+        """Test VM hostgroup generation with a list-based format."""
+        hostgroup = Hostgroup("vm", self.mock_vm, "4.0", self.mock_logger)
+        
+        # Test with a list of format strings
+        format_list = ["platform", "role", "cluster_type/cluster"]
+        
+        # Generate hostgroups for each format in the list
+        hostgroups = []
+        for fmt in format_list:
+            result = hostgroup.generate(fmt)
+            if result:  # Only add non-None results
+                hostgroups.append(result)
+        
+        # Verify each expected hostgroup is generated
+        self.assertEqual(len(hostgroups), 3)  # Should have 3 hostgroups
+        self.assertIn("TestPlatform", hostgroups)
+        self.assertIn("TestRole", hostgroups)
+        self.assertIn("TestClusterType/TestCluster", hostgroups)
+    
+    def test_nested_format_splitting(self):
+        """Test that formats with slashes correctly split and resolve each component."""
+        hostgroup = Hostgroup("vm", self.mock_vm, "4.0", self.mock_logger)
+        
+        # Test a format with slashes that should be split
+        complex_format = "cluster_type/cluster"
+        result = hostgroup.generate(complex_format)
+        
+        # Verify the format is correctly split and each component resolved
+        self.assertEqual(result, "TestClusterType/TestCluster")
+        
+    def test_multiple_hostgroup_formats_device(self):
+        """Test device hostgroup generation with multiple formats."""
+        hostgroup = Hostgroup("dev", self.mock_device, "4.0", self.mock_logger)
+        
+        # Test with various formats that would be in a list
+        formats = [
+            "site", 
+            "manufacturer/role", 
+            "platform/location", 
+            "tenant_group/tenant"
+        ]
+        
+        # Generate and check each format
+        results = {}
+        for fmt in formats:
+            results[fmt] = hostgroup.generate(fmt)
+        
+        # Verify results
+        self.assertEqual(results["site"], "TestSite")
+        self.assertEqual(results["manufacturer/role"], "TestManufacturer/TestRole")
+        self.assertEqual(results["platform/location"], "TestPlatform/TestLocation")
+        self.assertEqual(results["tenant_group/tenant"], "TestTenantGroup/TestTenant")
 
 
 if __name__ == "__main__":

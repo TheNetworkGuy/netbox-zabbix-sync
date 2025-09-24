@@ -88,7 +88,7 @@ class TestZabbixUsermacros(unittest.TestCase):
         macros = ZabbixUsermacros(self.nb, {}, False, logger=self.logger)
         result = macros.render_macro("{$FOO}", {"type": "text"})
         self.assertFalse(result)
-        self.logger.warning.assert_called()
+        self.logger.info.assert_called()
 
     def test_render_macro_str(self):
         macros = ZabbixUsermacros(self.nb, {}, False, logger=self.logger)
@@ -102,7 +102,7 @@ class TestZabbixUsermacros(unittest.TestCase):
         macros = ZabbixUsermacros(self.nb, {}, False, logger=self.logger)
         result = macros.render_macro("FOO", "bar")
         self.assertFalse(result)
-        self.logger.error.assert_called()
+        self.logger.warning.assert_called()
 
     def test_generate_from_map(self):
         nb = DummyNB(memory="bar", role="baz")

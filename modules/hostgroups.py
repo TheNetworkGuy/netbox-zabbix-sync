@@ -11,6 +11,7 @@ class Hostgroup:
     Takes type (vm or dev) and NB object"""
 
     # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
+    # pylint: disable=logging-fstring-interpolation
     def __init__(
         self,
         obj_type,
@@ -93,6 +94,11 @@ class Hostgroup:
                 format_options["cluster"] = self.nb.cluster.name
                 format_options["cluster_type"] = self.nb.cluster.type.name
         self.format_options = format_options
+        self.logger.debug(
+            "Host %s: Resolved properties for use in hostgroups: %s",
+            self.name,
+            self.format_options,
+        )
 
     def set_nesting(
         self, nested_sitegroup_flag, nested_region_flag, nb_groups, nb_regions
@@ -103,49 +109,51 @@ class Hostgroup:
             "region": {"flag": nested_region_flag, "data": nb_regions},
         }
 
-    def generate(self, hg_format=None):
+    def generate(self, hg_format):
         """Generate hostgroup based on a provided format"""
-        # Set format to default in case its not specified
-        if not hg_format:
-            hg_format = (
-                "site/manufacturer/role" if self.type == "dev" else "cluster/role"
-            )
         # Split all given names
         hg_output = []
         hg_items = hg_format.split("/")
         for hg_item in hg_items:
             # Check if requested data is available as option for this host
             if hg_item not in self.format_options:
-                # Check if a custom field exists with this name
-                cf_data = self.custom_field_lookup(hg_item)
-                # CF does not exist
-                if not cf_data["result"]:
-                    msg = (
-                        f"Unable to generate hostgroup for host {self.name}. "
-                        f"Item type {hg_item} not supported."
-                    )
-                    self.logger.error(msg)
-                    raise HostgroupError(msg)
-                # CF data is populated
-                if cf_data["cf"]:
-                    hg_output.append(cf_data["cf"])
+                if hg_item.startswith(("'", '"')) and hg_item.endswith(("'", '"')):
+                    hg_item = hg_item.strip("\'")
+                    hg_item = hg_item.strip('\"')
+                    hg_output.append(hg_item)
+                else:
+                    # Check if a custom field exists with this name
+                    cf_data = self.custom_field_lookup(hg_item)
+                    # CF does not exist
+                    if not cf_data["result"]:
+                        msg = (
+                            f"Unable to generate hostgroup for host {self.name}. "
+                            f"Item type {hg_item} not supported."
+                        )
+                        self.logger.error(msg)
+                        raise HostgroupError(msg)
+                    # CF data is populated
+                    if cf_data["cf"]:
+                        hg_output.append(cf_data["cf"])
                 continue
             # Check if there is a value associated to the variable.
             # For instance, if a device has no location, do not use it with hostgroup calculation
             hostgroup_value = self.format_options[hg_item]
             if hostgroup_value:
                 hg_output.append(hostgroup_value)
+            else:
+                self.logger.info(
+                    "Host %s: Used field '%s' has no value.", self.name, hg_item
+                )
         # Check if the hostgroup is populated with at least one item.
         if bool(hg_output):
             return "/".join(hg_output)
         msg = (
-            f"Unable to generate hostgroup for host {self.name}."
-            " Not enough valid items. This is most likely"
-            " due to the use of custom fields that are empty"
-            " or an invalid hostgroup format."
+            f"Host {self.name}: Generating hostgroup name for '{hg_format}' failed. "
+            f"This is most likely due to fields that have no value."
         )
-        self.logger.error(msg)
-        raise HostgroupError(msg)
+        self.logger.warning(msg)
+        return None
 
     def list_formatoptions(self):
         """
