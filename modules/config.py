@@ -31,6 +31,7 @@ DEFAULT_CONFIG = {
     "nb_vm_filter": {"name__n": "null"},
     "inventory_mode": "disabled",
     "inventory_sync": False,
+    "extended_site_properties": False,
     "device_inventory_map": {
         "asset_tag": "asset_tag",
         "virtual_chassis/name": "chassis",

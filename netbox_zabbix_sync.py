@@ -166,6 +166,9 @@ def main(arguments):
             # Check if a valid hostgroup has been found for this VM.
             if not vm.hostgroups:
                 continue
+            if config["extended_site_properties"] and nb_vm.site:
+                logger.debug("VM %s: extending site information.", vm.name)
+                vm.site=(convert_recordset(netbox.dcim.sites.filter(id=nb_vm.site.id)))
             vm.set_inventory(nb_vm)
             vm.set_usermacros()
             vm.set_tags()
@@ -238,6 +241,9 @@ def main(arguments):
                     device.name,
                 )
                 continue
+            if config["extended_site_properties"] and nb_device.site:
+                logger.debug("Device %s: extending site information.", device.name)
+                device.site=(convert_recordset(netbox.dcim.sites.filter(id=nb_device.site.id)))
             device.set_inventory(nb_device)
             device.set_usermacros()
             device.set_tags()
