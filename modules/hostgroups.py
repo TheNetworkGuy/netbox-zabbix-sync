@@ -118,8 +118,8 @@ class Hostgroup:
             # Check if requested data is available as option for this host
             if hg_item not in self.format_options:
                 if hg_item.startswith(("'", '"')) and hg_item.endswith(("'", '"')):
-                    hg_item = hg_item.strip("\'")
-                    hg_item = hg_item.strip('\"')
+                    hg_item = hg_item.strip("'")
+                    hg_item = hg_item.strip('"')
                     hg_output.append(hg_item)
                 else:
                     # Check if a custom field exists with this name
