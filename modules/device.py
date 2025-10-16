@@ -5,12 +5,14 @@ Device specific handeling for NetBox to Zabbix
 
 from copy import deepcopy
 from logging import getLogger
-from re import search
 from operator import itemgetter
+from re import search
+from typing import Any
 
-from zabbix_utils import APIRequestError
 from pynetbox import RequestError as NetboxRequestError
+from zabbix_utils import APIRequestError
 
+from modules.config import load_config
 from modules.exceptions import (
     InterfaceConfigError,
     SyncExternalError,
@@ -20,9 +22,13 @@ from modules.exceptions import (
 from modules.hostgroups import Hostgroup
 from modules.interface import ZabbixInterface
 from modules.tags import ZabbixTags
-from modules.tools import field_mapper, remove_duplicates, sanatize_log_output
+from modules.tools import (
+    cf_to_string,
+    field_mapper,
+    remove_duplicates,
+    sanatize_log_output,
+)
 from modules.usermacros import ZabbixUsermacros
-from modules.config import load_config
 
 config = load_config()
 
@@ -454,33 +460,54 @@ class PhysicalDevice:
         self.tags = tags.generate()
         return True
 
-    def setProxy(self, proxy_list):
+    def _setProxy(self, proxy_list: list[dict[str, Any]]) -> bool:
         """
         Sets proxy or proxy group if this
         value has been defined in config context
+        or custom fields.
 
         input: List of all proxies and proxy groups in standardized format
         """
-        # check if the key Zabbix is defined in the config context
-        if "zabbix" not in self.nb.config_context:
-            return False
-        if (
-            "proxy" in self.nb.config_context["zabbix"]
-            and not self.nb.config_context["zabbix"]["proxy"]
-        ):
-            return False
         # Proxy group takes priority over a proxy due
         # to it being HA and therefore being more reliable
         # Includes proxy group fix since Zabbix <= 6 should ignore this
         proxy_types = ["proxy"]
-        if str(self.zabbix.version).startswith("7"):
+        proxy_name = None
+
+        if self.zabbix.version >= 7.0:
             # Only insert groups in front of list for Zabbix7
             proxy_types.insert(0, "proxy_group")
+
+        # loop through supported proxy-types
         for proxy_type in proxy_types:
-            # Check if the key exists in NetBox CC
-            if proxy_type in self.nb.config_context["zabbix"]:
+            # Check if we should use custom fields for proxy config
+            field_config = "proxy_cf" if proxy_type == "proxy" else "proxy_group_cf"
+            if config[field_config]:
+                if (
+                    config[field_config] in self.nb.custom_fields
+                    and self.nb.custom_fields[config[field_config]]
+                ):
+                    proxy_name = cf_to_string(
+                        self.nb.custom_fields[config[field_config]]
+                    )
+                elif (
+                    config[field_config] in self.nb.site.custom_fields
+                    and self.nb.site.custom_fields[config[field_config]]
+                ):
+                    proxy_name = cf_to_string(
+                        self.nb.site.custom_fields[config[field_config]]
+                    )
+
+            # Otherwise check if the proxy is configured in NetBox CC
+            if (
+                not proxy_name
+                and "zabbix" in self.nb.config_context
+                and proxy_type in self.nb.config_context["zabbix"]
+            ):
                 proxy_name = self.nb.config_context["zabbix"][proxy_type]
-                # go through all proxies
+
+            # If a proxy name was found, loop through all proxies to find a match
+            if proxy_name:
                 for proxy in proxy_list:
                     # If the proxy does not match the type, ignore and continue
                     if not proxy["type"] == proxy_type:
@@ -492,6 +519,7 @@ class PhysicalDevice:
                         )
                         self.zbxproxy = proxy
                         return True
+
                 self.logger.warning(
                     "Host %s: unable to find proxy %s", self.name, proxy_name
                 )
@@ -524,7 +552,7 @@ class PhysicalDevice:
             # Set interface, group and template configuration
             interfaces = self.setInterfaceDetails()
             # Set Zabbix proxy if defined
-            self.setProxy(proxies)
+            self._setProxy(proxies)
             # Set basic data for host creation
             create_data = {
                 "host": self.name,
@@ -656,7 +684,7 @@ class PhysicalDevice:
 
         # Prepare templates and proxy config
         self.zbxTemplatePrepper(templates)
-        self.setProxy(proxies)
+        self._setProxy(proxies)
         # Get host object from Zabbix
         host = self.zabbix.host.get(
             filter={"hostid": self.zabbix_id},
@@ -792,7 +820,7 @@ class PhysicalDevice:
                 # Display error message
                 self.logger.warning(
                     "Host %s: Is configured with proxy in Zabbix but not in NetBox."
-                    "The -p flag was ommited: no changes have been made.",
+                    "full_proxy_sync is not set: no changes have been made.",
                     self.name,
                 )
             if not proxy_set:

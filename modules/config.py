@@ -1,6 +1,7 @@
 """
 Module for parsing configuration from the top level config.py file
 """
+
 from pathlib import Path
 from importlib import util
 from os import environ, path
@@ -16,6 +17,8 @@ DEFAULT_CONFIG = {
     "templates_config_context_overrule": False,
     "template_cf": "zabbix_template",
     "device_cf": "zabbix_hostid",
+    "proxy_cf": False,
+    "proxy_group_cf": False,
     "clustering": False,
     "create_hostgroups": True,
     "create_journal": False,
@@ -45,40 +48,40 @@ DEFAULT_CONFIG = {
         "serial": "serialno_a",
         "device_type/model": "type",
         "device_type/manufacturer/name": "vendor",
-        "oob_ip/address": "oob_ip"
+        "oob_ip/address": "oob_ip",
     },
     "vm_inventory_map": {
         "status/label": "deployment_status",
         "comments": "notes",
-        "name": "name"
+        "name": "name",
     },
     "usermacro_sync": False,
     "device_usermacro_map": {
         "serial": "{$HW_SERIAL}",
         "role/name": "{$DEV_ROLE}",
         "url": "{$NB_URL}",
-        "id": "{$NB_ID}"
+        "id": "{$NB_ID}",
     },
     "vm_usermacro_map": {
         "memory": "{$TOTAL_MEMORY}",
         "role/name": "{$DEV_ROLE}",
         "url": "{$NB_URL}",
-        "id": "{$NB_ID}"
+        "id": "{$NB_ID}",
     },
     "tag_sync": False,
     "tag_lower": True,
-    "tag_name": 'NetBox',
+    "tag_name": "NetBox",
     "tag_value": "name",
     "device_tag_map": {
         "site/name": "site",
         "rack/name": "rack",
-        "platform/name": "target"
+        "platform/name": "target",
     },
     "vm_tag_map": {
         "site/name": "site",
         "cluster/name": "cluster",
-        "platform/name": "target"
-    }
+        "platform/name": "target",
+    },
 }
 
 

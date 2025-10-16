@@ -53,9 +53,9 @@ hostgroup_format = "site/manufacturer/role"
 traverse_regions = False
 traverse_site_groups = False
 
-## Extended site properteis
+## Extended site properties
 # By default, NetBox will only return basic site info for any device or VM.
-# By setting `extended_site_properties` to True, the script will query NetBox for additiopnal site info.
+# By setting `extended_site_properties` to True, the script will query NetBox for additional site info.
 # Be aware that this will increase the number of API queries to NetBox.
 extended_site_properties = False
 
