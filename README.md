@@ -289,6 +289,27 @@ hostgroup_format = "mycustomfieldname"
 NetBox-Zabbix-sync - ERROR - ESXI1 has no reliable hostgroup. This is most likely due to the use of custom fields that are empty.
 ```
 
+### Extended site properties
+
+By default, NetBox will only return the following properties under the 'site' key for a device:
+
+- site id
+- (api) url
+- display name
+- name
+- slug
+- description
+
+However, NetBox-Zabbix-Sync allows you to extend these site properties with the full site information
+so you can use this data in inventory fields, tags and usermacros.
+
+To enable this functionality, enable the following setting in your configuration file:
+
+`extended_site_properties = True`
+
+Keep in mind that enabling this option will increase the number of API calls to your NetBox instance, 
+this might impact performance on large syncs.
+
 ### Device status
 
 By setting a status on a NetBox device you determine how the host is added (or
@@ -393,9 +414,9 @@ Tags can be synced from the following sources:
 Syncing tags will override any tags that were set manually on the host,
 making NetBox the single source-of-truth for managing tags.
 
-To enable syncing, turn on tag_sync in the config file.
+To enable syncing, turn on `tag_sync` in the config file.
 By default, this script will modify tag names and tag values to lowercase.
-You can change this behaviour by setting tag_lower to False.
+You can change this behavior by setting `tag_lower` to `False`.
 
 ```python
 tag_sync = True
@@ -408,7 +429,8 @@ As NetBox doesn't follow the tag/value pattern for tags, we will need a tag
 name set to register the netbox tags.
 
 By default the tag name is "NetBox", but you can change this to whatever you want.
-The value for the tag can be set to 'name', 'display', or 'slug', which refers to the property of the NetBox tag object that will be used as the value in Zabbix.
+The value for the tag can be set to 'name', 'display', or 'slug', which refers to the
+property of the NetBox tag object that will be used as the value in Zabbix.
 
 ```python
 tag_name = 'NetBox'
@@ -491,7 +513,7 @@ Through this method, it is possible to define the following types of usermacros:
 2. Secret
 3. Vault
 
-The default macro type is text if no `type` and `value` have been set.
+The default macro type is text, if no `type` and `value` have been set.
 It is also possible to create usermacros with
 [context](https://www.zabbix.com/documentation/7.0/en/manual/config/macros/user_macros_context).
 
@@ -611,7 +633,8 @@ python3 netbox_zabbix_sync.py
 
 ### Zabbix proxy
 
-You can set the proxy for a device using the 'proxy' key in config context.
+#### Config Context
+You can set the proxy for a device using the `proxy` key in config context.
 
 ```json
 {
@@ -651,6 +674,34 @@ proxy.
 In the example above the host will use the group on Zabbix 7. On Zabbix 6 and
 below the host will use the proxy. Zabbix 7 will use the proxy value when
 omitting the proxy_group value.
+
+#### Custom Field
+
+Alternatively, you can use a custom field for assigning a device or VM to 
+a Zabbix proxy or proxy group. The custom fields can be assigned to both 
+Devices and VMs. 
+
+You can also assign these custom fields to a site to allow all devices/VMs
+in that site to be configured with the same proxy or proxy group.
+In order for this to work, `extended_site_properties` needs to be enabled in
+the configuration as well.
+
+To use the custom fields for proxy configuration, configure one or both 
+of the following settings in the configuration file with the actual names of your 
+custom fields:
+
+```python
+proxy_cf = "zabbix_proxy"
+proxy_group_cf = "zabbix_proxy_group"
+```
+
+As with config context proxy configuration, proxy group will take precedence over 
+standalone proxy when configured. 
+Proxy settings configured on the device or VM will in their turn take precedence 
+over any site configuration.
+
+If the custom fields have no value but the proxy or proxy group is configured in config context,
+that setting will be used.
 
 ### Set interface parameters within NetBox
 

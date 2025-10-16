@@ -50,6 +50,20 @@ def proxy_prepper(proxy_list, proxy_group_list):
     return output
 
 
+def cf_to_string(cf, key="name", logger=None):
+    """
+    Converts a dict custom fields to string
+    """
+    if isinstance(cf, dict):
+        if key in cf:
+            return cf[key]
+        logger.error(
+            "Conversion of custom field failed, '%s' not found in cf dict.", key
+        )
+        return None
+    return cf
+
+
 def field_mapper(host, mapper, nbdevice, logger):
     """
     Maps NetBox field data to Zabbix properties.
@@ -160,7 +174,7 @@ def verify_hg_format(
         if (
             hg_object not in allowed_objects[hg_type]
             and hg_object not in allowed_objects["cfs"][hg_type]
-            and not hg_object.startswith(('"',"'"))
+            and not hg_object.startswith(('"', "'"))
         ):
             e = (
                 f"Hostgroup item {hg_object} is not valid. Make sure you"
