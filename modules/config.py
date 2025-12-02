@@ -82,6 +82,12 @@ DEFAULT_CONFIG = {
         "cluster/name": "cluster",
         "platform/name": "target",
     },
+    "map_site_filter": {},
+    "map_cf": "zabbix_mapid",
+    "map_layout": "auto",
+    "map_width": 700,
+    "map_height": 700,
+    "map_border": 300
 }
 
 

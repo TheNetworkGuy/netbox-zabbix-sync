@@ -1,2 +1,3 @@
 pynetbox==7.4.1
 zabbix-utils==2.0.3
+igraph==1.0.0
