@@ -12,6 +12,7 @@ __pycache__/
 .vscode
 .flake
 .coverage
+.ruff_cache
 # venv directories
 bin/
 include/
