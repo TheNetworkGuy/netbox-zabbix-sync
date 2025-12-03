@@ -6,7 +6,13 @@ Pipfile
 Pipfile.lock
 # Byte-compiled / optimized / DLL files
 __pycache__/
+pyvenv.cfg
 *.py[cod]
 .vscode
 .flake
 .coverage
+bin/
+include/
+lib/
+lib64/
+debug/

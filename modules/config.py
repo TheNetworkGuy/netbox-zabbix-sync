@@ -87,7 +87,7 @@ DEFAULT_CONFIG = {
     "map_layout": "auto",
     "map_width": 700,
     "map_height": 700,
-    "map_border": 300
+    "map_border": 100
 }
 
 

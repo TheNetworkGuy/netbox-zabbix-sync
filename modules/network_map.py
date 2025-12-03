@@ -166,15 +166,16 @@ class ZabbixMap:
         layout = self.graph.layout(self.layout)
         layout.fit_into(bbox=self.bbox)
         
-        #out = ig.plot(self.graph, layout=layout)
-        #out.save(self.name + '.png')
+        # debug, needs to be removed 
+        out = ig.plot(self.graph, layout=layout)
+        out.save('./debug/' + self.name + '.png')
 
         # Calculate X and Y coords for each device
         self.graph.vs['x'] = [
-            int(coord[0]) + (self.border/ 2) for coord in layout.coords
+            int(coord[0]) + self.border for coord in layout.coords
         ]
         self.graph.vs['y'] = [
-            int(coord[1]) + (self.border/ 2) for coord in layout.coords
+            int(coord[1]) + self.border for coord in layout.coords
         ]
         for d in self.graph.vs:
             self.logger.debug("Device '%s' coords: (x: %s, y: %s)", d['name'], d['x'], d['y'])
@@ -190,8 +191,31 @@ class ZabbixMap:
         self.map['markelements'] = 1
         self.map['severity_min'] = 2
         self.map['show_unack'] = 2
+        self.map['label_type'] = 0
         if self.zabbix_id:
             self.map['sysmapid'] = self.zabbix_id
+
+        # Add map elements
+        self.map['selements'] = []
+        for e in self.graph.vs:
+            element={}
+            element['selementid'] = e.index+1
+            element['iconid_off'] = 57
+            element['elements'] =  [{'hostid': e['zabbix_id']}]  
+            element['label'] = '{HOST.NAME}\nping: {?last(//icmppingsec)}'
+            element['elementtype'] = 0
+            element['x'] = e['x'] 
+            element['y'] = e['y'] 
+            self.map['selements'].append(element)
+
+        # add element links
+        self.map['links'] = []
+        for l in self.graph.es:
+            link = {}
+            link['selementid1'] = l.source+1
+            link['selementid2'] = l.target+1
+            self.map['links'].append(link)
+
         return True
 
     def createZabbixMap(self):
