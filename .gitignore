@@ -2,17 +2,18 @@
 .venv
 .env
 config.py
+pyvenv.cfg
 Pipfile
 Pipfile.lock
+debug/
 # Byte-compiled / optimized / DLL files
 __pycache__/
-pyvenv.cfg
 *.py[cod]
 .vscode
 .flake
 .coverage
+# venv directories
 bin/
 include/
 lib/
 lib64/
-debug/
