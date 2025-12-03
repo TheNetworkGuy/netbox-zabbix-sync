@@ -103,7 +103,9 @@ def main(arguments):
         sys.exit(1)
     #netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
     #netbox_regions = convert_recordset(netbox.dcim.regions.all())
-    #zabbix_groups = zabbix.hostgroup.get(output=["groupid", "name"])
+    zabbix_backgrounds = zabbix.image.get(filter={'imagetype': 2}, output=["imageid", "name"])
+    zabbix_icons = zabbix.image.get(filter={'imagetype': 1}, output=["imageid", "name"])
+    zabbix_iconmaps = zabbix.iconmap.get(output=["iconmapid", "name"])
     netbox_journals = netbox.extras.journal_entries
     netbox_sites = list(netbox.dcim.sites.filter(**config["map_site_filter"]))
 

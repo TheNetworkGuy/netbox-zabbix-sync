@@ -96,6 +96,9 @@ class ZabbixMap:
         return True
 
     def findConnections(self):
+        """
+        Finds connections between devices in NetBox that have been synced to Zabbix.
+        """
         connections = []
         for device in self.devices:
             self.logger.info("Processing device '%s'.", device.name)
@@ -114,6 +117,7 @@ class ZabbixMap:
             for interface in interfaces:
                 connection = {}
                 peerindex = None
+                # Only process connected interfaces
                 if interface.connected_endpoints:
                     for peer in interface.connected_endpoints:
                         if peerindex:
@@ -122,6 +126,7 @@ class ZabbixMap:
                             if site_device.id == peer.device.id:
                                 peerindex = self.devices.index(site_device)
                                 break
+                # If we've found a connection with a Zabbix host, continue processing
                 if peerindex or peerindex==0:
                     self.logger.debug("Found connection: '%s' (%s) -> '%s' (%s)", 
                                       device.name, interface.name, 
@@ -139,20 +144,30 @@ class ZabbixMap:
                                               'index':  peerindex
                                              }
                                         }
+                    # Check if we already found the reverse connection, 
+                    # if so we ignore this connection.
                     rev_connection = {'a': connection['b'], 'b': connection['a']}
                     if rev_connection in connections:
                         self.logger.debug("Reverse connection was already mapped, skipping!")
                     else:
                         connections.append(connection)
+
         self.logger.info("Registered %s connections in this site.", len(connections))
         return connections
 
     def buildEdges(self, connections):
+        """
+        Converts connections to iGraph edges
+        """ 
         for c in connections:
             self.edges.append((c['a']['index'],c['b']['index']))
             self.edges_ints.append((c['a']['int'],c['b']['int']))
+        return True
 
     def buildGraph(self):
+        """
+        Build graph based on NetBox connection info.
+        """
         self.logger.info("Plotting '%s' graph with %s devices and %s connections.", 
                          self.layout, len(self.devices), len(self.edges))
         self.graph = ig.Graph(len(self.devices),self.edges)
@@ -166,7 +181,7 @@ class ZabbixMap:
         layout = self.graph.layout(self.layout)
         layout.fit_into(bbox=self.bbox)
         
-        # debug, needs to be removed 
+        # Debug, needs to be removed at some point 
         out = ig.plot(self.graph, layout=layout)
         out.save('./debug/' + self.name + '.png')
 
@@ -179,8 +194,12 @@ class ZabbixMap:
         ]
         for d in self.graph.vs:
             self.logger.debug("Device '%s' coords: (x: %s, y: %s)", d['name'], d['x'], d['y'])
+        return True    
 
     def buildZabbixMap(self):
+        """
+        Build Zabbix map from iGraph
+        """
         # Set Map properties
         self.map = {}
         self.map['height'] = self.height
@@ -192,33 +211,25 @@ class ZabbixMap:
         self.map['severity_min'] = 2
         self.map['show_unack'] = 2
         self.map['label_type'] = 0
+        self.map['backgroundid'] = None
         if self.zabbix_id:
             self.map['sysmapid'] = self.zabbix_id
 
         # Add map elements
-        self.map['selements'] = []
-        for e in self.graph.vs:
-            element={}
-            element['selementid'] = e.index+1
-            element['iconid_off'] = 57
-            element['elements'] =  [{'hostid': e['zabbix_id']}]  
-            element['label'] = '{HOST.NAME}\nping: {?last(//icmppingsec)}'
-            element['elementtype'] = 0
-            element['x'] = e['x'] 
-            element['y'] = e['y'] 
-            self.map['selements'].append(element)
+        self.map['selements'] = self.generateElements()
+        if not self.map['selements']:
+            logger.error("Site '%s' map does not contain any host elements.", self.name)
+            return False
 
         # add element links
-        self.map['links'] = []
-        for l in self.graph.es:
-            link = {}
-            link['selementid1'] = l.source+1
-            link['selementid2'] = l.target+1
-            self.map['links'].append(link)
+        self.map['links'] = self.generateLinks()
 
         return True
 
     def createZabbixMap(self):
+        """
+        Create new map in Zabbix
+        """
         if self.map:
             try:
                 m = self.zabbix.map.create(**self.map)
@@ -237,6 +248,9 @@ class ZabbixMap:
         return False
    
     def updateZabbixMap(self):
+        """
+        Update existing map in Zabbix
+        """
         if self.map:
             try:
                 m = self.zabbix.map.update(**self.map)
@@ -251,6 +265,44 @@ class ZabbixMap:
             return True
         return False
 
+    def generateElements(self):
+        """ 
+        Generates Zabbix Host elements on the map.
+        """
+        if self.graph.vs:
+            selements=[]
+            for e in self.graph.vs:
+                element={}
+                element['selementid'] = e.index+1
+                element['iconid_off'] = 57
+                element['elements'] =  [{'hostid': e['zabbix_id']}]  
+                element['label'] = '{HOST.NAME}\nping: {?last(//icmppingsec)}'
+                element['elementtype'] = 0
+                element['x'] = e['x'] 
+                element['y'] = e['y'] 
+                selements.append(element)
+            return selements
+        return False
+
+    def generateLinks(self):
+        """
+        Generates links between Zabbix map elements.
+        """
+        links = []
+        # add element links
+        if self.graph.es:
+            if 'selements' in self.map and self.map['selements']:
+                for l in self.graph.es:
+                    link = {}
+                    link['selementid1'] = l.source+1
+                    link['selementid2'] = l.target+1
+                    links.append(link)
+                return links
+            else:
+                self.logger.error("Site map '%s' has no elements, cannot create links.", self.name)
+        else:
+            self.logger.info("Site map '%s' has no element links, make some connections in NetBox.", self.name)
+        return False
 #    def createInZabbix(
 #        self,
 #        groups,
