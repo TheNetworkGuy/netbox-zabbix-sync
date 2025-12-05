@@ -37,23 +37,29 @@ class ZabbixMap:
     """
 
     def __init__(
-        self, nb, devices, zabbix, netbox, nb_journal_class, nb_version, journal=None, logger=None
+        self, nb, devices, zabbix, zabbix_backgrounds, bgid, iconid, iconmapid, 
+        netbox, nb_journal_class, nb_version, journal=None, logger=None
     ):
         self.nb = nb
         self.id = nb.id
         self.devices = devices
         self.edges = []
         self.edges_ints = []
-        self.name = nb.name
+        self.name = str(config['map_name_prefix']) + nb.name + str(config['map_name_suffix'])
         self.graph = None
         self.layout = config['map_layout']
-        self.width = config['map_width']
-        self.height = config['map_height']
-        self.border = config['map_border']
+        self.width = int(config['map_width'])
+        self.height = int(config['map_height'])
+        self.border = int(config['map_border'])
+        self.header_size = int(config['map_header_size']) if config['map_header_size'] else 0
         self.bbox = None
         self.visible_name = None
         self.status = nb.status.label
         self.zabbix = zabbix
+        self.zabbix_backgrounds = zabbix_backgrounds
+        self.bgid = bgid
+        self.iconid = iconid
+        self.iconmapid = iconmapid
         self.netbox = netbox
         self.zabbix_id = None
         self.nb_api_version = nb_version
@@ -81,13 +87,15 @@ class ZabbixMap:
             e = f"Site {self.name}: Custom field {config['map_cf']} not present"
             self.logger.error(e)
             raise SyncInventoryError(e)
-        self.bbox = (self.width - (self.border * 2), self.height - (self.border * 2))
+            
+        self.bbox = (self.width - (self.border * 2), self.height - (self.border * 2) - self.header_size)
 
         # Generate plot using igraph
         self.buildEdges(self.findConnections())
         self.buildGraph()
-
+        
         # Generate Zabbix Map
+        self.setBackground()
         if self.buildZabbixMap():
             if not self.zabbix_id:
                self.createZabbixMap()
@@ -144,6 +152,7 @@ class ZabbixMap:
                                               'index':  peerindex
                                              }
                                         }
+
                     # Check if we already found the reverse connection, 
                     # if so we ignore this connection.
                     rev_connection = {'a': connection['b'], 'b': connection['a']}
@@ -187,10 +196,10 @@ class ZabbixMap:
 
         # Calculate X and Y coords for each device
         self.graph.vs['x'] = [
-            int(coord[0]) + self.border for coord in layout.coords
+            int(coord[0]) + self.border/2 for coord in layout.coords
         ]
         self.graph.vs['y'] = [
-            int(coord[1]) + self.border for coord in layout.coords
+            int(coord[1]) + self.border/2 + self.header_size for coord in layout.coords
         ]
         for d in self.graph.vs:
             self.logger.debug("Device '%s' coords: (x: %s, y: %s)", d['name'], d['x'], d['y'])
@@ -211,21 +220,25 @@ class ZabbixMap:
         self.map['severity_min'] = 2
         self.map['show_unack'] = 2
         self.map['label_type'] = 0
-        self.map['backgroundid'] = None
+        self.map['backgroundid'] = self.bgid
+        self.map['iconmapid'] = self.iconmapid
         if self.zabbix_id:
             self.map['sysmapid'] = self.zabbix_id
 
         # Add map elements
         self.map['selements'] = self.generateElements()
         if not self.map['selements']:
-            logger.error("Site '%s' map does not contain any host elements.", self.name)
+            logger.error("Site '%s' map does not contain any host elements.", self.nb.name)
             return False
 
-        # add element links
+        # Add element links
         self.map['links'] = self.generateLinks()
+    
+        # Add header
+        self.map['shapes'] = self.setHeader()
 
         return True
-
+    
     def createZabbixMap(self):
         """
         Create new map in Zabbix
@@ -274,13 +287,14 @@ class ZabbixMap:
             for e in self.graph.vs:
                 element={}
                 element['selementid'] = e.index+1
-                element['iconid_off'] = 57
+                element['iconid_off'] = self.iconid
                 element['elements'] =  [{'hostid': e['zabbix_id']}]  
                 element['label'] = '{HOST.NAME}\nping: {?last(//icmppingsec)}'
                 element['elementtype'] = 0
                 element['x'] = e['x'] 
                 element['y'] = e['y'] 
                 selements.append(element)
+            self.logger.debug("Added %s host elements to Zabbix map.", len(selements))
             return selements
         return False
 
@@ -294,82 +308,63 @@ class ZabbixMap:
             if 'selements' in self.map and self.map['selements']:
                 for l in self.graph.es:
                     link = {}
-                    link['selementid1'] = l.source+1
-                    link['selementid2'] = l.target+1
-                    links.append(link)
+                    idx = None
+                    for i,e in enumerate(links):
+                        if (l.source+1 == e['selementid1'] and 
+                            l.target+1 == e['selementid2']):
+                           self.logger.debug("Found duplicate link between elements %s and %s.", l.source+1, l.target+1)
+                           idx = i
+                           break
+                    if idx is None: 
+                        link['selementid1'] = l.source+1
+                        link['selementid2'] = l.target+1
+                        link['color'] = config['map_link_uni']
+                        pprint(link)
+                        links.append(link)
+                    else:
+                        links[idx]['drawtype'] = 2
+                        links[idx]['color'] = config['map_link_multi']
+                        links[idx]['label'] = "Multi"
+                         
+                self.logger.debug("Added %s links to Zabbix map.", len(links))
+                #pprint(links)
                 return links
             else:
                 self.logger.error("Site map '%s' has no elements, cannot create links.", self.name)
         else:
             self.logger.info("Site map '%s' has no element links, make some connections in NetBox.", self.name)
-        return False
-#    def createInZabbix(
-#        self,
-#        groups,
-#        templates,
-#        proxies,
-#        description="Host added by NetBox sync script.",
-#    ):
-#        """
-#        Creates Zabbix host object with parameters from NetBox object.
-#        """
-#        # Check if hostname is already present in Zabbix
-#        if not self._zabbixHostnameExists():
-#            # Set group and template ID's for host
-#            if not self.setZabbixGroupID(groups):
-#                e = (
-#                    f"Unable to find group '{self.hostgroup}' "
-#                    f"for host {self.name} in Zabbix."
-#                )
-#                self.logger.warning(e)
-#                raise SyncInventoryError(e)
-#            self.zbxTemplatePrepper(templates)
-#            templateids = []
-#            for template in self.zbx_templates:
-#                templateids.append({"templateid": template["templateid"]})
-#            # Set interface, group and template configuration
-#            interfaces = self.setInterfaceDetails()
-#            # Set Zabbix proxy if defined
-#            self._setProxy(proxies)
-#            # Set basic data for host creation
-#            create_data = {
-#                "host": self.name,
-#                "name": self.visible_name,
-#                "status": self.zabbix_state,
-#                "interfaces": interfaces,
-#                "groups": self.group_ids,
-#                "templates": templateids,
-#                "description": description,
-#                "inventory_mode": self.inventory_mode,
-#                "inventory": self.inventory,
-#                "macros": self.usermacros,
-#                "tags": self.tags,
-#            }
-#            # If a Zabbix proxy or Zabbix Proxy group has been defined
-#            if self.zbxproxy:
-#                # If a lower version than 7 is used, we can assume that
-#                # the proxy is a normal proxy and not a proxy group
-#                if not str(self.zabbix.version).startswith("7"):
-#                    create_data["proxy_hostid"] = self.zbxproxy["id"]
-#                else:
-#                    # Configure either a proxy or proxy group
-#                    create_data[self.zbxproxy["idtype"]] = self.zbxproxy["id"]
-#                    create_data["monitored_by"] = self.zbxproxy["monitored_by"]
-#            # Add host to Zabbix
-#            try:
-#                host = self.zabbix.host.create(**create_data)
-#                self.zabbix_id = host["hostids"][0]
-#            except APIRequestError as e:
-#                msg = f"Host {self.name}: Couldn't create. Zabbix returned {str(e)}."
-#                self.logger.error(msg)
-#                raise SyncExternalError(msg) from e
-#            # Set NetBox custom field to hostID value.
-#            self.nb.custom_fields[config["device_cf"]] = int(self.zabbix_id)
-#            self.nb.save()
-#            msg = f"Host {self.name}: Created host in Zabbix. (ID:{self.zabbix_id})"
-#            self.logger.info(msg)
-#            self.create_journal_entry("success", msg)
-#        else:
-#            self.logger.error(
-#                "Host %s: Unable to add to Zabbix. Host already present.", self.name
-#            )
+        return []
+
+    def setBackground(self):
+        """
+        Resolve dynamic map backgrounds based on site name.
+        """
+        if config['map_dynamic_bg']:
+            dynbgid = (next(filter(lambda x: x['name'] == self.nb.name, self.zabbix_backgrounds), None))
+            if dynbgid:
+                self.bgid = dynbgid['imageid']
+                self.logger.info("Site map '%s' is using dynamic background '%s'. (ID:%s)", 
+                                 self.name, dynbgid['name'], dynbgid['imageid'])
+            else:
+                self.logger.debug("No dynamic background found for site map '%s'.", self.name)
+        return self.bgid
+
+    def setHeader(self):
+        """
+        Render map header.
+        """
+        shapes=[]
+        if self.header_size:
+            self.logger.debug("Adding header to map '%s'.", self.name)
+            shape = {
+                "text": self.nb.name,
+                "font_size": int(self.header_size/2),
+                "width": int(self.width),
+                "height": int(self.header_size),
+                "x": 0,
+                "y": 0,
+                "border_type": 0,
+                "type": 0,
+            } 
+            shapes.append(shape)
+        return shapes

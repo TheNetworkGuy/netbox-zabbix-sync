@@ -87,7 +87,17 @@ DEFAULT_CONFIG = {
     "map_layout": "auto",
     "map_width": 700,
     "map_height": 700,
-    "map_border": 100
+    "map_border": 100,
+    "map_header_size": None,
+    "map_name_prefix": "",
+    "map_name_suffix": "",
+    "map_default_bg": None,
+    "map_dynamic_bg": False,
+    "map_default_icon": "Network_(48)",
+    "map_iconmap": None,
+    "map_link_uni": "000000",
+    "map_link_multi": "27B7F5",
+    "map_link_failed": "F53C27", 
 }
 
 

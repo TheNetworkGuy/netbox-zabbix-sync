@@ -109,7 +109,42 @@ def main(arguments):
     netbox_journals = netbox.extras.journal_entries
     netbox_sites = list(netbox.dcim.sites.filter(**config["map_site_filter"]))
 
+    # verify we have a default icon, this is mandatory!
+    iconid = None
+    if config['map_default_icon']:
+        result = (next(filter(lambda x: x['name'] == config['map_default_icon'], zabbix_icons), None))
+        if result:
+            iconid = result['imageid']
+            logger.info("Using default icon '%s' (ID:%s) for all map elements.", config['map_default_icon'], iconid )
+        else:
+            logger.error("Default icon '%s' not found in Zabbix, can not continue.", config['map_default_icon'])
+            exit(1)
+    else:
+        logger.error("Default icon not set in config.py, can not continue.", config['map_default_icon'])
+        exit(1)
+
+    # verify we have the configured iconmap
+    iconmapid = None
+    if config['map_iconmap']:
+        result = (next(filter(lambda x: x['name'] == config['map_iconmap'], zabbix_iconmaps), None))
+        if result:
+            iconmapid = result['iconmapid']
+            logger.info("Using iconmap '%s' (ID:%s) for all maps.", config['map_iconmap'], iconmapid)
+        else:
+            logger.warning("Default iconmap '%s' not found in Zabbix. Disabling iconmap usage.", config['map_iconmap'])
+        
+    # verify we have the default background
+    bgid = None
+    if config['map_default_bg']:
+        result = (next(filter(lambda x: x['name'] == config['map_default_bg'], zabbix_backgrounds), None))
+        if result:
+            bgid = result['imageid']
+            logger.info("Found default background '%s' (ID:%s) to use for all maps.", config['map_default_bg'], bgid)
+        else:
+            logger.warning("Default map background '%s' not found in Zabbix. Disabling default backgound usage.", config['map_default_bg'])
+
     for nb_site in netbox_sites:
+        logger.info("Processing site '%s'.", nb_site.name)
         site_devices = []
         network_map = None
         for device in netbox.dcim.devices.filter(site_id=nb_site['id']):
@@ -122,15 +157,18 @@ def main(arguments):
                 nb_site,
                 site_devices,
                 zabbix,
+                zabbix_backgrounds,
+                bgid,
+                iconid,
+                iconmapid,
                 netbox,
                 netbox_journals,
                 nb_version,
                 config["create_journal"],
                 logger,
             )
-        
-        #for device in site_devices:
-        #    pprint(list(netbox.dcim.interfaces.filter(device_id=device.id)))
+        else:
+            logger.info("No zabbix devices found in site '%s', skipping.", nb_site.name)
     zabbix.logout()
 
 if __name__ == "__main__":
