@@ -19,7 +19,7 @@ from modules.config import load_config
 from modules.network_map import ZabbixMap
 from modules.exceptions import EnvironmentVarError, SyncError
 from modules.logging import get_logger, set_log_levels, setup_logger
-from modules.tools import convert_recordset
+from modules.tools import convert_recordset, zabbixTriggerPrio
 
 
 config = load_config()
@@ -142,6 +142,12 @@ def main(arguments):
             logger.info("Found default background '%s' (ID:%s) to use for all maps.", config['map_default_bg'], bgid)
         else:
             logger.warning("Default map background '%s' not found in Zabbix. Disabling default backgound usage.", config['map_default_bg'])
+
+    # check minimum trigger priority for maps
+    zprio=zabbixTriggerPrio(config['map_trigger_prio'])
+    if zprio is False:
+        logger.error("'map_trigger_prio' in config.py is not a valid severity.")
+        exit(1)
 
     for nb_site in netbox_sites:
         logger.info("Processing site '%s'.", nb_site.name)

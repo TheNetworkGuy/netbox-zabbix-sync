@@ -219,3 +219,18 @@ def sanatize_log_output(data):
                 # A macro is not used, so we sanitize the value.
                 sanitized_data["details"][key] = "********"
     return sanitized_data
+
+def zabbixTriggerPrio(priority):
+    pmap = {
+        'not_classified': 0,
+        'informational': 1,
+        'warning': 2,
+        'average': 3,
+        'high': 4,
+        'disaster': 5
+    }
+    priority = priority.lower()
+    if priority in pmap:
+        return pmap[priority]
+    else:
+        return False

@@ -83,6 +83,7 @@ DEFAULT_CONFIG = {
         "platform/name": "target",
     },
     "map_site_filter": {},
+    "map_orphans": False,
     "map_cf": "zabbix_mapid",
     "map_layout": "auto",
     "map_width": 700,
@@ -97,7 +98,9 @@ DEFAULT_CONFIG = {
     "map_iconmap": None,
     "map_link_uni": "000000",
     "map_link_multi": "27B7F5",
-    "map_link_failed": "F53C27", 
+    "map_link_failed": "F53C27",
+    "map_link_triggers": False,
+    "map_trigger_prio": "WARNING"
 }
 
 

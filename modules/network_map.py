@@ -20,12 +20,7 @@ from modules.exceptions import (
     SyncInventoryError,
 )
 #from modules.tags import ZabbixTags
-#from modules.tools import (
-#    cf_to_string,
-#    field_mapper,
-#    remove_duplicates,
-#    sanatize_log_output,
-#)
+#from modules.tools import zabbixTriggerPrio
 
 config = load_config()
 
@@ -160,7 +155,6 @@ class ZabbixMap:
                         self.logger.debug("Reverse connection was already mapped, skipping!")
                     else:
                         connections.append(connection)
-
         self.logger.info("Registered %s connections in this site.", len(connections))
         return connections
 
@@ -187,6 +181,14 @@ class ZabbixMap:
         for device in self.devices:
             zabbix_ids.append(device.custom_fields[config['device_cf']])
         self.graph.vs['zabbix_id'] = zabbix_ids
+
+        # Remove orphaned devices from the graph if configured:
+        if not config['map_orphans']:
+            orphans = [v.index for v in self.graph.vs if self.graph.degree(v) == 0]
+            for orphan in sorted(orphans,reverse=True):
+                self.logger.info("Device '%s' is orphaned, removing from graph.", self.graph.vs['name'][orphan])
+                self.graph.delete_vertices(orphan)
+
         layout = self.graph.layout(self.layout)
         layout.fit_into(bbox=self.bbox)
         
@@ -228,7 +230,7 @@ class ZabbixMap:
         # Add map elements
         self.map['selements'] = self.generateElements()
         if not self.map['selements']:
-            logger.error("Site '%s' map does not contain any host elements.", self.nb.name)
+            self.logger.warning("Site '%s' map does not contain any host elements.", self.nb.name)
             return False
 
         # Add element links
@@ -289,7 +291,7 @@ class ZabbixMap:
                 element['selementid'] = e.index+1
                 element['iconid_off'] = self.iconid
                 element['elements'] =  [{'hostid': e['zabbix_id']}]  
-                element['label'] = '{HOST.NAME}\nping: {?last(//icmppingsec)}'
+                element['label'] = '{HOST.NAME} (' + str(e.index+1) + ")"
                 element['elementtype'] = 0
                 element['x'] = e['x'] 
                 element['y'] = e['y'] 
@@ -319,21 +321,60 @@ class ZabbixMap:
                         link['selementid1'] = l.source+1
                         link['selementid2'] = l.target+1
                         link['color'] = config['map_link_uni']
-                        pprint(link)
+                        link['meta'] = {"count": 1,
+                                        "conns": [l['int']]}
                         links.append(link)
                     else:
                         links[idx]['drawtype'] = 2
                         links[idx]['color'] = config['map_link_multi']
-                        links[idx]['label'] = "Multi"
-                         
+                        links[idx]['meta']['count'] = links[idx]['meta']['count']+1
+                        links[idx]['meta']['conns'].append(l['int'])
+                self.setLinkLabels(links)
+                self.setLinkTriggers(links)
+
+                # Cleanup metadata                
+                for link in links:
+                    link.pop('meta', None)
+
                 self.logger.debug("Added %s links to Zabbix map.", len(links))
-                #pprint(links)
                 return links
             else:
                 self.logger.error("Site map '%s' has no elements, cannot create links.", self.name)
         else:
             self.logger.info("Site map '%s' has no element links, make some connections in NetBox.", self.name)
         return []
+
+    def setLinkLabels(self, links):
+        """
+        Creates link labels for use in Zabbix Map.
+        """
+        for link in links:
+            label = ""
+            for conn in link['meta']['conns']:
+                label = label + "("+ str(link['selementid1']) +") " + conn[0] + "⇄" + "("+ str(link['selementid2']) +") " + conn[1] + "\n"
+            link['label'] = label
+        return True
+
+    def setLinkTriggers(self, links):
+        """
+        Creates link triggers for use in Zabbix Map.
+        """
+        if config['map_link_triggers']:
+            hostids = []
+            for device in self.devices:
+                hostids.append(device.custom_fields[config['device_cf']])
+            triggers = self.zabbix.trigger.get(hostids=hostids,selectTags='extend', selectHosts='hostid', output=['description','priority','triggerid'])
+            pprint(triggers)
+            e = {}
+            hid = None
+            for link in links:
+                #pprint(link)
+                e = next((selement for selement in self.map['selements'] 
+                           if selement['selementid'] == link['selementid1']), None)
+                if e and "elements" in e:
+                    hid = e['elements'][0]['hostid']
+             #   pprint(self.zabbix.trigger.get(hostids=[hid],output=['description','priority','triggerid']))
+            return True
 
     def setBackground(self):
         """
@@ -358,6 +399,7 @@ class ZabbixMap:
             self.logger.debug("Adding header to map '%s'.", self.name)
             shape = {
                 "text": self.nb.name,
+                "font": 4, #Arial Black
                 "font_size": int(self.header_size/2),
                 "width": int(self.width),
                 "height": int(self.header_size),
