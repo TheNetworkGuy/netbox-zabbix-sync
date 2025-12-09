@@ -90,17 +90,23 @@ DEFAULT_CONFIG = {
     "map_height": 700,
     "map_border": 100,
     "map_header_size": None,
+    "map_header_color": "696969",
     "map_name_prefix": "",
     "map_name_suffix": "",
     "map_default_bg": None,
     "map_dynamic_bg": False,
     "map_default_icon": "Network_(48)",
     "map_iconmap": None,
-    "map_link_uni": "000000",
-    "map_link_multi": "27B7F5",
-    "map_link_failed": "F53C27",
+    "map_link_uni": "195431",
+    "map_link_multi": "2F9F5E",
+    "map_link_nc": "97AAB3",
+    "map_link_info": "7499FF",
+    "map_link_warn": "FFC859",
+    "map_link_avg": "FFA059",
+    "map_link_high": "E97659",
+    "map_link_dis": "E45959",
     "map_link_triggers": False,
-    "map_trigger_prio": "WARNING"
+    "map_trigger_prio": "warning"
 }
 
 

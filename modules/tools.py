@@ -1,7 +1,10 @@
 """A collection of tools used by several classes"""
 
+from collections import OrderedDict
 from modules.exceptions import HostgroupError
+from modules.config import load_config
 
+config = load_config()
 
 def convert_recordset(recordset):
     """Converts netbox RedcordSet to list of dicts."""
@@ -234,3 +237,32 @@ def zabbixTriggerPrio(priority):
         return pmap[priority]
     else:
         return False
+
+def zabbixTriggerColor(priority):
+    pmap = {
+        0: config['map_link_nc'],
+        1: config['map_link_info'],
+        2: config['map_link_warn'],
+        3: config['map_link_avg'],
+        4: config['map_link_high'],
+        5: config['map_link_dis'],
+    }
+    priority = int(priority)
+    if priority in pmap:
+        return pmap[priority]
+    else:
+        return False
+
+def findTriggersByTag(triggers,hostid,tagvalue):
+    t = []
+    for trigger in triggers:
+        if hostid in [int(d['hostid']) for d in trigger['hosts']]:
+            for tag in trigger['tags']:
+                if tag['value'] == tagvalue:
+                    t.append({'triggerid': trigger['triggerid'],
+                              'priority': trigger['priority']})
+                    break
+    # reverse sort based on priority
+    if t:
+        t = sorted(t, key=lambda d: d['priority'],reverse=True)
+    return t

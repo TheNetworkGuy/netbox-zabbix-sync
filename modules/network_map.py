@@ -7,6 +7,7 @@ from logging import getLogger
 #from operator import itemgetter
 #from re import search
 from typing import Any
+from random import randint
 
 from pprint import pprint
 
@@ -20,7 +21,7 @@ from modules.exceptions import (
     SyncInventoryError,
 )
 #from modules.tags import ZabbixTags
-#from modules.tools import zabbixTriggerPrio
+from modules.tools import zabbixTriggerColor, findTriggersByTag
 
 config = load_config()
 
@@ -33,15 +34,17 @@ class ZabbixMap:
 
     def __init__(
         self, nb, devices, zabbix, zabbix_backgrounds, bgid, iconid, iconmapid, 
-        netbox, nb_journal_class, nb_version, journal=None, logger=None
+        zprio, netbox, nb_journal_class, nb_version, journal=None, logger=None
     ):
         self.nb = nb
         self.id = nb.id
         self.devices = devices
         self.edges = []
         self.edges_ints = []
+        self.edges_weights = []
         self.name = str(config['map_name_prefix']) + nb.name + str(config['map_name_suffix'])
         self.graph = None
+        self.layout = config['map_layout']
         self.layout = config['map_layout']
         self.width = int(config['map_width'])
         self.height = int(config['map_height'])
@@ -55,6 +58,7 @@ class ZabbixMap:
         self.bgid = bgid
         self.iconid = iconid
         self.iconmapid = iconmapid
+        self.prio = zprio
         self.netbox = netbox
         self.zabbix_id = None
         self.nb_api_version = nb_version
@@ -188,10 +192,10 @@ class ZabbixMap:
             for orphan in sorted(orphans,reverse=True):
                 self.logger.info("Device '%s' is orphaned, removing from graph.", self.graph.vs['name'][orphan])
                 self.graph.delete_vertices(orphan)
-
+        self.graph.vs[0]['mass'] = 1000
         layout = self.graph.layout(self.layout)
-        layout.fit_into(bbox=self.bbox)
-        
+        layout.fit_into(bbox=self.bbox, keep_aspect_ratio=False)
+         
         # Debug, needs to be removed at some point 
         out = ig.plot(self.graph, layout=layout)
         out.save('./debug/' + self.name + '.png')
@@ -219,7 +223,7 @@ class ZabbixMap:
         self.map['expand_macros'] = 1
         self.map['expandproblem'] = 0
         self.map['markelements'] = 1
-        self.map['severity_min'] = 2
+        self.map['severity_min'] = self.prio
         self.map['show_unack'] = 2
         self.map['label_type'] = 0
         self.map['backgroundid'] = self.bgid
@@ -235,12 +239,12 @@ class ZabbixMap:
 
         # Add element links
         self.map['links'] = self.generateLinks()
-    
+
         # Add header
         self.map['shapes'] = self.setHeader()
 
         return True
-    
+
     def createZabbixMap(self):
         """
         Create new map in Zabbix
@@ -314,7 +318,8 @@ class ZabbixMap:
                     for i,e in enumerate(links):
                         if (l.source+1 == e['selementid1'] and 
                             l.target+1 == e['selementid2']):
-                           self.logger.debug("Found duplicate link between elements %s and %s.", l.source+1, l.target+1)
+                           self.logger.debug("Found duplicate link between elements %s and %s.",
+                                             l.source+1, l.target+1)
                            idx = i
                            break
                     if idx is None: 
@@ -323,14 +328,19 @@ class ZabbixMap:
                         link['color'] = config['map_link_uni']
                         link['meta'] = {"count": 1,
                                         "conns": [l['int']]}
+                        link['linktriggers'] = []
                         links.append(link)
                     else:
                         links[idx]['drawtype'] = 2
                         links[idx]['color'] = config['map_link_multi']
                         links[idx]['meta']['count'] = links[idx]['meta']['count']+1
                         links[idx]['meta']['conns'].append(l['int'])
-                self.setLinkLabels(links)
-                self.setLinkTriggers(links)
+
+                # add link labels
+                links=self.setLinkLabels(links)
+
+                # add link indicators
+                links=self.setLinkTriggers(links)
 
                 # Cleanup metadata                
                 for link in links:
@@ -348,33 +358,48 @@ class ZabbixMap:
         """
         Creates link labels for use in Zabbix Map.
         """
-        for link in links:
-            label = ""
-            for conn in link['meta']['conns']:
-                label = label + "("+ str(link['selementid1']) +") " + conn[0] + "⇄" + "("+ str(link['selementid2']) +") " + conn[1] + "\n"
-            link['label'] = label
-        return True
+        if config['map_link_labels']:
+            self.logger.debug("Generating link labels...")
+            for link in links:
+                label = ""
+                for conn in link['meta']['conns']:
+                    label = label + "("+ str(link['selementid1']) +") " + conn[0] + "⇄" + "("+ str(link['selementid2']) +") " + conn[1] + "\n"
+                link['label'] = label
+        return links
 
     def setLinkTriggers(self, links):
         """
         Creates link triggers for use in Zabbix Map.
         """
+        # This needs to be updated for Zabbix 7.4 and up.
         if config['map_link_triggers']:
+            self.logger.debug("Generating link triggers...")
             hostids = []
+            # grab all triggers for site hosts
             for device in self.devices:
                 hostids.append(device.custom_fields[config['device_cf']])
-            triggers = self.zabbix.trigger.get(hostids=hostids,selectTags='extend', selectHosts='hostid', output=['description','priority','triggerid'])
-            pprint(triggers)
+            triggers = self.zabbix.trigger.get(hostids=hostids,selectTags='extend', selectHosts='hostid', 
+                                               min_severity=self.prio, output=['description','priority','triggerid'])
             e = {}
-            hid = None
-            for link in links:
-                #pprint(link)
-                e = next((selement for selement in self.map['selements'] 
-                           if selement['selementid'] == link['selementid1']), None)
-                if e and "elements" in e:
-                    hid = e['elements'][0]['hostid']
-             #   pprint(self.zabbix.trigger.get(hostids=[hid],output=['description','priority','triggerid']))
-            return True
+            # loop over all links in map
+            for idx, link in enumerate(links):
+                link['linktriggers'] = []
+                # for both selements of the link, find the element (host)
+                for s in ['selementid1', 'selementid2']:
+                    e = next((selement for selement in self.map['selements'] 
+                               if selement['selementid'] == link[s]), None)
+                    if e and "elements" in e:
+                        for i in link['meta']['conns']:
+                            t={}
+                            # find the right interface to find triggers for
+                            b = 0 if s == "selementid1" else 1
+                            for trigger in findTriggersByTag(triggers,e['elements'][0]['hostid'],i[b]):
+                                # Add link indicator
+                                t={'triggerid': trigger['triggerid'], 
+                                   'color': zabbixTriggerColor(trigger['priority']),
+                                   'drawtype': 4, 'linkid': idx}     
+                                link['linktriggers'].append(t)
+            return links
 
     def setBackground(self):
         """
@@ -400,6 +425,7 @@ class ZabbixMap:
             shape = {
                 "text": self.nb.name,
                 "font": 4, #Arial Black
+                "font_color": config['map_header_color'],
                 "font_size": int(self.header_size/2),
                 "width": int(self.width),
                 "height": int(self.header_size),

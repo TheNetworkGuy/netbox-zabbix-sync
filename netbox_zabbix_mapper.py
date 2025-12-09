@@ -167,6 +167,7 @@ def main(arguments):
                 bgid,
                 iconid,
                 iconmapid,
+                zprio,
                 netbox,
                 netbox_journals,
                 nb_version,
