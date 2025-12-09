@@ -97,6 +97,7 @@ DEFAULT_CONFIG = {
     "map_dynamic_bg": False,
     "map_default_icon": "Network_(48)",
     "map_iconmap": None,
+    "map_link_labels": True,
     "map_link_uni": "195431",
     "map_link_multi": "2F9F5E",
     "map_link_nc": "97AAB3",
