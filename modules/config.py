@@ -97,7 +97,6 @@ DEFAULT_CONFIG = {
     "map_dynamic_bg": False,
     "map_default_icon": "Network_(48)",
     "map_iconmap": None,
-    "map_link_labels": True,
     "map_link_uni": "195431",
     "map_link_multi": "2F9F5E",
     "map_link_nc": "97AAB3",
@@ -106,6 +105,7 @@ DEFAULT_CONFIG = {
     "map_link_avg": "FFA059",
     "map_link_high": "E97659",
     "map_link_dis": "E45959",
+    "map_link_labels": False,
     "map_link_triggers": False,
     "map_trigger_prio": "warning"
 }

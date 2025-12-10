@@ -337,10 +337,10 @@ class ZabbixMap:
                         links[idx]['meta']['conns'].append(l['int'])
 
                 # add link labels
-                links=self.setLinkLabels(links)
+                self.setLinkLabels(links)
 
                 # add link indicators
-                links=self.setLinkTriggers(links)
+                self.setLinkTriggers(links)
 
                 # Cleanup metadata                
                 for link in links:
@@ -359,7 +359,7 @@ class ZabbixMap:
         Creates link labels for use in Zabbix Map.
         """
         if config['map_link_labels']:
-            self.logger.debug("Generating link labels...")
+            self.logger.debug("Generating link labels for map '%s'", self.name)
             for link in links:
                 label = ""
                 for conn in link['meta']['conns']:
@@ -373,7 +373,7 @@ class ZabbixMap:
         """
         # This needs to be updated for Zabbix 7.4 and up.
         if config['map_link_triggers']:
-            self.logger.debug("Generating link triggers...")
+            self.logger.debug("Generating link triggers for map '%s'.", self.name)
             hostids = []
             # grab all triggers for site hosts
             for device in self.devices:
