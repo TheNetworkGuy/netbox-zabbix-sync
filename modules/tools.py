@@ -1,5 +1,7 @@
 """A collection of tools used by several classes"""
 
+from typing import Any, Callable, Optional, overload
+from warnings import deprecated
 from modules.exceptions import HostgroupError
 
 
@@ -108,15 +110,40 @@ def field_mapper(host, mapper, nbdevice, logger):
     return data
 
 
-def remove_duplicates(input_list, sortkey=None):
+@overload
+def remove_duplicates(
+    input_list: list[dict[Any, Any]],
+    sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
+): ...
+
+
+@overload
+@deprecated("input_list should be of type list[dict[Any, Any]]")
+def remove_duplicates(
+    input_list: dict[Any, Any],
+    sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
+): ...
+
+
+def remove_duplicates(
+    input_list: list[dict[Any, Any]] | dict[Any, Any],
+    sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
+):
     """
     Removes duplicate entries from a list and sorts the list
+
+    sortkey: Optional; key to sort the list on. Can be a string or a callable function.
     """
     output_list = []
     if isinstance(input_list, list):
         output_list = [dict(t) for t in {tuple(d.items()) for d in input_list}]
+
     if sortkey and isinstance(sortkey, str):
         output_list.sort(key=lambda x: x[sortkey])
+
+    elif sortkey and callable(sortkey):
+        output_list.sort(key=sortkey)
+
     return output_list
 
 
