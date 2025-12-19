@@ -1,7 +1,6 @@
 """A collection of tools used by several classes"""
 
 from typing import Any, Callable, Optional, overload
-from warnings import deprecated
 from modules.exceptions import HostgroupError
 
 
@@ -118,11 +117,14 @@ def remove_duplicates(
 
 
 @overload
-@deprecated("input_list should be of type list[dict[Any, Any]]")
 def remove_duplicates(
     input_list: dict[Any, Any],
     sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
-): ...
+):
+    """
+    deprecated: input_list as dict is deprecated, use list of dicts instead
+    """
+    ...
 
 
 def remove_duplicates(
