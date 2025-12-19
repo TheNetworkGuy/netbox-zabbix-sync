@@ -124,7 +124,6 @@ def remove_duplicates(
     """
     deprecated: input_list as dict is deprecated, use list of dicts instead
     """
-    ...
 
 
 def remove_duplicates(
