@@ -71,7 +71,7 @@ def main(arguments):
         nb_version = netbox.version
         logger.debug("NetBox version is %s.", nb_version)
     except RequestsConnectionError:
-        logger.error(
+        logger.exception(
             "Unable to connect to NetBox with URL %s. Please check the URL and status of NetBox.",
             netbox_host,
         )
