@@ -1,0 +1,67 @@
+[project]
+name = "netbox-zabbix-sync"
+description = "Python script to synchronize Netbox devices to Zabbix."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["igraph>=1.0.0", "pynetbox>=7.6.1", "zabbix-utils>=2.0.4"]
+version = "3.3.0"
+
+[project.urls]
+"Homepage" = "https://github.com/TheNetworkGuy/netbox-zabbix-sync"
+"Issues" = "https://github.com/TheNetworkGuy/netbox-zabbix-sync/issues"
+
+[tool.ruff.lint]
+ignore = [
+    # Ignore line-length
+    "E501",
+    # Ignore too many arguments
+    "PLR0913",
+    # Ignore too many statements
+    "PLR0915",
+    # Ignore too many branches
+    "PLR0912",
+]
+
+select = [
+    # commented-out-code
+    "ERA001",
+    # flake8-bandit
+    "S",
+    # flake8-logging-format
+    "G",
+    # flake8-print
+    "T20",
+    # pep8-naming
+    "N",
+    # Pyflakes
+    "F",
+    # pycodestyle
+    "E",
+    # isort
+    "I",
+    # pep8-naming
+    "N",
+    # pyupgrade
+    "UP",
+    # flake8-2020
+    "YTT",
+    # flake8-async
+    "ASYNC",
+    # flake8-bugbear
+    "B",
+    # flake8-executable
+    "EXE",
+    # flake8-pie
+    "PIE",
+    # flake8-pyi
+    "PYI",
+    # flake8-simplify
+    "SIM",
+    # pylint
+    "PL",
+    # Ruff-specific rules
+    "RUF",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.0.2", "ruff>=0.14.14", "ty>=0.0.14"]
