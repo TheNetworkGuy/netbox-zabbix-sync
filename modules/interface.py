@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
 """
 All of the Zabbix interface related configuration
 """
+
 from modules.exceptions import InterfaceConfigError
 
 
@@ -30,7 +30,7 @@ class ZabbixInterface:
             zabbix = self.context["zabbix"]
             if "interface_type" in zabbix:
                 self.interface["type"] = zabbix["interface_type"]
-                if not "interface_port" in zabbix:
+                if "interface_port" not in zabbix:
                     self._set_default_port()
                     return True
                 self.interface["port"] = zabbix["interface_port"]
@@ -41,35 +41,37 @@ class ZabbixInterface:
     def set_snmp(self):
         """Check if interface is type SNMP"""
         # pylint: disable=too-many-branches
-        if self.interface["type"] == 2:
+        snmp_interface_type = 2
+        if self.interface["type"] == snmp_interface_type:
             # Checks if SNMP settings are defined in NetBox
             if "snmp" in self.context["zabbix"]:
                 snmp = self.context["zabbix"]["snmp"]
-                self.interface["details"] = {}
+                details: dict[str, str] = {}
+                self.interface["details"] = details
                 # Checks if bulk config has been defined
                 if "bulk" in snmp:
-                    self.interface["details"]["bulk"] = str(snmp.pop("bulk"))
+                    details["bulk"] = str(snmp.pop("bulk"))
                 else:
                     # Fallback to bulk enabled if not specified
-                    self.interface["details"]["bulk"] = "1"
+                    details["bulk"] = "1"
                 # SNMP Version config is required in NetBox config context
                 if snmp.get("version"):
-                    self.interface["details"]["version"] = str(snmp.pop("version"))
+                    details["version"] = str(snmp.pop("version"))
                 else:
                     e = "SNMP version option is not defined."
                     raise InterfaceConfigError(e)
                 # If version 1 or 2 is used, get community string
-                if self.interface["details"]["version"] in ["1", "2"]:
+                if details["version"] in ["1", "2"]:
                     if "community" in snmp:
                         # Set SNMP community to confix context value
                         community = snmp["community"]
                     else:
                         # Set SNMP community to default
                         community = "{$SNMP_COMMUNITY}"
-                    self.interface["details"]["community"] = str(community)
+                    details["community"] = str(community)
                 # If version 3 has been used, get all
                 # SNMPv3 NetBox related configs
-                elif self.interface["details"]["version"] == "3":
+                elif details["version"] == "3":
                     items = [
                         "securityname",
                         "securitylevel",
@@ -81,7 +83,7 @@ class ZabbixInterface:
                     ]
                     for key, item in snmp.items():
                         if key in items:
-                            self.interface["details"][key] = str(item)
+                            details[key] = str(item)
                 else:
                     e = "Unsupported SNMP version."
                     raise InterfaceConfigError(e)

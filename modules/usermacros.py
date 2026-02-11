@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments, logging-fstring-interpolation
 """
 All of the Zabbix Usermacro related configuration
@@ -57,7 +56,7 @@ class ZabbixUsermacros:
         if self.validate_macro(macro_name):
             macro["macro"] = str(macro_name)
             if isinstance(macro_properties, dict):
-                if not "value" in macro_properties:
+                if "value" not in macro_properties:
                     self.logger.info(
                         "Host %s: Usermacro %s has no value in Netbox, skipping.",
                         self.name,

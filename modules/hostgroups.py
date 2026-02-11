@@ -26,7 +26,7 @@ class Hostgroup:
         self.logger = logger if logger else getLogger(__name__)
         if obj_type not in ("vm", "dev"):
             msg = f"Unable to create hostgroup with type {type}"
-            self.logger.error()
+            self.logger.error(msg)
             raise HostgroupError(msg)
         self.type = str(obj_type)
         self.nb = nb_obj
@@ -87,12 +87,10 @@ class Hostgroup:
                 str(self.nb.location) if self.nb.location else None
             )
             format_options["rack"] = self.nb.rack.name if self.nb.rack else None
-        # Variables only applicable for VM's
-        if self.type == "vm":
-            # Check if a cluster is configured. Could also be configured in a site.
-            if self.nb.cluster:
-                format_options["cluster"] = self.nb.cluster.name
-                format_options["cluster_type"] = self.nb.cluster.type.name
+        # Variables only applicable for VM's such as clusters
+        if self.type == "vm" and self.nb.cluster:
+            format_options["cluster"] = self.nb.cluster.name
+            format_options["cluster_type"] = self.nb.cluster.type.name
         self.format_options = format_options
         self.logger.debug(
             "Host %s: Resolved properties for use in hostgroups: %s",
@@ -117,10 +115,14 @@ class Hostgroup:
         for hg_item in hg_items:
             # Check if requested data is available as option for this host
             if hg_item not in self.format_options:
-                if hg_item.startswith(("'", '"')) and hg_item.endswith(("'", '"')):
-                    hg_item = hg_item.strip("'")
-                    hg_item = hg_item.strip('"')
-                    hg_output.append(hg_item)
+                # If the string is between quotes, use it as a literal in the hostgroup name
+                minimum_length = 2
+                if (
+                    len(hg_item) > minimum_length
+                    and hg_item[0] == hg_item[-1]
+                    and hg_item[0] in ("'", '"')
+                ):
+                    hg_output.append(hg_item[1:-1])
                 else:
                     # Check if a custom field exists with this name
                     cf_data = self.custom_field_lookup(hg_item)
@@ -155,20 +157,6 @@ class Hostgroup:
         self.logger.warning(msg)
         return None
 
-    def list_formatoptions(self):
-        """
-        Function to easily troubleshoot which values
-        are generated for a specific device or VM.
-        """
-        print(f"The following options are available for host {self.name}")
-        for option_type, value in self.format_options.items():
-            if value is not None:
-                print(f"{option_type} - {value}")
-        print("The following options are not available")
-        for option_type, value in self.format_options.items():
-            if value is None:
-                print(f"{option_type}")
-
     def custom_field_lookup(self, hg_category):
         """
         Checks if a valid custom field is present in NetBox.
@@ -192,7 +180,7 @@ class Hostgroup:
         OUTPUT: STRING - Either the single child name or child and parents.
         """
         # Check if this type of nesting is supported.
-        if not nest_type in self.nested_objects:
+        if nest_type not in self.nested_objects:
             return child_object
         # If the nested flag is True, perform parent calculation
         if self.nested_objects[nest_type]["flag"]:

@@ -2,10 +2,10 @@
 Module for parsing configuration from the top level config.py file
 """
 
-from pathlib import Path
 from importlib import util
-from os import environ, path
 from logging import getLogger
+from os import environ, path
+from pathlib import Path
 
 logger = getLogger(__name__)
 
@@ -123,6 +123,8 @@ def load_config_file(config_default, config_file="config.py"):
     dconf = config_default.copy()
     # Dynamically import the config module
     spec = util.spec_from_file_location("config", config_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load config from {config_path}")
     config_module = util.module_from_spec(spec)
     spec.loader.exec_module(config_module)
     # Update DEFAULT_CONFIG with variables from the config module

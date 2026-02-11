@@ -2,6 +2,10 @@
 
 A script to create, update and delete Zabbix hosts using NetBox device objects. Tested and compatible with all [currently supported Zabbix releases](https://www.zabbix.com/life_cycle_and_release_policy).
 
+# Documentation
+
+Documentation will be moved to the Github wiki of this project. Feel free to [check it out](https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki)!
+
 ## Installation via Docker
 
 To pull the latest stable version to your local cache, use the following docker

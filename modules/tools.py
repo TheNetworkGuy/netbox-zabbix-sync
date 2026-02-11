@@ -1,6 +1,8 @@
 """A collection of tools used by several classes"""
 
-from typing import Any, Callable, Optional, overload
+from collections.abc import Callable
+from typing import Any, cast, overload
+
 from modules.exceptions import HostgroupError
 
 
@@ -21,10 +23,14 @@ def build_path(endpoint, list_of_dicts):
     item_path = []
     itemlist = [i for i in list_of_dicts if i["name"] == endpoint]
     item = itemlist[0] if len(itemlist) == 1 else None
+    if item is None:
+        return []
     item_path.append(item["name"])
     while item["_depth"] > 0:
         itemlist = [i for i in list_of_dicts if i["name"] == str(item["parent"])]
         item = itemlist[0] if len(itemlist) == 1 else None
+        if item is None:
+            break
         item_path.append(item["name"])
     item_path.reverse()
     return item_path
@@ -58,9 +64,10 @@ def cf_to_string(cf, key="name", logger=None):
     if isinstance(cf, dict):
         if key in cf:
             return cf[key]
-        logger.error(
-            "Conversion of custom field failed, '%s' not found in cf dict.", key
-        )
+        if logger:
+            logger.error(
+                "Conversion of custom field failed, '%s' not found in cf dict.", key
+            )
         return None
     return cf
 
@@ -112,14 +119,14 @@ def field_mapper(host, mapper, nbdevice, logger):
 @overload
 def remove_duplicates(
     input_list: list[dict[Any, Any]],
-    sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
+    sortkey: str | Callable[[dict[str, Any]], str] | None = None,
 ): ...
 
 
 @overload
 def remove_duplicates(
     input_list: dict[Any, Any],
-    sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
+    sortkey: str | Callable[[dict[str, Any]], str] | None = None,
 ):
     """
     deprecated: input_list as dict is deprecated, use list of dicts instead
@@ -128,7 +135,7 @@ def remove_duplicates(
 
 def remove_duplicates(
     input_list: list[dict[Any, Any]] | dict[Any, Any],
-    sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
+    sortkey: str | Callable[[dict[str, Any]], str] | None = None,
 ):
     """
     Removes duplicate entries from a list and sorts the list
@@ -143,7 +150,7 @@ def remove_duplicates(
         output_list.sort(key=lambda x: x[sortkey])
 
     elif sortkey and callable(sortkey):
-        output_list.sort(key=sortkey)
+        output_list.sort(key=cast(Any, sortkey))
 
     return output_list
 
@@ -188,9 +195,9 @@ def verify_hg_format(
         "cfs": {"dev": [], "vm": []},
     }
     for cf in device_cfs:
-        allowed_objects["cfs"]["dev"].append(cf.name)
+        allowed_objects["cfs"]["dev"].append(cf.name)  # type: ignore[index]
     for cf in vm_cfs:
-        allowed_objects["cfs"]["vm"].append(cf.name)
+        allowed_objects["cfs"]["vm"].append(cf.name)  # type: ignore[index]
     hg_objects = []
     if isinstance(hg_format, list):
         for f in hg_format:
@@ -201,14 +208,15 @@ def verify_hg_format(
     for hg_object in hg_objects:
         if (
             hg_object not in allowed_objects[hg_type]
-            and hg_object not in allowed_objects["cfs"][hg_type]
+            and hg_object not in allowed_objects["cfs"][hg_type]  # type: ignore[index]
             and not hg_object.startswith(('"', "'"))
         ):
             e = (
                 f"Hostgroup item {hg_object} is not valid. Make sure you"
                 " use valid items and separate them with '/'."
             )
-            logger.warning(e)
+            if logger:
+                logger.warning(e)
             raise HostgroupError(e)
 
 
@@ -235,7 +243,7 @@ def sanatize_log_output(data):
         del sanitized_data["interfaceid"]
         # InterfaceID also hints that this is a interface update.
         # A check is required if there are no macro's used for SNMP security parameters.
-        if not "details" in data:
+        if "details" not in data:
             return sanitized_data
         for key, detail in sanitized_data["details"].items():
             # If the detail is a secret, we don't want to log it.

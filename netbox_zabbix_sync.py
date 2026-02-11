@@ -6,7 +6,8 @@
 import argparse
 import logging
 import ssl
-from os import environ, sys
+import sys
+from os import environ
 
 from pynetbox import api
 from pynetbox.core.query import RequestError as NBRequestError
@@ -115,15 +116,12 @@ def main(arguments):
         else:
             zabbix = ZabbixAPI(zabbix_host, token=zabbix_token, ssl_context=ssl_ctx)
         zabbix.check_auth()
-    except (APIRequestError, ProcessingError) as e:
-        e = f"Zabbix returned the following error: {str(e)}"
+    except (APIRequestError, ProcessingError) as zbx_error:
+        e = f"Zabbix returned the following error: {zbx_error}."
         logger.error(e)
         sys.exit(1)
     # Set API parameter mapping based on API version
-    if not str(zabbix.version).startswith("7"):
-        proxy_name = "host"
-    else:
-        proxy_name = "name"
+    proxy_name = "host" if not str(zabbix.version).startswith("7") else "name"
     # Get all Zabbix and NetBox data
     netbox_devices = list(netbox.dcim.devices.filter(**config["nb_device_filter"]))
     netbox_vms = []
@@ -131,16 +129,16 @@ def main(arguments):
         netbox_vms = list(
             netbox.virtualization.virtual_machines.filter(**config["nb_vm_filter"])
         )
-    netbox_site_groups = convert_recordset((netbox.dcim.site_groups.all()))
+    netbox_site_groups = convert_recordset(netbox.dcim.site_groups.all())
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
-    zabbix_groups = zabbix.hostgroup.get(output=["groupid", "name"])
-    zabbix_templates = zabbix.template.get(output=["templateid", "name"])
-    zabbix_proxies = zabbix.proxy.get(output=["proxyid", proxy_name])
+    zabbix_groups = zabbix.hostgroup.get(output=["groupid", "name"])  # type: ignore[attr-defined]
+    zabbix_templates = zabbix.template.get(output=["templateid", "name"])  # type: ignore[attr-defined]
+    zabbix_proxies = zabbix.proxy.get(output=["proxyid", proxy_name])  # type: ignore[attr-defined]
     # Set empty list for proxy processing Zabbix <= 6
     zabbix_proxygroups = []
     if str(zabbix.version).startswith("7"):
-        zabbix_proxygroups = zabbix.proxygroup.get(output=["proxy_groupid", "name"])
+        zabbix_proxygroups = zabbix.proxygroup.get(output=["proxy_groupid", "name"])  # type: ignore[attr-defined]
     # Sanitize proxy data
     if proxy_name == "host":
         for proxy in zabbix_proxies:
@@ -172,7 +170,7 @@ def main(arguments):
                 continue
             if config["extended_site_properties"] and nb_vm.site:
                 logger.debug("VM %s: extending site information.", vm.name)
-                vm.site = convert_recordset(netbox.dcim.sites.filter(id=nb_vm.site.id))
+                vm.site = convert_recordset(netbox.dcim.sites.filter(id=nb_vm.site.id))  # type: ignore[attr-defined]
             vm.set_inventory(nb_vm)
             vm.set_usermacros()
             vm.set_tags()
@@ -196,14 +194,14 @@ def main(arguments):
             # Add hostgroup if config is set
             if config["create_hostgroups"]:
                 # Create new hostgroup. Potentially multiple groups if nested
-                hostgroups = vm.createZabbixHostgroup(zabbix_groups)
+                hostgroups = vm.create_zbx_hostgroup(zabbix_groups)
                 # go through all newly created hostgroups
                 for group in hostgroups:
                     # Add new hostgroups to zabbix group list
                     zabbix_groups.append(group)
             # Check if VM is already in Zabbix
             if vm.zabbix_id:
-                vm.ConsistencyCheck(
+                vm.consistency_check(
                     zabbix_groups,
                     zabbix_templates,
                     zabbix_proxy_list,
@@ -212,7 +210,7 @@ def main(arguments):
                 )
                 continue
             # Add VM to Zabbix
-            vm.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
+            vm.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
         except SyncError:
             pass
 
@@ -247,7 +245,7 @@ def main(arguments):
                 continue
             if config["extended_site_properties"] and nb_device.site:
                 logger.debug("Device %s: extending site information.", device.name)
-                device.site = convert_recordset(
+                device.site = convert_recordset(  # type: ignore[attr-defined]
                     netbox.dcim.sites.filter(id=nb_device.site.id)
                 )
             device.set_inventory(nb_device)
@@ -255,9 +253,9 @@ def main(arguments):
             device.set_tags()
             # Checks if device is part of cluster.
             # Requires clustering variable
-            if device.isCluster() and config["clustering"]:
+            if device.is_cluster() and config["clustering"]:
                 # Check if device is primary or secondary
-                if device.promoteMasterDevice():
+                if device.promote_primary_device():
                     logger.info(
                         "Device %s: is part of cluster and primary.", device.name
                     )
@@ -290,14 +288,14 @@ def main(arguments):
             # Add hostgroup is config is set
             if config["create_hostgroups"]:
                 # Create new hostgroup. Potentially multiple groups if nested
-                hostgroups = device.createZabbixHostgroup(zabbix_groups)
+                hostgroups = device.create_zbx_hostgroup(zabbix_groups)
                 # go through all newly created hostgroups
                 for group in hostgroups:
                     # Add new hostgroups to zabbix group list
                     zabbix_groups.append(group)
             # Check if device is already in Zabbix
             if device.zabbix_id:
-                device.ConsistencyCheck(
+                device.consistency_check(
                     zabbix_groups,
                     zabbix_templates,
                     zabbix_proxy_list,
@@ -306,7 +304,7 @@ def main(arguments):
                 )
                 continue
             # Add device to Zabbix
-            device.createInZabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
+            device.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
         except SyncError:
             pass
     zabbix.logout()
