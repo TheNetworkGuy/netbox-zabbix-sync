@@ -4,7 +4,7 @@ A script to create, update and delete Zabbix hosts using NetBox device objects. 
 
 # Documentation
 
-Documentation will be slowly moved to the Github wiki of this project. Feel free to check it out!
+Documentation will be moved to the Github wiki of this project. Feel free to check it out!
 
 ## Installation via Docker
 
