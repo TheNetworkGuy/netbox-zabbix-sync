@@ -1,6 +1,8 @@
 """A collection of tools used by several classes"""
 
-from typing import Any, Callable, Optional, overload
+from collections.abc import Callable
+from typing import Any, overload
+
 from modules.exceptions import HostgroupError
 
 
@@ -112,14 +114,14 @@ def field_mapper(host, mapper, nbdevice, logger):
 @overload
 def remove_duplicates(
     input_list: list[dict[Any, Any]],
-    sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
+    sortkey: str | Callable[[dict[str, Any]], str] | None = None,
 ): ...
 
 
 @overload
 def remove_duplicates(
     input_list: dict[Any, Any],
-    sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
+    sortkey: str | Callable[[dict[str, Any]], str] | None = None,
 ):
     """
     deprecated: input_list as dict is deprecated, use list of dicts instead
@@ -128,7 +130,7 @@ def remove_duplicates(
 
 def remove_duplicates(
     input_list: list[dict[Any, Any]] | dict[Any, Any],
-    sortkey: Optional[str | Callable[[dict[str, Any]], str]] = None,
+    sortkey: str | Callable[[dict[str, Any]], str] | None = None,
 ):
     """
     Removes duplicate entries from a list and sorts the list
@@ -235,7 +237,7 @@ def sanatize_log_output(data):
         del sanitized_data["interfaceid"]
         # InterfaceID also hints that this is a interface update.
         # A check is required if there are no macro's used for SNMP security parameters.
-        if not "details" in data:
+        if "details" not in data:
             return sanitized_data
         for key, detail in sanitized_data["details"].items():
             # If the detail is a secret, we don't want to log it.

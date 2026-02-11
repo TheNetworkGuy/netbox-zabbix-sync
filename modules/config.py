@@ -2,10 +2,10 @@
 Module for parsing configuration from the top level config.py file
 """
 
-from pathlib import Path
 from importlib import util
-from os import environ, path
 from logging import getLogger
+from os import environ, path
+from pathlib import Path
 
 logger = getLogger(__name__)
 

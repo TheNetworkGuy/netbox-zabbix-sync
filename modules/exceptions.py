@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 All custom exceptions used for Exception generation
 """

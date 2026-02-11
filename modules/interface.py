@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 All of the Zabbix interface related configuration
 """
@@ -30,7 +29,7 @@ class ZabbixInterface:
             zabbix = self.context["zabbix"]
             if "interface_type" in zabbix:
                 self.interface["type"] = zabbix["interface_type"]
-                if not "interface_port" in zabbix:
+                if "interface_port" not in zabbix:
                     self._set_default_port()
                     return True
                 self.interface["port"] = zabbix["interface_port"]
@@ -41,7 +40,8 @@ class ZabbixInterface:
     def set_snmp(self):
         """Check if interface is type SNMP"""
         # pylint: disable=too-many-branches
-        if self.interface["type"] == 2:
+        snmp_interface_type = 2
+        if self.interface["type"] == snmp_interface_type:
             # Checks if SNMP settings are defined in NetBox
             if "snmp" in self.context["zabbix"]:
                 snmp = self.context["zabbix"]["snmp"]
