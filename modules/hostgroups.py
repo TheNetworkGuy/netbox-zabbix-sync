@@ -26,7 +26,7 @@ class Hostgroup:
         self.logger = logger if logger else getLogger(__name__)
         if obj_type not in ("vm", "dev"):
             msg = f"Unable to create hostgroup with type {type}"
-            self.logger.error()
+            self.logger.error(msg)
             raise HostgroupError(msg)
         self.type = str(obj_type)
         self.nb = nb_obj

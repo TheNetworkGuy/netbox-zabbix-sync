@@ -541,7 +541,7 @@ class PhysicalDevice:
             # Set group and template ID's for host
             if not self.set_zbx_groupid(groups):
                 e = (
-                    f"Unable to find group '{self.hostgroup}' "
+                    f"Unable to find group '{self.hostgroups}' "
                     f"for host {self.name} in Zabbix."
                 )
                 self.logger.warning(e)

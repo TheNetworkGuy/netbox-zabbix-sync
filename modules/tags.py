@@ -128,7 +128,11 @@ class ZabbixTags:
         # Pull in NetBox device tags if tag_name is set
         if self.tag_name and isinstance(self.tag_name, str):
             for tag in self.nb.tags:
-                if self.tag_value.lower() in ["display", "name", "slug"]:
+                if (
+                    self.tag_value
+                    and isinstance(self.tag_value, str)
+                    and self.tag_value.lower() in ["display", "name", "slug"]
+                ):
                     value = tag[self.tag_value]
                 else:
                     value = tag["name"]

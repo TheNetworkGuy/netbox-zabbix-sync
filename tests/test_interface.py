@@ -142,13 +142,9 @@ class TestZabbixInterface(unittest.TestCase):
         self.assertEqual(details["securityname"], "snmpuser")
         self.assertEqual(details["securitylevel"], "authPriv")
         self.assertEqual(details["authprotocol"], "SHA")
-        self.assertEqual(
-            details["authpassphrase"], "authpass123"
-        )
+        self.assertEqual(details["authpassphrase"], "authpass123")
         self.assertEqual(details["privprotocol"], "AES")
-        self.assertEqual(
-            details["privpassphrase"], "privpass123"
-        )
+        self.assertEqual(details["privpassphrase"], "privpass123")
         self.assertEqual(details["contextname"], "context1")
 
     def test_set_snmp_no_snmp_config(self):
@@ -217,9 +213,7 @@ class TestZabbixInterface(unittest.TestCase):
         self.assertEqual(interface.interface["port"], "161")
         details = cast(dict[str, str], interface.interface["details"])
         self.assertEqual(details["version"], "2")
-        self.assertEqual(
-            details["community"], "{$SNMP_COMMUNITY}"
-        )
+        self.assertEqual(details["community"], "{$SNMP_COMMUNITY}")
         self.assertEqual(details["bulk"], "1")
 
     def test_set_default_agent(self):
@@ -243,6 +237,4 @@ class TestZabbixInterface(unittest.TestCase):
 
         # Should use default community string
         details = cast(dict[str, str], interface.interface["details"])
-        self.assertEqual(
-            details["community"], "{$SNMP_COMMUNITY}"
-        )
+        self.assertEqual(details["community"], "{$SNMP_COMMUNITY}")

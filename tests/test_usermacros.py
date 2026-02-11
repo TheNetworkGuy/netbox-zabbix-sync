@@ -54,7 +54,7 @@ class TestUsermacroSync(unittest.TestCase):
         "modules.device.config",
         {"usermacro_sync": False, "device_cf": "zabbix_hostid", "tag_sync": False},
     )
-    @patch.object(PhysicalDevice, '_usermacro_map')
+    @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_false(self, mock_usermacro_map):
         mock_usermacro_map.return_value = self.usermacro_map
         device = self.create_mock_device()
@@ -70,7 +70,7 @@ class TestUsermacroSync(unittest.TestCase):
         {"usermacro_sync": True, "device_cf": "zabbix_hostid", "tag_sync": False},
     )
     @patch("modules.device.ZabbixUsermacros")
-    @patch.object(PhysicalDevice, '_usermacro_map')
+    @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_true(self, mock_usermacro_map, mock_usermacros_class):
         mock_usermacro_map.return_value = self.usermacro_map
         # Mock the ZabbixUsermacros class to return some test data
@@ -94,7 +94,7 @@ class TestUsermacroSync(unittest.TestCase):
         {"usermacro_sync": "full", "device_cf": "zabbix_hostid", "tag_sync": False},
     )
     @patch("modules.device.ZabbixUsermacros")
-    @patch.object(PhysicalDevice, '_usermacro_map')
+    @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_full(self, mock_usermacro_map, mock_usermacros_class):
         mock_usermacro_map.return_value = self.usermacro_map
         # Mock the ZabbixUsermacros class to return some test data
