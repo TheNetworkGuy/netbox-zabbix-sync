@@ -869,7 +869,11 @@ class PhysicalDevice:
 
         # Check host tags
         if config["tag_sync"]:
-            if remove_duplicates(host["tags"], sortkey="tag") == self.tags:
+            if remove_duplicates(
+                host["tags"], lambda tag: f"{tag['tag']}{tag['value']}"
+            ) == remove_duplicates(
+                self.tags, lambda tag: f"{tag['tag']}{tag['value']}"
+            ):
                 self.logger.debug("Host %s: Tags in-sync.", self.name)
             else:
                 self.logger.info("Host %s: Tags OUT of sync.", self.name)
