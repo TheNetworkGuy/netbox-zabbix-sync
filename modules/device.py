@@ -167,7 +167,7 @@ class PhysicalDevice:
         # Gather templates from the custom field but overrule
         # them should there be any device specific templates
         if overrule_custom:
-            try: # noqa: SIM105
+            try:  # noqa: SIM105
                 self.zbx_template_names = self.get_templates_context()
             except TemplateError:
                 pass
@@ -673,7 +673,7 @@ class PhysicalDevice:
             if not self.group_ids:
                 zbx_groupid_confirmation = self.set_zbx_groupid(groups)
                 if not zbx_groupid_confirmation and not create_hostgroups:
-                # Function returns true / false but also sets GroupID
+                    # Function returns true / false but also sets GroupID
                     e = (
                         f"Host {self.name}: different hostgroup is required but "
                         "unable to create hostgroup without generation permission."
@@ -771,10 +771,10 @@ class PhysicalDevice:
             # Check if proxy or proxy group is defined.
             # Check for proxy_hostid for backwards compatibility with Zabbix <= 6
             if (
-                (self.zbxproxy["idtype"] in host
-                and host[self.zbxproxy["idtype"]] == self.zbxproxy["id"])
-                or ("proxy_hostid" in host and
-                host["proxy_hostid"] == self.zbxproxy["id"])
+                self.zbxproxy["idtype"] in host
+                and host[self.zbxproxy["idtype"]] == self.zbxproxy["id"]
+            ) or (
+                "proxy_hostid" in host and host["proxy_hostid"] == self.zbxproxy["id"]
             ):
                 self.logger.debug("Host %s: Proxy in-sync.", self.name)
             # Proxy does not match, update Zabbix
@@ -890,10 +890,9 @@ class PhysicalDevice:
                     if isinstance(item, dict) and key == "details":
                         for k, i in item.items():
                             # Check if the key is found in Zabbix and if the value matches
-                            if(
-                                k in host["interfaces"][0][key] and
-                                host["interfaces"][0][key][k] != str(i)
-                            ):
+                            if k in host["interfaces"][0][key] and host["interfaces"][
+                                0
+                            ][key][k] != str(i):
                                 # If dict has not been created, add it
                                 if key not in updates:
                                     updates[key] = {}
@@ -1009,5 +1008,7 @@ class PhysicalDevice:
         # all of the NetBox templates have been confirmed as successful
         # and the ZBX template list is empty. This means that
         # all of the templates match.
-        return (len(succesfull_templates) == len(self.zbx_templates)
-            and len(tmpls_from_zabbix) == 0)
+        return (
+            len(succesfull_templates) == len(self.zbx_templates)
+            and len(tmpls_from_zabbix) == 0
+        )

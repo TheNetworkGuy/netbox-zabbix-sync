@@ -1,5 +1,6 @@
 # pylint: disable=duplicate-code
 """Module that hosts all functions for virtual machine processing"""
+
 from modules.config import load_config
 from modules.device import PhysicalDevice
 from modules.exceptions import InterfaceConfigError, SyncInventoryError, TemplateError
@@ -39,7 +40,7 @@ class VirtualMachine(PhysicalDevice):
         except TemplateError as e:
             self.logger.warning(e)
         return True
-    
+
     def set_interface_details(self):
         """
         Overwrites device function to select an agent interface type by default

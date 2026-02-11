@@ -1,4 +1,5 @@
 """Tests for device deletion functionality in the PhysicalDevice class."""
+
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -40,14 +41,14 @@ class TestDeviceDeletion(unittest.TestCase):
         self.mock_logger = MagicMock()
 
         # Create PhysicalDevice instance with mocks
-        with patch('modules.device.config', {"device_cf": "zabbix_hostid"}):
+        with patch("modules.device.config", {"device_cf": "zabbix_hostid"}):
             self.device = PhysicalDevice(
                 self.mock_nb_device,
                 self.mock_zabbix,
                 self.mock_nb_journal,
                 "3.0",
                 journal=True,
-                logger=self.mock_logger
+                logger=self.mock_logger,
             )
 
     def test_cleanup_successful_deletion(self):
@@ -60,12 +61,15 @@ class TestDeviceDeletion(unittest.TestCase):
         self.device.cleanup()
 
         # Verify
-        self.mock_zabbix.host.get.assert_called_once_with(filter={'hostid': '456'}, output=[])
-        self.mock_zabbix.host.delete.assert_called_once_with('456')
+        self.mock_zabbix.host.get.assert_called_once_with(
+            filter={"hostid": "456"}, output=[]
+        )
+        self.mock_zabbix.host.delete.assert_called_once_with("456")
         self.mock_nb_device.save.assert_called_once()
         self.assertIsNone(self.mock_nb_device.custom_fields["zabbix_hostid"])
-        self.mock_logger.info.assert_called_with(f"Host {self.device.name}: "
-                                                  "Deleted host from Zabbix.")
+        self.mock_logger.info.assert_called_with(
+            f"Host {self.device.name}: Deleted host from Zabbix."
+        )
 
     def test_cleanup_device_already_deleted(self):
         """Test cleanup when device is already deleted from Zabbix."""
@@ -76,12 +80,15 @@ class TestDeviceDeletion(unittest.TestCase):
         self.device.cleanup()
 
         # Verify
-        self.mock_zabbix.host.get.assert_called_once_with(filter={'hostid': '456'}, output=[])
+        self.mock_zabbix.host.get.assert_called_once_with(
+            filter={"hostid": "456"}, output=[]
+        )
         self.mock_zabbix.host.delete.assert_not_called()
         self.mock_nb_device.save.assert_called_once()
         self.assertIsNone(self.mock_nb_device.custom_fields["zabbix_hostid"])
         self.mock_logger.info.assert_called_with(
-            f"Host {self.device.name}: was already deleted from Zabbix. Removed link in NetBox.")
+            f"Host {self.device.name}: was already deleted from Zabbix. Removed link in NetBox."
+        )
 
     def test_cleanup_api_error(self):
         """Test cleanup when Zabbix API returns an error."""
@@ -94,15 +101,17 @@ class TestDeviceDeletion(unittest.TestCase):
             self.device.cleanup()
 
         # Verify correct calls were made
-        self.mock_zabbix.host.get.assert_called_once_with(filter={'hostid': '456'}, output=[])
-        self.mock_zabbix.host.delete.assert_called_once_with('456')
+        self.mock_zabbix.host.get.assert_called_once_with(
+            filter={"hostid": "456"}, output=[]
+        )
+        self.mock_zabbix.host.delete.assert_called_once_with("456")
         self.mock_nb_device.save.assert_not_called()
         self.mock_logger.error.assert_called()
 
     def test_zeroize_cf(self):
         """Test _zeroize_cf method that clears the custom field."""
         # Execute
-        self.device._zeroize_cf() #  pylint: disable=protected-access
+        self.device._zeroize_cf()  #  pylint: disable=protected-access
 
         # Verify
         self.assertIsNone(self.mock_nb_device.custom_fields["zabbix_hostid"])
@@ -138,14 +147,14 @@ class TestDeviceDeletion(unittest.TestCase):
     def test_create_journal_entry_when_disabled(self):
         """Test create_journal_entry when journaling is disabled."""
         # Setup - create device with journal=False
-        with patch('modules.device.config', {"device_cf": "zabbix_hostid"}):
+        with patch("modules.device.config", {"device_cf": "zabbix_hostid"}):
             device = PhysicalDevice(
                 self.mock_nb_device,
                 self.mock_zabbix,
                 self.mock_nb_journal,
                 "3.0",
                 journal=False,  # Disable journaling
-                logger=self.mock_logger
+                logger=self.mock_logger,
             )
 
         # Execute
@@ -161,8 +170,10 @@ class TestDeviceDeletion(unittest.TestCase):
         self.mock_zabbix.host.get.return_value = [{"hostid": "456"}]
 
         # Execute
-        with patch.object(self.device, 'create_journal_entry') as mock_journal_entry:
+        with patch.object(self.device, "create_journal_entry") as mock_journal_entry:
             self.device.cleanup()
 
         # Verify
-        mock_journal_entry.assert_called_once_with("warning", "Deleted host from Zabbix")
+        mock_journal_entry.assert_called_once_with(
+            "warning", "Deleted host from Zabbix"
+        )

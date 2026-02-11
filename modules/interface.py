@@ -1,6 +1,7 @@
 """
 All of the Zabbix interface related configuration
 """
+
 from modules.exceptions import InterfaceConfigError
 
 

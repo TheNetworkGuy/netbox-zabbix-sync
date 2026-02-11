@@ -117,10 +117,10 @@ class Hostgroup:
             if hg_item not in self.format_options:
                 # If the string is between quotes, use it as a literal in the hostgroup name
                 minimum_length = 2
-                if(
-                    len(hg_item) > minimum_length and
-                    hg_item[0] == hg_item[-1] and
-                    hg_item[0] in ("'", '"')
+                if (
+                    len(hg_item) > minimum_length
+                    and hg_item[0] == hg_item[-1]
+                    and hg_item[0] in ("'", '"')
                 ):
                     hg_output.append(hg_item[1:-1])
                 else:

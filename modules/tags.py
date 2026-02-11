@@ -54,14 +54,22 @@ class ZabbixTags:
         Validates tag name
         """
         max_tag_name_length = 256
-        return tag_name and isinstance(tag_name, str) and len(tag_name) <= max_tag_name_length
+        return (
+            tag_name
+            and isinstance(tag_name, str)
+            and len(tag_name) <= max_tag_name_length
+        )
 
     def validate_value(self, tag_value):
         """
         Validates tag value
         """
         max_tag_value_length = 256
-        return tag_value and isinstance(tag_value, str) and len(tag_value) <= max_tag_value_length
+        return (
+            tag_value
+            and isinstance(tag_value, str)
+            and len(tag_value) <= max_tag_value_length
+        )
 
     def render_tag(self, tag_name, tag_value):
         """
