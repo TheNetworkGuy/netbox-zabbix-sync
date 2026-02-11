@@ -20,6 +20,8 @@ ignore = [
     "PLR0915",
     # Ignore too many branches
     "PLR0912",
+    # Ignore use of assert
+    "S101",
 ]
 
 select = [
