@@ -1,5 +1,6 @@
 from modules.tools import sanatize_log_output
 
+
 def test_sanatize_log_output_secrets():
     data = {
         "macros": [
