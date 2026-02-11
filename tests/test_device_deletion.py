@@ -1,7 +1,9 @@
 """Tests for device deletion functionality in the PhysicalDevice class."""
 import unittest
 from unittest.mock import MagicMock, patch
+
 from zabbix_utils import APIRequestError
+
 from modules.device import PhysicalDevice
 from modules.exceptions import SyncExternalError
 

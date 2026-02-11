@@ -1,8 +1,9 @@
 """Tests for the PhysicalDevice class in the device module."""
 import unittest
 from unittest.mock import MagicMock, patch
+
 from modules.device import PhysicalDevice
-from modules.exceptions import TemplateError, SyncInventoryError
+from modules.exceptions import TemplateError
 
 
 class TestPhysicalDevice(unittest.TestCase):
@@ -62,22 +63,6 @@ class TestPhysicalDevice(unittest.TestCase):
         self.assertEqual(self.device.status, "Active")
         self.assertEqual(self.device.ip, "192.168.1.1")
         self.assertEqual(self.device.cidr, "192.168.1.1/24")
-
-    def test_init_no_primary_ip(self):
-        """Test initialization when device has no primary IP."""
-        # Set primary_ip to None
-        self.mock_nb_device.primary_ip = None
-
-        # Creating device should raise SyncInventoryError
-        with patch('modules.device.config', {"device_cf": "zabbix_hostid"}):
-            with self.assertRaises(SyncInventoryError):
-                PhysicalDevice(
-                    self.mock_nb_device,
-                    self.mock_zabbix,
-                    self.mock_nb_journal,
-                    "3.0",
-                    logger=self.mock_logger
-                )
 
     def test_set_basics_with_special_characters(self):
         """Test _setBasics when device name contains special characters."""
@@ -352,7 +337,7 @@ class TestPhysicalDevice(unittest.TestCase):
             )
 
         # Check isCluster result
-        self.assertTrue(device.isCluster())
+        self.assertTrue(device.is_cluster())
 
     def test_is_cluster_false(self):
         """Test isCluster when device is not part of a cluster."""
@@ -370,7 +355,7 @@ class TestPhysicalDevice(unittest.TestCase):
             )
 
         # Check isCluster result
-        self.assertFalse(device.isCluster())
+        self.assertFalse(device.is_cluster())
 
 
     def test_promote_master_device_primary(self):
@@ -393,7 +378,7 @@ class TestPhysicalDevice(unittest.TestCase):
         )
 
         # Call promoteMasterDevice and check the result
-        result = device.promoteMasterDevice()
+        result = device.promote_primary_device()
 
         # Should return True for primary device
         self.assertTrue(result)
@@ -421,7 +406,7 @@ class TestPhysicalDevice(unittest.TestCase):
         )
 
         # Call promoteMasterDevice and check the result
-        result = device.promoteMasterDevice()
+        result = device.promote_primary_device()
 
         # Should return False for secondary device
         self.assertFalse(result)

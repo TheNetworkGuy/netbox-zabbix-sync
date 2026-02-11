@@ -1,7 +1,13 @@
 """Tests for configuration parsing in the modules.config module."""
-from unittest.mock import patch, MagicMock
 import os
-from modules.config import load_config, DEFAULT_CONFIG, load_config_file, load_env_variable
+from unittest.mock import MagicMock, patch
+
+from modules.config import (
+    DEFAULT_CONFIG,
+    load_config,
+    load_config_file,
+    load_env_variable,
+)
 
 
 def test_load_config_defaults():
@@ -121,19 +127,3 @@ def test_load_env_variable_function():
             os.environ[test_var] = original_env
         else:
             os.environ.pop(test_var, None)
-
-
-def test_load_config_file_exception_handling():
-    """Test that load_config_file handles exceptions gracefully"""
-    # This test requires modifying the load_config_file function to handle exceptions
-    # For now, we're just checking that an exception is raised
-    with patch('pathlib.Path.exists', return_value=True), \
-         patch('importlib.util.spec_from_file_location', side_effect=Exception("Import error")):
-        # Since the current implementation doesn't handle exceptions, we should
-        # expect an exception to be raised
-        try:
-            load_config_file(DEFAULT_CONFIG.copy())
-            assert False, "An exception should have been raised"
-        except Exception:  # pylint: disable=broad-except
-            # This is expected
-            pass

@@ -1,7 +1,8 @@
 """Tests for the ZabbixInterface class in the interface module."""
 import unittest
-from modules.interface import ZabbixInterface
+
 from modules.exceptions import InterfaceConfigError
+from modules.interface import ZabbixInterface
 
 
 class TestZabbixInterface(unittest.TestCase):

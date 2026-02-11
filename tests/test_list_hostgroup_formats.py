@@ -1,8 +1,9 @@
 """Tests for list-based hostgroup formats in configuration."""
 import unittest
-from unittest.mock import MagicMock, patch
-from modules.hostgroups import Hostgroup
+from unittest.mock import MagicMock
+
 from modules.exceptions import HostgroupError
+from modules.hostgroups import Hostgroup
 from modules.tools import verify_hg_format
 
 

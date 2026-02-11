@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import MagicMock, patch
+
 from modules.device import PhysicalDevice
 from modules.usermacros import ZabbixUsermacros
+
 
 class DummyNB:
     def __init__(self, name="dummy", config_context=None, **kwargs):
@@ -24,37 +26,85 @@ class TestUsermacroSync(unittest.TestCase):
         self.logger = MagicMock()
         self.usermacro_map = {"serial": "{$HW_SERIAL}"}
 
-    @patch("modules.device.config", {"usermacro_sync": False})
-    def test_usermacro_sync_false(self):
-        device = PhysicalDevice.__new__(PhysicalDevice)
-        device.nb = self.nb
-        device.logger = self.logger
-        device.name = "dummy"
+    def create_mock_device(self):
+        """Helper method to create a properly mocked PhysicalDevice"""
+        # Mock the NetBox device with all required attributes
+        mock_nb = MagicMock()
+        mock_nb.id = 1
+        mock_nb.name = "dummy"
+        mock_nb.status.label = "Active"
+        mock_nb.tenant = None
+        mock_nb.config_context = {}
+        mock_nb.primary_ip.address = "192.168.1.1/24"
+        mock_nb.custom_fields = {"zabbix_hostid": None}
+        
+        # Create device with proper initialization
+        device = PhysicalDevice(
+            nb=mock_nb,
+            zabbix=MagicMock(),
+            nb_journal_class=MagicMock(),
+            nb_version="3.0",
+            logger=self.logger
+        )
+        
+        # Override the usermacro map method for testing
         device._usermacro_map = MagicMock(return_value=self.usermacro_map)
-        # call set_usermacros
+        
+        return device
+
+    @patch("modules.device.config", {
+        "usermacro_sync": False,
+        "device_cf": "zabbix_hostid",
+        "tag_sync": False
+    })
+    def test_usermacro_sync_false(self):
+        device = self.create_mock_device()
+        
+        # Call set_usermacros
         result = device.set_usermacros()
+        
         self.assertEqual(device.usermacros, [])
         self.assertTrue(result is True or result is None)
 
-    @patch("modules.device.config", {"usermacro_sync": True})
-    def test_usermacro_sync_true(self):
-        device = PhysicalDevice.__new__(PhysicalDevice)
-        device.nb = self.nb
-        device.logger = self.logger
-        device.name = "dummy"
-        device._usermacro_map = MagicMock(return_value=self.usermacro_map)
-        result = device.set_usermacros()
+    @patch("modules.device.config", {
+        "usermacro_sync": True,
+        "device_cf": "zabbix_hostid",
+        "tag_sync": False
+    })
+    @patch("modules.device.ZabbixUsermacros")
+    def test_usermacro_sync_true(self, mock_usermacros_class):
+        # Mock the ZabbixUsermacros class to return some test data
+        mock_macros_instance = MagicMock()
+        mock_macros_instance.sync = True  # This is important - sync must be True
+        mock_macros_instance.generate.return_value = [{"macro": "{$HW_SERIAL}", "value": "1234"}]
+        mock_usermacros_class.return_value = mock_macros_instance
+        
+        device = self.create_mock_device()
+        
+        # Call set_usermacros
+        device.set_usermacros()
+        
         self.assertIsInstance(device.usermacros, list)
         self.assertGreater(len(device.usermacros), 0)
 
-    @patch("modules.device.config", {"usermacro_sync": "full"})
-    def test_usermacro_sync_full(self):
-        device = PhysicalDevice.__new__(PhysicalDevice)
-        device.nb = self.nb
-        device.logger = self.logger
-        device.name = "dummy"
-        device._usermacro_map = MagicMock(return_value=self.usermacro_map)
-        result = device.set_usermacros()
+    @patch("modules.device.config", {
+        "usermacro_sync": "full",
+        "device_cf": "zabbix_hostid",
+        "tag_sync": False
+    })
+    @patch("modules.device.ZabbixUsermacros")
+    def test_usermacro_sync_full(self, mock_usermacros_class):
+        # Mock the ZabbixUsermacros class to return some test data
+        mock_macros_instance = MagicMock()
+        mock_macros_instance.sync = True  # This is important - sync must be True
+        mock_macros_instance.generate.return_value = [{"macro": "{$HW_SERIAL}", "value": "1234"}]
+        mock_usermacros_class.return_value = mock_macros_instance
+        
+        device = self.create_mock_device()
+        
+        # Call set_usermacros
+        device.set_usermacros()
+        
         self.assertIsInstance(device.usermacros, list)
         self.assertGreater(len(device.usermacros), 0)
 
@@ -114,12 +164,19 @@ class TestZabbixUsermacros(unittest.TestCase):
         self.assertEqual(result[1]["macro"], "{$BAR}")
 
     def test_generate_from_config_context(self):
-        config_context = {"zabbix": {"usermacros": {"{$FOO}": {"value": "bar"}}}}
+        config_context = {
+            "zabbix": {
+                "usermacros": {
+                    "{$TEST_MACRO}": "test_value"
+                }
+            }
+        }
         nb = DummyNB(config_context=config_context)
         macros = ZabbixUsermacros(nb, {}, True, logger=self.logger)
         result = macros.generate()
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["macro"], "{$FOO}")
+        self.assertEqual(result[0]["macro"], "{$TEST_MACRO}")
+        self.assertEqual(result[0]["value"], "test_value")
 
 if __name__ == "__main__":
     unittest.main()

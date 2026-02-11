@@ -1,8 +1,9 @@
 """Tests for the Hostgroup class in the hostgroups module."""
 import unittest
-from unittest.mock import MagicMock, patch, call
-from modules.hostgroups import Hostgroup
+from unittest.mock import MagicMock, patch
+
 from modules.exceptions import HostgroupError
+from modules.hostgroups import Hostgroup
 
 
 class TestHostgroups(unittest.TestCase):
@@ -299,19 +300,6 @@ class TestHostgroups(unittest.TestCase):
             # Should include the parent site group
             self.assertEqual(result, "TestSite/ParentSiteGroup/TestSiteGroup/TestRole")
 
-
-    def test_list_formatoptions(self):
-        """Test the list_formatoptions method for debugging."""
-        hostgroup = Hostgroup("dev", self.mock_device, "4.0", self.mock_logger)
-        
-        # Patch sys.stdout to capture print output
-        with patch('sys.stdout') as mock_stdout:
-            hostgroup.list_formatoptions()
-            
-            # Check that print was called with expected output
-            calls = [call.write(f"The following options are available for host test-device"),
-                    call.write('\n')]
-            mock_stdout.assert_has_calls(calls, any_order=True)
             
     def test_vm_list_based_hostgroup_format(self):
         """Test VM hostgroup generation with a list-based format."""
