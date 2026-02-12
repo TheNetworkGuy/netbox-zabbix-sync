@@ -2,7 +2,7 @@ import argparse
 import logging
 from os import environ
 
-from netbox_zabbix_sync.modules.core import run_sync
+from netbox_zabbix_sync.modules.core import sync
 from netbox_zabbix_sync.modules.exceptions import EnvironmentVarError
 from netbox_zabbix_sync.modules.logging import get_logger, set_log_levels
 
@@ -47,7 +47,7 @@ def main(arguments):
     netbox_token = environ.get("NETBOX_TOKEN")
 
     # Run main sync process
-    run_sync(
+    sync(
         nb_host=netbox_host,
         nb_token=netbox_token,
         zbx_host=zabbix_host,

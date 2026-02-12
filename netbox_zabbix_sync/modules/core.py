@@ -28,7 +28,7 @@ setup_logger()
 logger = get_logger()
 
 
-def run_sync(nb_host, nb_token, zbx_host, zbx_user, zbx_pass, zbx_token):
+def sync(nb_host, nb_token, zbx_host, zbx_user, zbx_pass, zbx_token):
     """
     Run the NetBox to Zabbix sync process.
     """
