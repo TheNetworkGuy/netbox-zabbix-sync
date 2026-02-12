@@ -262,7 +262,9 @@ class TestHostgroups(unittest.TestCase):
     def test_nested_region_hostgroups(self):
         """Test hostgroup generation with nested regions."""
         # Mock the build_path function to return a predictable result
-        with patch("modules.hostgroups.build_path") as mock_build_path:
+        with patch(
+            "netbox_zabbix_sync.modules.hostgroups.build_path"
+        ) as mock_build_path:
             # Configure the mock to return a list of regions in the path
             mock_build_path.return_value = ["ParentRegion", "TestRegion"]
 
@@ -284,7 +286,9 @@ class TestHostgroups(unittest.TestCase):
     def test_nested_sitegroup_hostgroups(self):
         """Test hostgroup generation with nested site groups."""
         # Mock the build_path function to return a predictable result
-        with patch("modules.hostgroups.build_path") as mock_build_path:
+        with patch(
+            "netbox_zabbix_sync.modules.hostgroups.build_path"
+        ) as mock_build_path:
             # Configure the mock to return a list of site groups in the path
             mock_build_path.return_value = ["ParentSiteGroup", "TestSiteGroup"]
 
