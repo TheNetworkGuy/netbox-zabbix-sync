@@ -25,9 +25,7 @@ jobs:
         name: Build Distribution
         runs-on: ubuntu-latest
         needs: [quality, test]
-        strategy:
-            matrix:
-                python-version: ["3.12", "3.13"]
+
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
@@ -38,8 +36,8 @@ jobs:
                   enable-cache: true
                   cache-dependency-glob: "pyproject.toml"
 
-            - name: Set up Python ${{ matrix.python-version }}
-              run: uv python install ${{ matrix.python-version }}
+            - name: Set up Python 3.12
+              run: uv python install 3.12
 
             - name: Install dependencies
               run: uv sync --dev
@@ -50,7 +48,7 @@ jobs:
             - name: Upload build artifacts
               uses: actions/upload-artifact@v4
               with:
-                  name: dist-python-${{ matrix.python-version }}
+                  name: dist-python-3.12
                   path: dist/
                   retention-days: 30
                   if-no-files-found: error
