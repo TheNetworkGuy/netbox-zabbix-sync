@@ -14,3 +14,5 @@ __pycache__/
 *.egg-info
 dist
 build
+
+netbox_zabbix_sync/_version.py
