@@ -3,4 +3,4 @@
 from netbox_zabbix_sync.modules.cli import parse_cli
 
 if __name__ == "__main__":
-    args = parse_cli()
+    parse_cli()
