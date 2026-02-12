@@ -1,0 +1,56 @@
+---
+name: Build Package
+
+on:
+    pull_request:
+    push:
+        branches:
+            - main
+            - develop
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    quality:
+        name: Code Quality
+        uses: ./.github/workflows/quality.yml
+
+    test:
+        name: Tests
+        uses: ./.github/workflows/run_tests.yml
+
+    build:
+        name: Build Distribution
+        runs-on: ubuntu-latest
+        needs: [quality, test]
+        strategy:
+            matrix:
+                python-version: ["3.12", "3.13"]
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v5
+              with:
+                  enable-cache: true
+                  cache-dependency-glob: "pyproject.toml"
+
+            - name: Set up Python ${{ matrix.python-version }}
+              run: uv python install ${{ matrix.python-version }}
+
+            - name: Install dependencies
+              run: uv sync --dev
+
+            - name: Build package
+              run: uv build
+
+            - name: Upload build artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: dist-python-${{ matrix.python-version }}
+                  path: dist/
+                  retention-days: 30
+                  if-no-files-found: error
