@@ -281,8 +281,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
         mock_zabbix.version = version
-        mock_zabbix.hostgroup.get.return_value = [
-            {"groupid": "1", "name": "TestGroup"}]
+        mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
         mock_zabbix.template.get.return_value = [
             {"templateid": "1", "name": "TestTemplate"}
         ]
@@ -406,8 +405,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.version = "6.0"
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = [
-            {"proxyid": "1", "host": "proxy1"}]
+        mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "host": "proxy1"}]
 
         sync(
             "http://netbox.local",
@@ -433,8 +431,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.version = "7.0"
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = [
-            {"proxyid": "1", "name": "proxy1"}]
+        mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "name": "proxy1"}]
         mock_zabbix.proxygroup.get.return_value = []
 
         sync(
