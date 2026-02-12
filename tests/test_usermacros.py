@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from modules.device import PhysicalDevice
-from modules.usermacros import ZabbixUsermacros
+from netbox_zabbix_sync.modules.device import PhysicalDevice
+from netbox_zabbix_sync.modules.usermacros import ZabbixUsermacros
 
 
 class DummyNB:

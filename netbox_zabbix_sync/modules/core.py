@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """Core component of the sync process"""
 
 import ssl
@@ -11,12 +9,16 @@ from pynetbox.core.query import RequestError as NBRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 
-from modules.config import load_config
-from modules.device import PhysicalDevice
-from modules.exceptions import EnvironmentVarError, SyncError
-from modules.logging import get_logger, setup_logger
-from modules.tools import convert_recordset, proxy_prepper, verify_hg_format
-from modules.virtual_machine import VirtualMachine
+from netbox_zabbix_sync.modules.config import load_config
+from netbox_zabbix_sync.modules.device import PhysicalDevice
+from netbox_zabbix_sync.modules.exceptions import SyncError
+from netbox_zabbix_sync.modules.logging import get_logger, setup_logger
+from netbox_zabbix_sync.modules.tools import (
+    convert_recordset,
+    proxy_prepper,
+    verify_hg_format,
+)
+from netbox_zabbix_sync.modules.virtual_machine import VirtualMachine
 
 # Import configuration settings
 config = load_config()

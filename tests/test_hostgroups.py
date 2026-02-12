@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from modules.exceptions import HostgroupError
-from modules.hostgroups import Hostgroup
+from netbox_zabbix_sync.modules.exceptions import HostgroupError
+from netbox_zabbix_sync.modules.hostgroups import Hostgroup
 
 
 class TestHostgroups(unittest.TestCase):

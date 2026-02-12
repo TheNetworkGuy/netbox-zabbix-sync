@@ -3,7 +3,7 @@
 import os
 from unittest.mock import MagicMock, patch
 
-from modules.config import (
+from netbox_zabbix_sync.modules.config import (
     DEFAULT_CONFIG,
     load_config,
     load_config_file,

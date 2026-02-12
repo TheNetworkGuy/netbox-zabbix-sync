@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from modules.device import PhysicalDevice
-from modules.exceptions import TemplateError
+from netbox_zabbix_sync.modules.device import PhysicalDevice
+from netbox_zabbix_sync.modules.exceptions import TemplateError
 
 
 class TestPhysicalDevice(unittest.TestCase):

@@ -1,4 +1,4 @@
-from modules.tools import sanatize_log_output
+from netbox_zabbix_sync.modules.tools import sanatize_log_output
 
 
 def test_sanatize_log_output_secrets():

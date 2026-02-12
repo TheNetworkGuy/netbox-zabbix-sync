@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 from zabbix_utils import APIRequestError
 
-from modules.device import PhysicalDevice
-from modules.exceptions import SyncExternalError
+from netbox_zabbix_sync.modules.device import PhysicalDevice
+from netbox_zabbix_sync.modules.exceptions import SyncExternalError
 
 
 class TestDeviceDeletion(unittest.TestCase):

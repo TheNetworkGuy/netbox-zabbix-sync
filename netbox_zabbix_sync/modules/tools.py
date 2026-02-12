@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from typing import Any, cast, overload
 
-from modules.exceptions import HostgroupError
+from netbox_zabbix_sync.modules.exceptions import HostgroupError
 
 
 def convert_recordset(recordset):
