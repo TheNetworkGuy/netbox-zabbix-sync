@@ -40,7 +40,6 @@ class ZabbixInterface:
 
     def set_snmp(self):
         """Check if interface is type SNMP"""
-        # pylint: disable=too-many-branches
         snmp_interface_type = 2
         if self.interface["type"] == snmp_interface_type:
             # Checks if SNMP settings are defined in NetBox

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation
 
 """NetBox to Zabbix sync script."""
 
@@ -30,7 +29,6 @@ logger = get_logger()
 
 def main(arguments):
     """Run the sync process."""
-    # pylint: disable=too-many-branches, too-many-statements
     # set environment variables
     if arguments.verbose:
         set_log_levels(logging.WARNING, logging.INFO)

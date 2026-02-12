@@ -10,8 +10,6 @@ class Hostgroup:
     """Hostgroup class for devices and VM's
     Takes type (vm or dev) and NB object"""
 
-    # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
-    # pylint: disable=logging-fstring-interpolation
     def __init__(
         self,
         obj_type,

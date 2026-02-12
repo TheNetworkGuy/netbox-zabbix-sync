@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments, logging-fstring-interpolation
 """
 All of the Zabbix Usermacro related configuration
 """
