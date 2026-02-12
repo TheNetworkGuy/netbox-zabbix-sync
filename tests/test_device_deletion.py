@@ -111,7 +111,7 @@ class TestDeviceDeletion(unittest.TestCase):
     def test_zeroize_cf(self):
         """Test _zeroize_cf method that clears the custom field."""
         # Execute
-        self.device._zeroize_cf()  #  pylint: disable=protected-access
+        self.device._zeroize_cf()
 
         # Verify
         self.assertIsNone(self.mock_nb_device.custom_fields["zabbix_hostid"])

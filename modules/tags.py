@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments, logging-fstring-interpolation
 """
 All of the Zabbix Usermacro related configuration
 """
@@ -101,7 +100,6 @@ class ZabbixTags:
         """
         Generate full set of Usermacros
         """
-        # pylint: disable=too-many-branches
         tags = []
         # Parse the field mapper for tags
         if self.tag_map:

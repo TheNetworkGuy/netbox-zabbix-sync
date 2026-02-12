@@ -1,4 +1,3 @@
-# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines, too-many-public-methods, duplicate-code
 """
 Device specific handeling for NetBox to Zabbix
 """
@@ -34,7 +33,6 @@ config = load_config()
 
 
 class PhysicalDevice:
-    # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments
     """
     Represents Network device.
     INPUT: (NetBox device class, ZabbixAPI class, journal flag, NB journal class)
@@ -657,7 +655,6 @@ class PhysicalDevice:
     def consistency_check(
         self, groups, templates, proxies, proxy_power, create_hostgroups
     ):
-        # pylint: disable=too-many-branches, too-many-statements
         """
         Checks if Zabbix object is still valid with NetBox parameters.
         """
@@ -878,7 +875,6 @@ class PhysicalDevice:
                 self.update_zabbix_host(tags=self.tags)
 
         # If only 1 interface has been found
-        # pylint: disable=too-many-nested-blocks
         if len(host["interfaces"]) == 1:
             updates = {}
             # Go through each key / item and check if it matches Zabbix

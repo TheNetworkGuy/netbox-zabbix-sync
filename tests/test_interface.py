@@ -91,27 +91,27 @@ class TestZabbixInterface(unittest.TestCase):
 
         # Test for agent type (1)
         interface.interface["type"] = 1
-        interface._set_default_port()  #  pylint: disable=protected-access
+        interface._set_default_port()
         self.assertEqual(interface.interface["port"], "10050")
 
         # Test for SNMP type (2)
         interface.interface["type"] = 2
-        interface._set_default_port()  #  pylint: disable=protected-access
+        interface._set_default_port()
         self.assertEqual(interface.interface["port"], "161")
 
         # Test for IPMI type (3)
         interface.interface["type"] = 3
-        interface._set_default_port()  #  pylint: disable=protected-access
+        interface._set_default_port()
         self.assertEqual(interface.interface["port"], "623")
 
         # Test for JMX type (4)
         interface.interface["type"] = 4
-        interface._set_default_port()  #  pylint: disable=protected-access
+        interface._set_default_port()
         self.assertEqual(interface.interface["port"], "12345")
 
         # Test for unsupported type
         interface.interface["type"] = 99
-        result = interface._set_default_port()  #  pylint: disable=protected-access
+        result = interface._set_default_port()
         self.assertFalse(result)
 
     def test_set_snmp_v2(self):

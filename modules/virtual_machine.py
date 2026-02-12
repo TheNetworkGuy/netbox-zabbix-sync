@@ -1,4 +1,3 @@
-# pylint: disable=duplicate-code
 """Module that hosts all functions for virtual machine processing"""
 
 from modules.config import load_config
