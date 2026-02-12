@@ -1,7 +1,7 @@
 *.log
 .venv
 .env
-config.py
+/config.py
 Pipfile
 Pipfile.lock
 # Byte-compiled / optimized / DLL files
