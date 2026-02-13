@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from modules.device import PhysicalDevice
-from modules.usermacros import ZabbixUsermacros
+from netbox_zabbix_sync.modules.device import PhysicalDevice
+from netbox_zabbix_sync.modules.usermacros import ZabbixUsermacros
 
 
 class DummyNB:
@@ -51,7 +51,7 @@ class TestUsermacroSync(unittest.TestCase):
         return device
 
     @patch(
-        "modules.device.config",
+        "netbox_zabbix_sync.modules.device.config",
         {"usermacro_sync": False, "device_cf": "zabbix_hostid", "tag_sync": False},
     )
     @patch.object(PhysicalDevice, "_usermacro_map")
@@ -66,10 +66,10 @@ class TestUsermacroSync(unittest.TestCase):
         self.assertTrue(result is True or result is None)
 
     @patch(
-        "modules.device.config",
+        "netbox_zabbix_sync.modules.device.config",
         {"usermacro_sync": True, "device_cf": "zabbix_hostid", "tag_sync": False},
     )
-    @patch("modules.device.ZabbixUsermacros")
+    @patch("netbox_zabbix_sync.modules.device.ZabbixUsermacros")
     @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_true(self, mock_usermacro_map, mock_usermacros_class):
         mock_usermacro_map.return_value = self.usermacro_map
@@ -90,10 +90,10 @@ class TestUsermacroSync(unittest.TestCase):
         self.assertGreater(len(device.usermacros), 0)
 
     @patch(
-        "modules.device.config",
+        "netbox_zabbix_sync.modules.device.config",
         {"usermacro_sync": "full", "device_cf": "zabbix_hostid", "tag_sync": False},
     )
-    @patch("modules.device.ZabbixUsermacros")
+    @patch("netbox_zabbix_sync.modules.device.ZabbixUsermacros")
     @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_full(self, mock_usermacro_map, mock_usermacros_class):
         mock_usermacro_map.return_value = self.usermacro_map

@@ -4,11 +4,24 @@ description = "Python script to synchronize Netbox devices to Zabbix."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["igraph>=1.0.0", "pynetbox>=7.6.1", "zabbix-utils>=2.0.4"]
-version = "3.3.0"
+dynamic = ["version"]
 
 [project.urls]
 "Homepage" = "https://github.com/TheNetworkGuy/netbox-zabbix-sync"
 "Issues" = "https://github.com/TheNetworkGuy/netbox-zabbix-sync/issues"
+
+[project.scripts]
+netbox-zabbix-sync = "netbox_zabbix_sync.modules.cli:parse_cli"
+
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["netbox_zabbix_sync*"]
+
+[tool.setuptools_scm]
+version_file = "netbox_zabbix_sync/_version.py"
 
 [tool.ruff.lint]
 ignore = [

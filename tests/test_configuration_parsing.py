@@ -3,7 +3,7 @@
 import os
 from unittest.mock import MagicMock, patch
 
-from modules.config import (
+from netbox_zabbix_sync.modules.config import (
     DEFAULT_CONFIG,
     load_config,
     load_config_file,
@@ -14,8 +14,11 @@ from modules.config import (
 def test_load_config_defaults():
     """Test that load_config returns default values when no config file or env vars are present"""
     with (
-        patch("modules.config.load_config_file", return_value=DEFAULT_CONFIG.copy()),
-        patch("modules.config.load_env_variable", return_value=None),
+        patch(
+            "netbox_zabbix_sync.modules.config.load_config_file",
+            return_value=DEFAULT_CONFIG.copy(),
+        ),
+        patch("netbox_zabbix_sync.modules.config.load_env_variable", return_value=None),
     ):
         config = load_config()
         assert config == DEFAULT_CONFIG
@@ -30,8 +33,11 @@ def test_load_config_file():
     mock_config["sync_vms"] = True
 
     with (
-        patch("modules.config.load_config_file", return_value=mock_config),
-        patch("modules.config.load_env_variable", return_value=None),
+        patch(
+            "netbox_zabbix_sync.modules.config.load_config_file",
+            return_value=mock_config,
+        ),
+        patch("netbox_zabbix_sync.modules.config.load_env_variable", return_value=None),
     ):
         config = load_config()
         assert config["templates_config_context"] is True
@@ -52,8 +58,14 @@ def test_load_env_variables():
         return None
 
     with (
-        patch("modules.config.load_config_file", return_value=DEFAULT_CONFIG.copy()),
-        patch("modules.config.load_env_variable", side_effect=mock_load_env),
+        patch(
+            "netbox_zabbix_sync.modules.config.load_config_file",
+            return_value=DEFAULT_CONFIG.copy(),
+        ),
+        patch(
+            "netbox_zabbix_sync.modules.config.load_env_variable",
+            side_effect=mock_load_env,
+        ),
     ):
         config = load_config()
         assert config["sync_vms"] is True
@@ -75,8 +87,14 @@ def test_env_vars_override_config_file():
         return None
 
     with (
-        patch("modules.config.load_config_file", return_value=mock_config),
-        patch("modules.config.load_env_variable", side_effect=mock_load_env),
+        patch(
+            "netbox_zabbix_sync.modules.config.load_config_file",
+            return_value=mock_config,
+        ),
+        patch(
+            "netbox_zabbix_sync.modules.config.load_env_variable",
+            side_effect=mock_load_env,
+        ),
     ):
         config = load_config()
         # This should be overridden by the env var

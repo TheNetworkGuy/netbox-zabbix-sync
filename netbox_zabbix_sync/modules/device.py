@@ -11,23 +11,23 @@ from typing import Any
 from pynetbox import RequestError as NetboxRequestError
 from zabbix_utils import APIRequestError
 
-from modules.config import load_config
-from modules.exceptions import (
+from netbox_zabbix_sync.modules.config import load_config
+from netbox_zabbix_sync.modules.exceptions import (
     InterfaceConfigError,
     SyncExternalError,
     SyncInventoryError,
     TemplateError,
 )
-from modules.hostgroups import Hostgroup
-from modules.interface import ZabbixInterface
-from modules.tags import ZabbixTags
-from modules.tools import (
+from netbox_zabbix_sync.modules.hostgroups import Hostgroup
+from netbox_zabbix_sync.modules.interface import ZabbixInterface
+from netbox_zabbix_sync.modules.tags import ZabbixTags
+from netbox_zabbix_sync.modules.tools import (
     cf_to_string,
     field_mapper,
     remove_duplicates,
     sanatize_log_output,
 )
-from modules.usermacros import ZabbixUsermacros
+from netbox_zabbix_sync.modules.usermacros import ZabbixUsermacros
 
 config = load_config()
 

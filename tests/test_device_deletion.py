@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 from zabbix_utils import APIRequestError
 
-from modules.device import PhysicalDevice
-from modules.exceptions import SyncExternalError
+from netbox_zabbix_sync.modules.device import PhysicalDevice
+from netbox_zabbix_sync.modules.exceptions import SyncExternalError
 
 
 class TestDeviceDeletion(unittest.TestCase):
@@ -41,7 +41,9 @@ class TestDeviceDeletion(unittest.TestCase):
         self.mock_logger = MagicMock()
 
         # Create PhysicalDevice instance with mocks
-        with patch("modules.device.config", {"device_cf": "zabbix_hostid"}):
+        with patch(
+            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
+        ):
             self.device = PhysicalDevice(
                 self.mock_nb_device,
                 self.mock_zabbix,
@@ -147,7 +149,9 @@ class TestDeviceDeletion(unittest.TestCase):
     def test_create_journal_entry_when_disabled(self):
         """Test create_journal_entry when journaling is disabled."""
         # Setup - create device with journal=False
-        with patch("modules.device.config", {"device_cf": "zabbix_hostid"}):
+        with patch(
+            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
+        ):
             device = PhysicalDevice(
                 self.mock_nb_device,
                 self.mock_zabbix,

@@ -3,8 +3,8 @@
 import unittest
 from typing import cast
 
-from modules.exceptions import InterfaceConfigError
-from modules.interface import ZabbixInterface
+from netbox_zabbix_sync.modules.exceptions import InterfaceConfigError
+from netbox_zabbix_sync.modules.interface import ZabbixInterface
 
 
 class TestZabbixInterface(unittest.TestCase):
