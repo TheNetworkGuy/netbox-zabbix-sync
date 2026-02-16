@@ -360,8 +360,7 @@ class PhysicalDevice:
             try:
                 # Check if the Zabbix host exists in Zabbix
                 zbx_host = bool(
-                    self.zabbix.host.get(
-                        filter={"hostid": self.zabbix_id}, output=[])
+                    self.zabbix.host.get(filter={"hostid": self.zabbix_id}, output=[])
                 )
                 e = (
                     f"Host {self.name}: was already deleted from Zabbix."
@@ -373,8 +372,7 @@ class PhysicalDevice:
                     e = f"Host {self.name}: Deleted host from Zabbix."
                 self._zeroize_cf()
                 self.logger.info(e)
-                self.create_journal_entry(
-                    "warning", "Deleted host from Zabbix")
+                self.create_journal_entry("warning", "Deleted host from Zabbix")
             except APIRequestError as e:
                 message = f"Zabbix returned the following error: {e}."
                 self.logger.error(message)
@@ -650,11 +648,9 @@ class PhysicalDevice:
             self.logger.error(e)
             raise SyncExternalError(e) from None
         self.logger.info(
-            "Host %s: updated with data %s.", self.name, sanatize_log_output(
-                kwargs)
+            "Host %s: updated with data %s.", self.name, sanatize_log_output(kwargs)
         )
-        self.create_journal_entry(
-            "info", "Updated host in Zabbix with latest NB data.")
+        self.create_journal_entry("info", "Updated host in Zabbix with latest NB data.")
 
     def consistency_check(
         self, groups, templates, proxies, proxy_power, create_hostgroups
@@ -845,8 +841,7 @@ class PhysicalDevice:
             # of secret type macros from Netbox
             netbox_macros = deepcopy(self.usermacros)
             # Set the sync bit
-            full_sync_bit = bool(
-                str(config["usermacro_sync"]).lower() == "full")
+            full_sync_bit = bool(str(config["usermacro_sync"]).lower() == "full")
             for macro in netbox_macros:
                 # If the Macro is a secret and full sync is NOT activated
                 if macro["type"] == str(1) and not full_sync_bit:
@@ -970,8 +965,7 @@ class PhysicalDevice:
             }
             try:
                 self.nb_journals.create(journal)
-                self.logger.debug(
-                    "Host %s: Created journal entry in NetBox", self.name)
+                self.logger.debug("Host %s: Created journal entry in NetBox", self.name)
                 return True
             except NetboxRequestError as e:
                 self.logger.warning(
