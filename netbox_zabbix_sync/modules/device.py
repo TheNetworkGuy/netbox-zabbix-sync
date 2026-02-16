@@ -11,7 +11,6 @@ from typing import Any
 from pynetbox import RequestError as NetboxRequestError
 from zabbix_utils import APIRequestError
 
-from netbox_zabbix_sync.modules.config import load_config
 from netbox_zabbix_sync.modules.exceptions import (
     InterfaceConfigError,
     SyncExternalError,
@@ -20,6 +19,7 @@ from netbox_zabbix_sync.modules.exceptions import (
 )
 from netbox_zabbix_sync.modules.hostgroups import Hostgroup
 from netbox_zabbix_sync.modules.interface import ZabbixInterface
+from netbox_zabbix_sync.modules.settings import load_config
 from netbox_zabbix_sync.modules.tags import ZabbixTags
 from netbox_zabbix_sync.modules.tools import (
     cf_to_string,
@@ -360,7 +360,8 @@ class PhysicalDevice:
             try:
                 # Check if the Zabbix host exists in Zabbix
                 zbx_host = bool(
-                    self.zabbix.host.get(filter={"hostid": self.zabbix_id}, output=[])
+                    self.zabbix.host.get(
+                        filter={"hostid": self.zabbix_id}, output=[])
                 )
                 e = (
                     f"Host {self.name}: was already deleted from Zabbix."
@@ -372,7 +373,8 @@ class PhysicalDevice:
                     e = f"Host {self.name}: Deleted host from Zabbix."
                 self._zeroize_cf()
                 self.logger.info(e)
-                self.create_journal_entry("warning", "Deleted host from Zabbix")
+                self.create_journal_entry(
+                    "warning", "Deleted host from Zabbix")
             except APIRequestError as e:
                 message = f"Zabbix returned the following error: {e}."
                 self.logger.error(message)
@@ -648,9 +650,11 @@ class PhysicalDevice:
             self.logger.error(e)
             raise SyncExternalError(e) from None
         self.logger.info(
-            "Host %s: updated with data %s.", self.name, sanatize_log_output(kwargs)
+            "Host %s: updated with data %s.", self.name, sanatize_log_output(
+                kwargs)
         )
-        self.create_journal_entry("info", "Updated host in Zabbix with latest NB data.")
+        self.create_journal_entry(
+            "info", "Updated host in Zabbix with latest NB data.")
 
     def consistency_check(
         self, groups, templates, proxies, proxy_power, create_hostgroups
@@ -659,7 +663,8 @@ class PhysicalDevice:
         Checks if Zabbix object is still valid with NetBox parameters.
         """
         # If group is found or if the hostgroup is nested
-        if not self.set_zbx_groupid(groups):  # or len(self.hostgroups.split("/")) > 1:
+        # or len(self.hostgroups.split("/")) > 1:
+        if not self.set_zbx_groupid(groups):
             if create_hostgroups:
                 # Script is allowed to create a new hostgroup
                 new_groups = self.create_zbx_hostgroup(groups)
@@ -840,7 +845,8 @@ class PhysicalDevice:
             # of secret type macros from Netbox
             netbox_macros = deepcopy(self.usermacros)
             # Set the sync bit
-            full_sync_bit = bool(str(config["usermacro_sync"]).lower() == "full")
+            full_sync_bit = bool(
+                str(config["usermacro_sync"]).lower() == "full")
             for macro in netbox_macros:
                 # If the Macro is a secret and full sync is NOT activated
                 if macro["type"] == str(1) and not full_sync_bit:
@@ -964,7 +970,8 @@ class PhysicalDevice:
             }
             try:
                 self.nb_journals.create(journal)
-                self.logger.debug("Host %s: Created journal entry in NetBox", self.name)
+                self.logger.debug(
+                    "Host %s: Created journal entry in NetBox", self.name)
                 return True
             except NetboxRequestError as e:
                 self.logger.warning(

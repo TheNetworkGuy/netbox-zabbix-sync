@@ -9,10 +9,10 @@ from pynetbox.core.query import RequestError as NBRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 
-from netbox_zabbix_sync.modules.config import load_config
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import SyncError
 from netbox_zabbix_sync.modules.logging import get_logger, setup_logger
+from netbox_zabbix_sync.modules.settings import load_config
 from netbox_zabbix_sync.modules.tools import (
     convert_recordset,
     proxy_prepper,
@@ -91,22 +91,28 @@ def sync(nb_host, nb_token, zbx_host, zbx_user, zbx_pass, zbx_token):
     # Set API parameter mapping based on API version
     proxy_name = "host" if not str(zabbix.version).startswith("7") else "name"
     # Get all Zabbix and NetBox data
-    netbox_devices = list(netbox.dcim.devices.filter(**config["nb_device_filter"]))
+    netbox_devices = list(netbox.dcim.devices.filter(
+        **config["nb_device_filter"]))
     netbox_vms = []
     if config["sync_vms"]:
         netbox_vms = list(
-            netbox.virtualization.virtual_machines.filter(**config["nb_vm_filter"])
+            netbox.virtualization.virtual_machines.filter(
+                **config["nb_vm_filter"])
         )
     netbox_site_groups = convert_recordset(netbox.dcim.site_groups.all())
     netbox_regions = convert_recordset(netbox.dcim.regions.all())
     netbox_journals = netbox.extras.journal_entries
-    zabbix_groups = zabbix.hostgroup.get(output=["groupid", "name"])  # type: ignore[attr-defined]
-    zabbix_templates = zabbix.template.get(output=["templateid", "name"])  # type: ignore[attr-defined]
-    zabbix_proxies = zabbix.proxy.get(output=["proxyid", proxy_name])  # type: ignore[attr-defined]
+    zabbix_groups = zabbix.hostgroup.get(
+        output=["groupid", "name"])  # type: ignore[attr-defined]
+    zabbix_templates = zabbix.template.get(
+        output=["templateid", "name"])  # type: ignore[attr-defined]
+    zabbix_proxies = zabbix.proxy.get(
+        output=["proxyid", proxy_name])  # type: ignore[attr-defined]
     # Set empty list for proxy processing Zabbix <= 6
     zabbix_proxygroups = []
     if str(zabbix.version).startswith("7"):
-        zabbix_proxygroups = zabbix.proxygroup.get(output=["proxy_groupid", "name"])  # type: ignore[attr-defined]
+        zabbix_proxygroups = zabbix.proxygroup.get(
+            output=["proxy_groupid", "name"])  # type: ignore[attr-defined]
     # Sanitize proxy data
     if proxy_name == "host":
         for proxy in zabbix_proxies:
@@ -138,7 +144,8 @@ def sync(nb_host, nb_token, zbx_host, zbx_user, zbx_pass, zbx_token):
                 continue
             if config["extended_site_properties"] and nb_vm.site:
                 logger.debug("VM %s: extending site information.", vm.name)
-                vm.site = convert_recordset(netbox.dcim.sites.filter(id=nb_vm.site.id))  # type: ignore[attr-defined]
+                vm.site = convert_recordset(netbox.dcim.sites.filter(
+                    id=nb_vm.site.id))  # type: ignore[attr-defined]
             vm.set_inventory(nb_vm)
             vm.set_usermacros()
             vm.set_tags()
@@ -178,7 +185,8 @@ def sync(nb_host, nb_token, zbx_host, zbx_user, zbx_pass, zbx_token):
                 )
                 continue
             # Add VM to Zabbix
-            vm.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
+            vm.create_in_zabbix(
+                zabbix_groups, zabbix_templates, zabbix_proxy_list)
         except SyncError:
             pass
 
@@ -212,7 +220,8 @@ def sync(nb_host, nb_token, zbx_host, zbx_user, zbx_pass, zbx_token):
                 )
                 continue
             if config["extended_site_properties"] and nb_device.site:
-                logger.debug("Device %s: extending site information.", device.name)
+                logger.debug(
+                    "Device %s: extending site information.", device.name)
                 device.site = convert_recordset(  # type: ignore[attr-defined]
                     netbox.dcim.sites.filter(id=nb_device.site.id)
                 )
@@ -272,7 +281,8 @@ def sync(nb_host, nb_token, zbx_host, zbx_user, zbx_pass, zbx_token):
                 )
                 continue
             # Add device to Zabbix
-            device.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
+            device.create_in_zabbix(
+                zabbix_groups, zabbix_templates, zabbix_proxy_list)
         except SyncError:
             pass
     zabbix.logout()

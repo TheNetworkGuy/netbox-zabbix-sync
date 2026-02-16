@@ -1,6 +1,5 @@
 """Module that hosts all functions for virtual machine processing"""
 
-from netbox_zabbix_sync.modules.config import load_config
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import (
     InterfaceConfigError,
@@ -8,6 +7,7 @@ from netbox_zabbix_sync.modules.exceptions import (
     TemplateError,
 )
 from netbox_zabbix_sync.modules.interface import ZabbixInterface
+from netbox_zabbix_sync.modules.settings import load_config
 
 # Load config
 config = load_config()

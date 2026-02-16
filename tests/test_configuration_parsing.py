@@ -3,7 +3,7 @@
 import os
 from unittest.mock import MagicMock, patch
 
-from netbox_zabbix_sync.modules.config import (
+from netbox_zabbix_sync.modules.settings import (
     DEFAULT_CONFIG,
     load_config,
     load_config_file,
@@ -15,10 +15,12 @@ def test_load_config_defaults():
     """Test that load_config returns default values when no config file or env vars are present"""
     with (
         patch(
-            "netbox_zabbix_sync.modules.config.load_config_file",
+            "netbox_zabbix_sync.modules.settings.load_config_file",
             return_value=DEFAULT_CONFIG.copy(),
         ),
-        patch("netbox_zabbix_sync.modules.config.load_env_variable", return_value=None),
+        patch(
+            "netbox_zabbix_sync.modules.settings.load_env_variable", return_value=None
+        ),
     ):
         config = load_config()
         assert config == DEFAULT_CONFIG
@@ -34,10 +36,12 @@ def test_load_config_file():
 
     with (
         patch(
-            "netbox_zabbix_sync.modules.config.load_config_file",
+            "netbox_zabbix_sync.modules.settings.load_config_file",
             return_value=mock_config,
         ),
-        patch("netbox_zabbix_sync.modules.config.load_env_variable", return_value=None),
+        patch(
+            "netbox_zabbix_sync.modules.settings.load_env_variable", return_value=None
+        ),
     ):
         config = load_config()
         assert config["templates_config_context"] is True
@@ -59,11 +63,11 @@ def test_load_env_variables():
 
     with (
         patch(
-            "netbox_zabbix_sync.modules.config.load_config_file",
+            "netbox_zabbix_sync.modules.settings.load_config_file",
             return_value=DEFAULT_CONFIG.copy(),
         ),
         patch(
-            "netbox_zabbix_sync.modules.config.load_env_variable",
+            "netbox_zabbix_sync.modules.settings.load_env_variable",
             side_effect=mock_load_env,
         ),
     ):
@@ -88,11 +92,11 @@ def test_env_vars_override_config_file():
 
     with (
         patch(
-            "netbox_zabbix_sync.modules.config.load_config_file",
+            "netbox_zabbix_sync.modules.settings.load_config_file",
             return_value=mock_config,
         ),
         patch(
-            "netbox_zabbix_sync.modules.config.load_env_variable",
+            "netbox_zabbix_sync.modules.settings.load_env_variable",
             side_effect=mock_load_env,
         ),
     ):
