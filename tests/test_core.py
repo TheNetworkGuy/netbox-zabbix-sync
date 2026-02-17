@@ -7,7 +7,7 @@ from pynetbox.core.query import RequestError as NBRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError
 
-from netbox_zabbix_sync.modules.core import sync
+from netbox_zabbix_sync.modules.core import Sync
 
 # Minimal config for testing - includes all keys used by sync()
 TEST_CONFIG = {
@@ -88,14 +88,16 @@ class TestSyncNetboxConnection(unittest.TestCase):
         )
 
         with self.assertRaises(SystemExit) as context:
-            sync(
-                "http://netbox.local",
-                "token",
-                "http://zabbix.local",
-                "user",
-                "pass",
-                None,
+            syncer = Sync()
+            syncer.connect(
+                nb_host="http://netbox.local",
+                nb_token="token",
+                zbx_host="http://zabbix.local",
+                zbx_user="user",
+                zbx_pass="pass",
+                zbx_token=None,
             )
+            syncer.start()
 
         self.assertEqual(context.exception.code, 1)
 
@@ -110,7 +112,7 @@ class TestSyncNetboxConnection(unittest.TestCase):
         )
 
         with self.assertRaises(SystemExit) as context:
-            sync(
+            Sync(
                 "http://netbox.local",
                 "token",
                 "http://zabbix.local",
@@ -150,7 +152,7 @@ class TestSyncZabbixConnection(unittest.TestCase):
         )
 
         with self.assertRaises(SystemExit) as context:
-            sync(
+            Sync(
                 "http://netbox.local",
                 "token",
                 "http://zabbix.local",
@@ -173,7 +175,7 @@ class TestSyncZabbixConnection(unittest.TestCase):
         )
 
         with self.assertRaises(SystemExit) as context:
-            sync(
+            Sync(
                 "http://netbox.local",
                 "token",
                 "http://zabbix.local",
@@ -219,7 +221,7 @@ class TestSyncZabbixAuthentication(unittest.TestCase):
         self._setup_netbox_mock(mock_api)
         self._setup_zabbix_mock(mock_zabbix_api)
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -243,7 +245,7 @@ class TestSyncZabbixAuthentication(unittest.TestCase):
         self._setup_netbox_mock(mock_api)
         self._setup_zabbix_mock(mock_zabbix_api)
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -281,7 +283,8 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
         mock_zabbix.version = version
-        mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
+        mock_zabbix.hostgroup.get.return_value = [
+            {"groupid": "1", "name": "TestGroup"}]
         mock_zabbix.template.get.return_value = [
             {"templateid": "1", "name": "TestTemplate"}
         ]
@@ -308,7 +311,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         mock_device_instance.zbx_template_names = []
         mock_physical_device.return_value = mock_device_instance
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -340,7 +343,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         mock_vm_instance.zbx_template_names = []
         mock_virtual_machine.return_value = mock_vm_instance
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -365,7 +368,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         self._setup_netbox_mock(mock_api, vms=[vm1])
         self._setup_zabbix_mock(mock_zabbix_api)
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -405,9 +408,10 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.version = "6.0"
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "host": "proxy1"}]
+        mock_zabbix.proxy.get.return_value = [
+            {"proxyid": "1", "host": "proxy1"}]
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -431,10 +435,11 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.version = "7.0"
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "name": "proxy1"}]
+        mock_zabbix.proxy.get.return_value = [
+            {"proxyid": "1", "name": "proxy1"}]
         mock_zabbix.proxygroup.get.return_value = []
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -461,7 +466,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.proxy.get.return_value = []
         mock_zabbix.proxygroup.get.return_value = []
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -487,7 +492,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.template.get.return_value = []
         mock_zabbix.proxy.get.return_value = []
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -529,7 +534,7 @@ class TestSyncLogout(unittest.TestCase):
         mock_zabbix.template.get.return_value = []
         mock_zabbix.proxy.get.return_value = []
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",
@@ -579,7 +584,7 @@ class TestSyncProxyNameSanitization(unittest.TestCase):
         ]
         mock_proxy_prepper.return_value = []
 
-        sync(
+        Sync(
             "http://netbox.local",
             "nb_token",
             "http://zabbix.local",

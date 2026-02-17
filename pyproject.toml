@@ -80,6 +80,8 @@ select = [
 "tests/*" = [
     # Ignore use of assert
     "S101",
+    # Ignore hardcoded passwords / tokens
+    "S106",
 ]
 
 

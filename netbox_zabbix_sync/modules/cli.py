@@ -2,10 +2,12 @@ import argparse
 import logging
 from os import environ
 
-from netbox_zabbix_sync.modules.core import sync
+from netbox_zabbix_sync.modules.core import Sync
 from netbox_zabbix_sync.modules.exceptions import EnvironmentVarError
-from netbox_zabbix_sync.modules.logging import get_logger, set_log_levels
+from netbox_zabbix_sync.modules.logging import get_logger, set_log_levels, setup_logger
 
+# Set logging
+setup_logger()
 logger = get_logger()
 
 
@@ -47,7 +49,8 @@ def main(arguments):
     netbox_token = environ.get("NETBOX_TOKEN")
 
     # Run main sync process
-    sync(
+    syncer = Sync()
+    syncer.connect(
         nb_host=netbox_host,
         nb_token=netbox_token,
         zbx_host=zabbix_host,
@@ -55,6 +58,7 @@ def main(arguments):
         zbx_pass=zabbix_pass,
         zbx_token=zabbix_token,
     )
+    syncer.start()
 
 
 def parse_cli():
