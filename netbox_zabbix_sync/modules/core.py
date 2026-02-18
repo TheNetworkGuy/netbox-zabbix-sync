@@ -1,10 +1,9 @@
 """Core component of the sync process"""
 
 import ssl
-import sys
 from os import environ
 
-from pynetbox import api
+from pynetbox import api as nbapi
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 
@@ -83,7 +82,7 @@ class Sync:
         :param zbx_token: Description
         """
         # Initialize Netbox API connection
-        netbox = api(nb_host, token=nb_token, threading=True)
+        netbox = nbapi(nb_host, token=nb_token, threading=True)
         try:
             # Get NetBox version
             nb_version = netbox.version
@@ -95,25 +94,35 @@ class Sync:
                 "Unable to connect to NetBox with URL %s. Please check the URL and status of NetBox.",
                 nb_host,
             )
+            return False
         # Set Zabbix API
+        if (zbx_pass or zbx_user) and zbx_token:
+            e = (
+                "Both ZABBIX_PASS, ZABBIX_USER and ZABBIX_TOKEN environment variables are set. "
+                "Please choose between token or password based authentication."
+            )
+            logger.error(e)
+            return False
         try:
             ssl_ctx = ssl.create_default_context()
 
             # If a custom CA bundle is set for pynetbox (requests), also use it for the Zabbix API
             if environ.get("REQUESTS_CA_BUNDLE", None):
                 ssl_ctx.load_verify_locations(environ["REQUESTS_CA_BUNDLE"])
-
             if not zbx_token:
+                logger.debug("Using user/password authentication for Zabbix API.")
                 self.zabbix = ZabbixAPI(
                     zbx_host, user=zbx_user, password=zbx_pass, ssl_context=ssl_ctx
                 )
             else:
+                logger.debug("Using token authentication for Zabbix API.")
                 self.zabbix = ZabbixAPI(zbx_host, token=zbx_token, ssl_context=ssl_ctx)
             self.zabbix.check_auth()
         except (APIRequestError, ProcessingError) as zbx_error:
             e = f"Zabbix returned the following error: {zbx_error}."
             logger.error(e)
-            sys.exit(1)
+            return False
+        return True
 
     def start(self):
         """
