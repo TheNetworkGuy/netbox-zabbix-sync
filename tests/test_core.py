@@ -81,8 +81,7 @@ class MockNetboxDevice:
         # Setup device type with proper structure
         if device_type is None:
             self.device_type = MagicMock()
-            self.device_type.custom_fields = {
-                "zabbix_template": "TestTemplate"}
+            self.device_type.custom_fields = {"zabbix_template": "TestTemplate"}
             self.device_type.manufacturer = MagicMock()
             self.device_type.manufacturer.name = "TestManufacturer"
             self.device_type.display = "Test Device Type"
@@ -107,7 +106,6 @@ class MockNetboxDevice:
 
     def save(self):
         """Mock save method for NetBox device."""
-        pass
 
 
 class MockNetboxVM:
@@ -308,8 +306,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
         mock_zabbix.version = version
-        mock_zabbix.hostgroup.get.return_value = [
-            {"groupid": "1", "name": "TestGroup"}]
+        mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
         mock_zabbix.template.get.return_value = [
             {"templateid": "1", "name": "TestTemplate"}
         ]
@@ -435,8 +432,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.version = "6.0"
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = [
-            {"proxyid": "1", "host": "proxy1"}]
+        mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "host": "proxy1"}]
 
         syncer = Sync()
         syncer.connect(
@@ -463,8 +459,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.version = "7.0"
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = [
-            {"proxyid": "1", "name": "proxy1"}]
+        mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "name": "proxy1"}]
         mock_zabbix.proxygroup.get.return_value = []
 
         syncer = Sync()
@@ -659,8 +654,7 @@ class TestDeviceHandeling(unittest.TestCase):
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
         mock_zabbix.version = version
-        mock_zabbix.hostgroup.get.return_value = [
-            {"groupid": "1", "name": "TestGroup"}]
+        mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
         mock_zabbix.template.get.return_value = [
             {"templateid": "1", "name": "TestTemplate"}
         ]
@@ -675,19 +669,22 @@ class TestDeviceHandeling(unittest.TestCase):
 
     @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
     @patch("netbox_zabbix_sync.modules.core.nbapi")
-    def test_sync_cluster_where_device_is_primary(
-        self, mock_api, mock_zabbix_api
-    ):
+    def test_sync_cluster_where_device_is_primary(self, mock_api, mock_zabbix_api):
         """Test that sync properly handles a device that is the primary in a virtual chassis."""
         # Create a device that is part of a virtual chassis and is the primary
+        # Setup virtual chassis mock
+        vc_master = MagicMock()
+        vc_master.id = 1  # Same as device ID - device is primary
+
+        virtual_chassis = MagicMock()
+        virtual_chassis.master = vc_master
+        virtual_chassis.name = "SW01"
+
         device = MockNetboxDevice(
             device_id=1,
             name="SW01N0",
-            virtual_chassis=MagicMock(),
+            virtual_chassis=virtual_chassis,
         )
-        device.virtual_chassis.master = MagicMock()
-        device.virtual_chassis.master.id = 1  # Same as device ID - device is primary
-        device.virtual_chassis.name = "SW01"
 
         # Setup NetBox mock with a site for hostgroup
         mock_netbox = self._setup_netbox_mock(mock_api)

@@ -2,6 +2,7 @@
 
 import ssl
 from os import environ
+from typing import Any
 
 from pynetbox import api as nbapi
 from requests.exceptions import ConnectionError as RequestsConnectionError
@@ -27,7 +28,7 @@ class Sync:
     This class is used to connect to NetBox and Zabbix and run the sync process.
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """
         Docstring for __init__
 
@@ -36,7 +37,7 @@ class Sync:
         """
         self.netbox = None
         self.zabbix = None
-        self.config = config
+        self.config: dict[str, Any] = config if config else {}
         self.nb_version = None
         self._config()
 
@@ -182,9 +183,9 @@ class Sync:
         # Set empty list for proxy processing Zabbix <= 6
         zabbix_proxygroups = []
         if str(self.zabbix.version).startswith("7"):
-            zabbix_proxygroups = self.zabbix.proxygroup.get(
+            zabbix_proxygroups = self.zabbix.proxygroup.get(  # type: ignore[attr-defined]
                 output=["proxy_groupid", "name"]
-            )  # type: ignore[attr-defined]
+            )
         # Sanitize proxy data
         if proxy_name == "host":
             for proxy in zabbix_proxies:
@@ -220,7 +221,7 @@ class Sync:
                     logger.debug("VM %s: extending site information.", vm.name)
                     vm.site = convert_recordset(
                         self.netbox.dcim.sites.filter(id=nb_vm.site.id)
-                    )  # type: ignore[attr-defined]
+                    )
                 vm.set_inventory(nb_vm)
                 vm.set_usermacros()
                 vm.set_tags()
@@ -296,7 +297,7 @@ class Sync:
                     continue
                 if self.config["extended_site_properties"] and nb_device.site:
                     logger.debug("Device %s: extending site information.", device.name)
-                    device.site = convert_recordset(  # type: ignore[attr-defined]
+                    device.site = convert_recordset(
                         self.netbox.dcim.sites.filter(id=nb_device.site.id)
                     )
                 device.set_inventory(nb_device)
