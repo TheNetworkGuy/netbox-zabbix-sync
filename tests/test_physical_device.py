@@ -36,9 +36,14 @@ class TestPhysicalDevice(unittest.TestCase):
         self.mock_logger = MagicMock()
 
         # Create PhysicalDevice instance with mocks
-        with patch(
-            "netbox_zabbix_sync.modules.device.config",
-            {
+        self.device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            journal=True,
+            logger=self.mock_logger,
+            config={
                 "device_cf": "zabbix_hostid",
                 "template_cf": "zabbix_template",
                 "templates_config_context": False,
@@ -49,15 +54,7 @@ class TestPhysicalDevice(unittest.TestCase):
                 "inventory_sync": False,
                 "device_inventory_map": {},
             },
-        ):
-            self.device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                journal=True,
-                logger=self.mock_logger,
-            )
+        )
 
     def test_init(self):
         """Test the initialization of the PhysicalDevice class."""
@@ -75,13 +72,7 @@ class TestPhysicalDevice(unittest.TestCase):
         self.mock_nb_device.name = "test-devïce"
 
         # We need to patch the search function to simulate finding special characters
-        with (
-            patch("netbox_zabbix_sync.modules.device.search") as mock_search,
-            patch(
-                "netbox_zabbix_sync.modules.device.config",
-                {"device_cf": "zabbix_hostid"},
-            ),
-        ):
+        with patch("netbox_zabbix_sync.modules.device.search") as mock_search:
             # Make the search function return True to simulate special characters
             mock_search.return_value = True
 
@@ -91,6 +82,7 @@ class TestPhysicalDevice(unittest.TestCase):
                 self.mock_nb_journal,
                 "3.0",
                 logger=self.mock_logger,
+                config={"device_cf": "zabbix_hostid"},
             )
 
         # With the mocked search function, the name should be changed to NETBOX_ID format
@@ -108,16 +100,14 @@ class TestPhysicalDevice(unittest.TestCase):
         }
 
         # Create device with the updated mock
-        with patch(
-            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
-        ):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config={"device_cf": "zabbix_hostid"},
+        )
 
         # Test that templates are returned correctly
         templates = device.get_templates_context()
@@ -129,16 +119,14 @@ class TestPhysicalDevice(unittest.TestCase):
         self.mock_nb_device.config_context = {"zabbix": {"templates": "Template1"}}
 
         # Create device with the updated mock
-        with patch(
-            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
-        ):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config={"device_cf": "zabbix_hostid"},
+        )
 
         # Test that template is wrapped in a list
         templates = device.get_templates_context()
@@ -150,16 +138,14 @@ class TestPhysicalDevice(unittest.TestCase):
         self.mock_nb_device.config_context = {}
 
         # Create device with the updated mock
-        with patch(
-            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
-        ):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config={"device_cf": "zabbix_hostid"},
+        )
 
         # Test that TemplateError is raised
         with self.assertRaises(TemplateError):
@@ -171,16 +157,14 @@ class TestPhysicalDevice(unittest.TestCase):
         self.mock_nb_device.config_context = {"zabbix": {}}
 
         # Create device with the updated mock
-        with patch(
-            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
-        ):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config={"device_cf": "zabbix_hostid"},
+        )
 
         # Test that TemplateError is raised
         with self.assertRaises(TemplateError):
@@ -195,17 +179,14 @@ class TestPhysicalDevice(unittest.TestCase):
         with patch.object(
             PhysicalDevice, "get_templates_context", return_value=["Template1"]
         ):
-            with patch(
-                "netbox_zabbix_sync.modules.device.config",
-                {"device_cf": "zabbix_hostid"},
-            ):
-                device = PhysicalDevice(
-                    self.mock_nb_device,
-                    self.mock_zabbix,
-                    self.mock_nb_journal,
-                    "3.0",
-                    logger=self.mock_logger,
-                )
+            device = PhysicalDevice(
+                self.mock_nb_device,
+                self.mock_zabbix,
+                self.mock_nb_journal,
+                "3.0",
+                logger=self.mock_logger,
+                config={"device_cf": "zabbix_hostid"},
+            )
 
             # Call set_template with prefer_config_context=True
             result = device.set_template(
@@ -225,23 +206,20 @@ class TestPhysicalDevice(unittest.TestCase):
             "inventory_sync": False,
         }
 
-        with patch("netbox_zabbix_sync.modules.device.config", config_patch):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config=config_patch,
+        )
+        result = device.set_inventory({})
 
-            # Call set_inventory with the config patch still active
-            with patch("netbox_zabbix_sync.modules.device.config", config_patch):
-                result = device.set_inventory({})
-
-            # Check result
-            self.assertTrue(result)
-            # Default value for disabled inventory
-            self.assertEqual(device.inventory_mode, -1)
+        # Check result
+        self.assertTrue(result)
+        # Default value for disabled inventory
+        self.assertEqual(device.inventory_mode, -1)
 
     def test_set_inventory_manual_mode(self):
         """Test set_inventory with inventory_mode=manual."""
@@ -252,22 +230,19 @@ class TestPhysicalDevice(unittest.TestCase):
             "inventory_sync": False,
         }
 
-        with patch("netbox_zabbix_sync.modules.device.config", config_patch):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config=config_patch,
+        )
+        result = device.set_inventory({})
 
-            # Call set_inventory with the config patch still active
-            with patch("netbox_zabbix_sync.modules.device.config", config_patch):
-                result = device.set_inventory({})
-
-            # Check result
-            self.assertTrue(result)
-            self.assertEqual(device.inventory_mode, 0)  # Manual mode
+        # Check result
+        self.assertTrue(result)
+        self.assertEqual(device.inventory_mode, 0)  # Manual mode
 
     def test_set_inventory_automatic_mode(self):
         """Test set_inventory with inventory_mode=automatic."""
@@ -278,22 +253,19 @@ class TestPhysicalDevice(unittest.TestCase):
             "inventory_sync": False,
         }
 
-        with patch("netbox_zabbix_sync.modules.device.config", config_patch):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config=config_patch,
+        )
+        result = device.set_inventory({})
 
-            # Call set_inventory with the config patch still active
-            with patch("netbox_zabbix_sync.modules.device.config", config_patch):
-                result = device.set_inventory({})
-
-            # Check result
-            self.assertTrue(result)
-            self.assertEqual(device.inventory_mode, 1)  # Automatic mode
+        # Check result
+        self.assertTrue(result)
+        self.assertEqual(device.inventory_mode, 1)  # Automatic mode
 
     def test_set_inventory_with_inventory_sync(self):
         """Test set_inventory with inventory_sync=True."""
@@ -305,28 +277,25 @@ class TestPhysicalDevice(unittest.TestCase):
             "device_inventory_map": {"name": "name", "serial": "serialno_a"},
         }
 
-        with patch("netbox_zabbix_sync.modules.device.config", config_patch):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config=config_patch,
+        )
 
-            # Create a mock device with the required attributes
-            mock_device_data = {"name": "test-device", "serial": "ABC123"}
+        # Create a mock device with the required attributes
+        mock_device_data = {"name": "test-device", "serial": "ABC123"}
+        result = device.set_inventory(mock_device_data)
 
-            # Call set_inventory with the config patch still active
-            with patch("netbox_zabbix_sync.modules.device.config", config_patch):
-                result = device.set_inventory(mock_device_data)
-
-            # Check result
-            self.assertTrue(result)
-            self.assertEqual(device.inventory_mode, 0)  # Manual mode
-            self.assertEqual(
-                device.inventory, {"name": "test-device", "serialno_a": "ABC123"}
-            )
+        # Check result
+        self.assertTrue(result)
+        self.assertEqual(device.inventory_mode, 0)  # Manual mode
+        self.assertEqual(
+            device.inventory, {"name": "test-device", "serialno_a": "ABC123"}
+        )
 
     def test_iscluster_true(self):
         """Test isCluster when device is part of a cluster."""
@@ -334,16 +303,14 @@ class TestPhysicalDevice(unittest.TestCase):
         self.mock_nb_device.virtual_chassis = MagicMock()
 
         # Create device with the updated mock
-        with patch(
-            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
-        ):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config={"device_cf": "zabbix_hostid"},
+        )
 
         # Check isCluster result
         self.assertTrue(device.is_cluster())
@@ -354,16 +321,14 @@ class TestPhysicalDevice(unittest.TestCase):
         self.mock_nb_device.virtual_chassis = None
 
         # Create device with the updated mock
-        with patch(
-            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
-        ):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            logger=self.mock_logger,
+            config={"device_cf": "zabbix_hostid"},
+        )
 
         # Check isCluster result
         self.assertFalse(device.is_cluster())

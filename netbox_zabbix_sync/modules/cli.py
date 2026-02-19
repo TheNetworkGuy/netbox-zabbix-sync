@@ -5,15 +5,86 @@ from os import environ
 from netbox_zabbix_sync.modules.core import Sync
 from netbox_zabbix_sync.modules.exceptions import EnvironmentVarError
 from netbox_zabbix_sync.modules.logging import get_logger, set_log_levels, setup_logger
+from netbox_zabbix_sync.modules.settings import load_config
 
 # Set logging
 setup_logger()
 logger = get_logger()
 
+# Boolean settings that can be toggled via --flag / --no-flag
+_BOOL_ARGS = [
+    ("clustering", "Enable clustering of devices with virtual chassis setup."),
+    ("create_hostgroups", "Enable hostgroup generation (requires Zabbix permissions)."),
+    ("create_journal", "Create NetBox journal entries on changes."),
+    ("sync_vms", "Enable virtual machine sync."),
+    (
+        "full_proxy_sync",
+        "Enable full proxy sync (removes proxies not in config context).",
+    ),
+    (
+        "templates_config_context",
+        "Use config context as the template source instead of a custom field.",
+    ),
+    (
+        "templates_config_context_overrule",
+        "Give config context templates higher priority than custom field templates.",
+    ),
+    ("traverse_regions", "Use the full parent-region path in hostgroup names."),
+    ("traverse_site_groups", "Use the full parent-site-group path in hostgroup names."),
+    (
+        "extended_site_properties",
+        "Fetch additional site info from NetBox (increases API queries).",
+    ),
+    ("inventory_sync", "Sync NetBox device properties to Zabbix inventory."),
+    ("usermacro_sync", "Sync usermacros from NetBox to Zabbix."),
+    ("tag_sync", "Sync host tags to Zabbix."),
+    ("tag_lower", "Lowercase tag names and values before syncing."),
+]
+
+# String settings that can be set via --option VALUE
+_STR_ARGS = [
+    ("template_cf", "NetBox custom field name for the Zabbix template.", "FIELD"),
+    ("device_cf", "NetBox custom field name for the Zabbix host ID.", "FIELD"),
+    (
+        "hostgroup_format",
+        "Hostgroup path pattern for physical devices (e.g. site/manufacturer/role).",
+        "PATTERN",
+    ),
+    (
+        "vm_hostgroup_format",
+        "Hostgroup path pattern for virtual machines (e.g. cluster_type/cluster/role).",
+        "PATTERN",
+    ),
+    (
+        "inventory_mode",
+        "Zabbix inventory mode: disabled, manual, or automatic.",
+        "MODE",
+    ),
+    ("tag_name", "Zabbix tag name used when syncing NetBox tags.", "NAME"),
+    (
+        "tag_value",
+        "NetBox tag property to use as the Zabbix tag value (name, slug, or display).",
+        "PROPERTY",
+    ),
+]
+
+
+def _apply_cli_overrides(config: dict, arguments: argparse.Namespace) -> dict:
+    """Override loaded config with any values explicitly provided on the CLI."""
+    for key, _help in _BOOL_ARGS:
+        cli_val = getattr(arguments, key, None)
+        if cli_val is not None:
+            config[key] = cli_val
+    for key, _help, _meta in _STR_ARGS:
+        cli_val = getattr(arguments, key, None)
+        if cli_val is not None:
+            config[key] = cli_val
+    return config
+
 
 def main(arguments):
     """Run the sync process."""
-    # set environment variables
+    # Set log levels based on verbosity flags
     if arguments.verbose:
         set_log_levels(logging.WARNING, logging.INFO)
     if arguments.debug:
@@ -48,8 +119,12 @@ def main(arguments):
     netbox_host = environ.get("NETBOX_HOST")
     netbox_token = environ.get("NETBOX_TOKEN")
 
+    # Load config (defaults → config.py → env vars), then apply CLI overrides
+    config = load_config(config_file=arguments.config)
+    config = _apply_cli_overrides(config, arguments)
+
     # Run main sync process
-    syncer = Sync()
+    syncer = Sync(config=config)
     syncer.connect(
         nb_host=netbox_host,
         nb_token=netbox_token,
@@ -63,8 +138,10 @@ def main(arguments):
 
 def parse_cli():
     parser = argparse.ArgumentParser(
-        description="A script to sync Zabbix with NetBox device data."
+        description="Synchronise NetBox device data to Zabbix."
     )
+
+    # ── Verbosity ──────────────────────────────────────────────────────────────
     parser.add_argument(
         "-v", "--verbose", help="Turn on verbose logging.", action="store_true"
     )
@@ -78,5 +155,46 @@ def parse_cli():
         action="store_true",
     )
     parser.add_argument("-q", "--quiet", help="Turn off warnings.", action="store_true")
+    parser.add_argument(
+        "-c",
+        "--config",
+        help="Path to the config file (default: config.py next to the script or in the current directory).",
+        metavar="FILE",
+        default=None,
+    )
+
+    # ── Boolean config overrides ───────────────────────────────────────────────
+    bool_group = parser.add_argument_group(
+        "config overrides (boolean)",
+        "Override boolean settings from config.py. "
+        "Use --flag to enable or --no-flag to disable. "
+        "When omitted, the value from config.py (or the built-in default) is used.",
+    )
+    for key, help_text in _BOOL_ARGS:
+        flag = key.replace("_", "-")
+        bool_group.add_argument(
+            f"--{flag}",
+            dest=key,
+            help=help_text,
+            action=argparse.BooleanOptionalAction,
+            default=None,
+        )
+
+    # ── String config overrides ────────────────────────────────────────────────
+    str_group = parser.add_argument_group(
+        "config overrides (string)",
+        "Override string settings from config.py. "
+        "When omitted, the value from config.py (or the built-in default) is used.",
+    )
+    for key, help_text, metavar in _STR_ARGS:
+        flag = key.replace("_", "-")
+        str_group.add_argument(
+            f"--{flag}",
+            dest=key,
+            help=help_text,
+            metavar=metavar,
+            default=None,
+        )
+
     args = parser.parse_args()
     main(args)

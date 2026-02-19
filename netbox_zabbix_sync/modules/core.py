@@ -203,6 +203,7 @@ class Sync:
                     self.nb_version,
                     self.config["create_journal"],
                     logger,
+                    config=self.config,
                 )
                 logger.debug("Host %s: Started operations on VM.", vm.name)
                 vm.set_vm_template()
@@ -276,6 +277,7 @@ class Sync:
                     self.nb_version,
                     self.config["create_journal"],
                     logger,
+                    config=self.config,
                 )
                 logger.debug("Host %s: Started operations on device.", device.name)
                 device.set_template(

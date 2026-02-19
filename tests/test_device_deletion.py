@@ -41,17 +41,15 @@ class TestDeviceDeletion(unittest.TestCase):
         self.mock_logger = MagicMock()
 
         # Create PhysicalDevice instance with mocks
-        with patch(
-            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
-        ):
-            self.device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                journal=True,
-                logger=self.mock_logger,
-            )
+        self.device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            journal=True,
+            logger=self.mock_logger,
+            config={"device_cf": "zabbix_hostid"},
+        )
 
     def test_cleanup_successful_deletion(self):
         """Test successful device deletion from Zabbix."""
@@ -149,17 +147,15 @@ class TestDeviceDeletion(unittest.TestCase):
     def test_create_journal_entry_when_disabled(self):
         """Test create_journal_entry when journaling is disabled."""
         # Setup - create device with journal=False
-        with patch(
-            "netbox_zabbix_sync.modules.device.config", {"device_cf": "zabbix_hostid"}
-        ):
-            device = PhysicalDevice(
-                self.mock_nb_device,
-                self.mock_zabbix,
-                self.mock_nb_journal,
-                "3.0",
-                journal=False,  # Disable journaling
-                logger=self.mock_logger,
-            )
+        device = PhysicalDevice(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            "3.0",
+            journal=False,  # Disable journaling
+            logger=self.mock_logger,
+            config={"device_cf": "zabbix_hostid"},
+        )
 
         # Execute
         result = device.create_journal_entry("info", "Test message")

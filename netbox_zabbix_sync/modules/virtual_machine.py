@@ -7,10 +7,6 @@ from netbox_zabbix_sync.modules.exceptions import (
     TemplateError,
 )
 from netbox_zabbix_sync.modules.interface import ZabbixInterface
-from netbox_zabbix_sync.modules.settings import load_config
-
-# Load config
-config = load_config()
 
 
 class VirtualMachine(PhysicalDevice):
@@ -24,15 +20,15 @@ class VirtualMachine(PhysicalDevice):
 
     def _inventory_map(self):
         """use VM inventory maps"""
-        return config["vm_inventory_map"]
+        return self.config["vm_inventory_map"]
 
     def _usermacro_map(self):
         """use VM usermacro maps"""
-        return config["vm_usermacro_map"]
+        return self.config["vm_usermacro_map"]
 
     def _tag_map(self):
         """use VM tag maps"""
-        return config["vm_tag_map"]
+        return self.config["vm_tag_map"]
 
     def set_vm_template(self):
         """Set Template for VMs. Overwrites default class
