@@ -785,6 +785,47 @@ class TestDeviceHandeling(unittest.TestCase):
 
     @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
     @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_sync_cluster_where_device_is_not_primary(self, mock_api, mock_zabbix_api):
+        """Test that a non-primary cluster member is skipped and not created in Zabbix."""
+        # vc_master.id (2) differs from device.id (1) → device is secondary
+        vc_master = MagicMock()
+        vc_master.id = 2  # Different from device ID → device is NOT primary
+
+        virtual_chassis = MagicMock()
+        virtual_chassis.master = vc_master
+        virtual_chassis.name = "SW01"
+
+        device = MockNetboxDevice(
+            device_id=1,
+            name="SW01N1",
+            virtual_chassis=virtual_chassis,
+        )
+
+        mock_netbox = self._setup_netbox_mock(mock_api)
+        mock_netbox.dcim.devices.filter.return_value = [device]
+
+        mock_site = MagicMock()
+        mock_site.name = "TestSite"
+        device.site = mock_site
+
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync({"clustering": True})
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        # Secondary cluster member must be skipped — no host should be created
+        mock_zabbix.host.create.assert_not_called()
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_templates_from_config_context(self, mock_api, mock_zabbix_api):
         """Test that templates_config_context=True uses the config context template."""
         device = MockNetboxDevice(
