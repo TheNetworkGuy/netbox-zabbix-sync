@@ -90,7 +90,6 @@ class MockNetboxDevice:
         else:
             self.device_type = device_type
 
-        # Setup device role (NetBox 2/3 compatibility) and role (NetBox 4+)
         if device_role is None and role is None:
             # Create default role
             mock_role = MagicMock()
@@ -716,3 +715,410 @@ class TestDeviceHandeling(unittest.TestCase):
 
         # The host should be created with the virtual chassis name, not the device name
         self.assertEqual(create_call_kwargs["host"], "SW01")
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_templates_from_config_context(self, mock_api, mock_zabbix_api):
+        """Test that templates_config_context=True uses the config context template."""
+        device = MockNetboxDevice(
+            device_id=1,
+            name="Router01",
+            config_context={
+                "zabbix": {
+                    "templates": ["ContextTemplate"],
+                }
+            },
+        )
+
+        mock_netbox = self._setup_netbox_mock(mock_api)
+        mock_netbox.dcim.devices.filter.return_value = [device]
+
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        # Both templates exist in Zabbix
+        mock_zabbix.template.get.return_value = [
+            {"templateid": "1", "name": "TestTemplate"},
+            {"templateid": "2", "name": "ContextTemplate"},
+        ]
+
+        syncer = Sync({"templates_config_context": True})
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        # Verify host was created with the config context template, not the custom field one
+        mock_zabbix.host.create.assert_called_once()
+        create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
+        self.assertEqual(create_call_kwargs["templates"], [{"templateid": "2"}])
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_templates_config_context_overrule(self, mock_api, mock_zabbix_api):
+        """Test that templates_config_context_overrule=True prefers config context over custom field.
+
+        The device has:
+          - Custom field template (device type): "TestTemplate"
+          - Config context template (device):    "ContextTemplate"
+
+        With overrule enabled the config context should win and the host should
+        be created with "ContextTemplate" only.
+        """
+        device = MockNetboxDevice(
+            device_id=1,
+            name="Router01",
+            config_context={
+                "zabbix": {
+                    "templates": ["ContextTemplate"],
+                }
+            },
+        )
+
+        mock_netbox = self._setup_netbox_mock(mock_api)
+        mock_netbox.dcim.devices.filter.return_value = [device]
+
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        # Both templates exist in Zabbix
+        mock_zabbix.template.get.return_value = [
+            {"templateid": "1", "name": "TestTemplate"},
+            {"templateid": "2", "name": "ContextTemplate"},
+        ]
+
+        syncer = Sync({"templates_config_context_overrule": True})
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        # Config context overrides the custom field - only "ContextTemplate" should be used
+        mock_zabbix.host.create.assert_called_once()
+        create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
+        self.assertEqual(create_call_kwargs["templates"], [{"templateid": "2"}])
+        # Verify the custom field template was NOT used
+        self.assertNotIn({"templateid": "1"}, create_call_kwargs["templates"])
+
+
+class TestDeviceStatusHandling(unittest.TestCase):
+    """
+    Tests device status handling during NetBox to Zabbix synchronization.
+
+    Validates the correct sync behavior for various combinations of NetBox device
+    status, Zabbix host state, and the 'zabbix_device_removal' / 'zabbix_device_disable'
+    configuration settings.
+
+    Scenarios:
+      1. Active, not in Zabbix          → created enabled
+      2. Active, already in Zabbix      → consistency check passes, no update
+      3. Staged, not in Zabbix          → created disabled
+      4. Staged, already in Zabbix      → consistency check passes, no update
+      5. Decommissioning, not in Zabbix → skipped entirely
+      6. Decommissioning, in Zabbix     → host deleted from Zabbix (cleanup)
+      7. Active, in Zabbix but disabled → host re-enabled via consistency check
+      8. Failed, in Zabbix but enabled  → host disabled via consistency check
+    """
+
+    # Hostgroup produced by the default "site/manufacturer/role" format
+    # for the default MockNetboxDevice attributes.
+    EXPECTED_HOSTGROUP = "TestSite/TestManufacturer/Switch"
+
+    def _setup_netbox_mock(self, mock_api, devices=None):
+        """Helper to setup a working NetBox mock."""
+        mock_netbox = MagicMock()
+        mock_api.return_value = mock_netbox
+        mock_netbox.version = "3.5"
+        mock_netbox.extras.custom_fields.filter.return_value = []
+        mock_netbox.dcim.devices.filter.return_value = devices or []
+        mock_netbox.virtualization.virtual_machines.filter.return_value = []
+        mock_netbox.dcim.site_groups.all.return_value = []
+        mock_netbox.dcim.regions.all.return_value = []
+        mock_netbox.extras.journal_entries = MagicMock()
+        return mock_netbox
+
+    def _setup_zabbix_mock(self, mock_zabbix_api, version=7.0):
+        """Helper to setup a working Zabbix mock."""
+        mock_zabbix = MagicMock()
+        mock_zabbix_api.return_value = mock_zabbix
+        mock_zabbix.version = version
+        mock_zabbix.hostgroup.get.return_value = [
+            {"groupid": "1", "name": self.EXPECTED_HOSTGROUP}
+        ]
+        mock_zabbix.hostgroup.create.return_value = {"groupids": ["2"]}
+        mock_zabbix.template.get.return_value = [
+            {"templateid": "1", "name": "TestTemplate"}
+        ]
+        mock_zabbix.proxy.get.return_value = []
+        mock_zabbix.proxygroup.get.return_value = []
+        mock_zabbix.logout = MagicMock()
+        mock_zabbix.host.get.return_value = []
+        mock_zabbix.host.create.return_value = {"hostids": ["1"]}
+        mock_zabbix.host.update.return_value = {"hostids": ["42"]}
+        mock_zabbix.host.delete.return_value = [42]
+        return mock_zabbix
+
+    def _make_zabbix_host(self, hostname="test-device", status="0"):
+        """Build a minimal but complete Zabbix host response for consistency_check."""
+        return [
+            {
+                "hostid": "42",
+                "host": hostname,
+                "name": hostname,
+                "parentTemplates": [{"templateid": "1"}],
+                "hostgroups": [{"groupid": "1"}],
+                "groups": [{"groupid": "1"}],
+                "status": status,
+                # Single empty-dict interface: len==1 avoids SyncInventoryError,
+                # empty keys prevent any spurious interface-update calls.
+                "interfaces": [{}],
+                "inventory_mode": "-1",
+                "inventory": {},
+                "macros": [],
+                "tags": [],
+                "proxy_hostid": "0",
+                "proxyid": "0",
+                "proxy_groupid": "0",
+            }
+        ]
+
+    # ------------------------------------------------------------------
+    # Scenario 1: Active device, not yet in Zabbix → created enabled (status=0)
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_active_device_not_in_zabbix_is_created(self, mock_api, mock_zabbix_api):
+        """Active device not yet synced to Zabbix should be created with status enabled (0)."""
+        device = MockNetboxDevice(
+            name="test-device", status_label="Active", zabbix_hostid=None
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.create.assert_called_once()
+        create_kwargs = mock_zabbix.host.create.call_args.kwargs
+        self.assertEqual(create_kwargs["host"], "test-device")
+        self.assertEqual(create_kwargs["status"], 0)
+
+    # ------------------------------------------------------------------
+    # Scenario 2: Active device, already in Zabbix → consistency check,
+    #             Zabbix status matches → no updates
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_active_device_in_zabbix_is_consistent(self, mock_api, mock_zabbix_api):
+        """Active device already in Zabbix with matching status should require no updates."""
+        device = MockNetboxDevice(
+            name="test-device", status_label="Active", zabbix_hostid=42
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix.host.get.return_value = self._make_zabbix_host(status="0")
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.create.assert_not_called()
+        mock_zabbix.host.update.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # Scenario 3: Staged device, not yet in Zabbix → created disabled (status=1)
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_staged_device_not_in_zabbix_is_created_disabled(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Staged device not yet in Zabbix should be created with status disabled (1)."""
+        device = MockNetboxDevice(
+            name="test-device", status_label="Staged", zabbix_hostid=None
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.create.assert_called_once()
+        create_kwargs = mock_zabbix.host.create.call_args.kwargs
+        self.assertEqual(create_kwargs["status"], 1)
+
+    # ------------------------------------------------------------------
+    # Scenario 4: Staged device, already in Zabbix as disabled → no update needed
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_staged_device_in_zabbix_is_consistent(self, mock_api, mock_zabbix_api):
+        """Staged device already in Zabbix as disabled should pass consistency check with no updates."""
+        device = MockNetboxDevice(
+            name="test-device", status_label="Staged", zabbix_hostid=42
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix.host.get.return_value = self._make_zabbix_host(status="1")
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.create.assert_not_called()
+        mock_zabbix.host.update.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # Scenario 5: Decommissioning device, not in Zabbix → skipped (no create, no delete)
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_decommissioning_device_not_in_zabbix_is_skipped(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Decommissioning device with no Zabbix ID should be skipped entirely."""
+        device = MockNetboxDevice(
+            name="test-device", status_label="Decommissioning", zabbix_hostid=None
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.create.assert_not_called()
+        mock_zabbix.host.delete.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # Scenario 6: Decommissioning device, already in Zabbix → cleanup (host deleted)
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_decommissioning_device_in_zabbix_is_deleted(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Decommissioning device with a Zabbix ID should be deleted from Zabbix."""
+        device = MockNetboxDevice(
+            name="test-device", status_label="Decommissioning", zabbix_hostid=42
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        # Zabbix still has the host → it should be deleted
+        mock_zabbix.host.get.return_value = [{"hostid": "42"}]
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.delete.assert_called_once_with(42)
+
+    # ------------------------------------------------------------------
+    # Scenario 7: Active device, Zabbix host is disabled → re-enable via consistency check
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_active_device_disabled_in_zabbix_is_enabled(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Active device whose Zabbix host is disabled should be re-enabled by consistency check."""
+        device = MockNetboxDevice(
+            name="test-device", status_label="Active", zabbix_hostid=42
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        # Zabbix host currently disabled; device is Active → status out-of-sync
+        mock_zabbix.host.get.return_value = self._make_zabbix_host(status="1")
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.update.assert_called_once_with(hostid=42, status="0")
+
+    # ------------------------------------------------------------------
+    # Scenario 8: Failed device, Zabbix host is enabled → disable via consistency check
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_failed_device_enabled_in_zabbix_is_disabled(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Failed device whose Zabbix host is enabled should be disabled by consistency check."""
+        device = MockNetboxDevice(
+            name="test-device", status_label="Failed", zabbix_hostid=42
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        # Zabbix host currently enabled; device is Failed → status out-of-sync
+        mock_zabbix.host.get.return_value = self._make_zabbix_host(status="0")
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.update.assert_called_once_with(hostid=42, status="1")
