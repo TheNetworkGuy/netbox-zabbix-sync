@@ -82,8 +82,7 @@ class MockNetboxDevice:
         # Setup device type with proper structure
         if device_type is None:
             self.device_type = MagicMock()
-            self.device_type.custom_fields = {
-                "zabbix_template": "TestTemplate"}
+            self.device_type.custom_fields = {"zabbix_template": "TestTemplate"}
             self.device_type.manufacturer = MagicMock()
             self.device_type.manufacturer.name = "TestManufacturer"
             self.device_type.display = "Test Device Type"
@@ -373,8 +372,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
         mock_zabbix.version = version
-        mock_zabbix.hostgroup.get.return_value = [
-            {"groupid": "1", "name": "TestGroup"}]
+        mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
         mock_zabbix.template.get.return_value = [
             {"templateid": "1", "name": "TestTemplate"}
         ]
@@ -500,8 +498,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.version = "6.0"
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = [
-            {"proxyid": "1", "host": "proxy1"}]
+        mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "host": "proxy1"}]
 
         syncer = Sync()
         syncer.connect(
@@ -528,8 +525,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.version = "7.0"
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = [
-            {"proxyid": "1", "name": "proxy1"}]
+        mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "name": "proxy1"}]
         mock_zabbix.proxygroup.get.return_value = []
 
         syncer = Sync()
@@ -724,8 +720,7 @@ class TestDeviceHandeling(unittest.TestCase):
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
         mock_zabbix.version = version
-        mock_zabbix.hostgroup.get.return_value = [
-            {"groupid": "1", "name": "TestGroup"}]
+        mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
         mock_zabbix.template.get.return_value = [
             {"templateid": "1", "name": "TestTemplate"}
         ]
@@ -826,8 +821,7 @@ class TestDeviceHandeling(unittest.TestCase):
         # Verify host was created with the config context template, not the custom field one
         mock_zabbix.host.create.assert_called_once()
         create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
-        self.assertEqual(create_call_kwargs["templates"], [
-                         {"templateid": "2"}])
+        self.assertEqual(create_call_kwargs["templates"], [{"templateid": "2"}])
 
     @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
     @patch("netbox_zabbix_sync.modules.core.nbapi")
@@ -875,8 +869,7 @@ class TestDeviceHandeling(unittest.TestCase):
         # Config context overrides the custom field - only "ContextTemplate" should be used
         mock_zabbix.host.create.assert_called_once()
         create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
-        self.assertEqual(create_call_kwargs["templates"], [
-                         {"templateid": "2"}])
+        self.assertEqual(create_call_kwargs["templates"], [{"templateid": "2"}])
         # Verify the custom field template was NOT used
         self.assertNotIn({"templateid": "1"}, create_call_kwargs["templates"])
 
@@ -1268,8 +1261,7 @@ class TestVMStatusHandling(unittest.TestCase):
         ]
 
     # Simple Sync config that enables VM sync with a flat hostgroup format
-    _SYNC_CFG: ClassVar[dict] = {"sync_vms": True,
-                                 "vm_hostgroup_format": "site/role"}
+    _SYNC_CFG: ClassVar[dict] = {"sync_vms": True, "vm_hostgroup_format": "site/role"}
 
     # ------------------------------------------------------------------
     # Scenario 1: Active VM, not yet in Zabbix → created enabled (status=0)
@@ -1278,8 +1270,7 @@ class TestVMStatusHandling(unittest.TestCase):
     @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_active_vm_not_in_zabbix_is_created(self, mock_api, mock_zabbix_api):
         """Active VM not yet synced to Zabbix should be created with status enabled (0)."""
-        vm = MockNetboxVM(
-            name="test-vm", status_label="Active", zabbix_hostid=None)
+        vm = MockNetboxVM(name="test-vm", status_label="Active", zabbix_hostid=None)
         self._setup_netbox_mock(mock_api, vms=[vm])
         mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
 
@@ -1306,8 +1297,7 @@ class TestVMStatusHandling(unittest.TestCase):
     @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_active_vm_in_zabbix_is_consistent(self, mock_api, mock_zabbix_api):
         """Active VM already in Zabbix with matching status should require no updates."""
-        vm = MockNetboxVM(
-            name="test-vm", status_label="Active", zabbix_hostid=42)
+        vm = MockNetboxVM(name="test-vm", status_label="Active", zabbix_hostid=42)
         self._setup_netbox_mock(mock_api, vms=[vm])
         mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = self._make_zabbix_host(status="0")
@@ -1335,8 +1325,7 @@ class TestVMStatusHandling(unittest.TestCase):
         self, mock_api, mock_zabbix_api
     ):
         """Staged VM not yet in Zabbix should be created with status disabled (1)."""
-        vm = MockNetboxVM(
-            name="test-vm", status_label="Staged", zabbix_hostid=None)
+        vm = MockNetboxVM(name="test-vm", status_label="Staged", zabbix_hostid=None)
         self._setup_netbox_mock(mock_api, vms=[vm])
         mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
 
@@ -1362,8 +1351,7 @@ class TestVMStatusHandling(unittest.TestCase):
     @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_staged_vm_in_zabbix_is_consistent(self, mock_api, mock_zabbix_api):
         """Staged VM already in Zabbix as disabled should pass consistency check with no updates."""
-        vm = MockNetboxVM(
-            name="test-vm", status_label="Staged", zabbix_hostid=42)
+        vm = MockNetboxVM(name="test-vm", status_label="Staged", zabbix_hostid=42)
         self._setup_netbox_mock(mock_api, vms=[vm])
         mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = self._make_zabbix_host(status="1")
@@ -1445,8 +1433,7 @@ class TestVMStatusHandling(unittest.TestCase):
     @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_active_vm_disabled_in_zabbix_is_enabled(self, mock_api, mock_zabbix_api):
         """Active VM whose Zabbix host is disabled should be re-enabled by consistency check."""
-        vm = MockNetboxVM(
-            name="test-vm", status_label="Active", zabbix_hostid=42)
+        vm = MockNetboxVM(name="test-vm", status_label="Active", zabbix_hostid=42)
         self._setup_netbox_mock(mock_api, vms=[vm])
         mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = self._make_zabbix_host(status="1")
@@ -1471,8 +1458,7 @@ class TestVMStatusHandling(unittest.TestCase):
     @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_failed_vm_enabled_in_zabbix_is_disabled(self, mock_api, mock_zabbix_api):
         """Failed VM whose Zabbix host is enabled should be disabled by consistency check."""
-        vm = MockNetboxVM(
-            name="test-vm", status_label="Failed", zabbix_hostid=42)
+        vm = MockNetboxVM(name="test-vm", status_label="Failed", zabbix_hostid=42)
         self._setup_netbox_mock(mock_api, vms=[vm])
         mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = self._make_zabbix_host(status="0")
