@@ -184,7 +184,7 @@ class Sync:
         if not self.netbox or not self.zabbix:
             e = "Not connected to NetBox or Zabbix. Please run the connect function first."
             logger.error(e)
-            raise SyncError(e)
+            return False
         device_cfs = []
         vm_cfs = []
         # Create API call to get all custom fields which are on the device objects
@@ -422,3 +422,4 @@ class Sync:
             except SyncError:
                 pass
         self.zabbix.logout()
+        return True
