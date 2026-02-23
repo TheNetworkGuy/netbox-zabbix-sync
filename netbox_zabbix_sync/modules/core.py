@@ -130,6 +130,7 @@ class Sync:
                 logger.debug("Using token authentication for Zabbix API.")
                 self.zabbix = ZabbixAPI(zbx_host, token=zbx_token, ssl_context=ssl_ctx)
             self.zabbix.check_auth()
+            logger.debug("Zabbix version is %s.", self.zabbix.version)
         except (APIRequestError, ProcessingError) as zbx_error:
             e = f"Zabbix returned the following error: {zbx_error}."
             logger.error(e)
@@ -239,7 +240,7 @@ class Sync:
         )
         # Set empty list for proxy processing Zabbix <= 6
         zabbix_proxygroups = []
-        if str(self.zabbix.version).startswith("7"):
+        if self.zabbix.version >= "7":
             zabbix_proxygroups = self.zabbix.proxygroup.get(  # type: ignore
                 output=["proxy_groupid", "name"]
             )
