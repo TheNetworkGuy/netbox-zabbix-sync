@@ -122,15 +122,13 @@ class Sync:
             if environ.get("REQUESTS_CA_BUNDLE", None):
                 ssl_ctx.load_verify_locations(environ["REQUESTS_CA_BUNDLE"])
             if not zbx_token:
-                logger.debug(
-                    "Using user/password authentication for Zabbix API.")
+                logger.debug("Using user/password authentication for Zabbix API.")
                 self.zabbix = ZabbixAPI(
                     zbx_host, user=zbx_user, password=zbx_pass, ssl_context=ssl_ctx
                 )
             else:
                 logger.debug("Using token authentication for Zabbix API.")
-                self.zabbix = ZabbixAPI(
-                    zbx_host, token=zbx_token, ssl_context=ssl_ctx)
+                self.zabbix = ZabbixAPI(zbx_host, token=zbx_token, ssl_context=ssl_ctx)
             self.zabbix.check_auth()
             logger.debug("Zabbix version is %s.", self.zabbix.version)
         except (APIRequestError, ProcessingError) as zbx_error:
@@ -151,8 +149,7 @@ class Sync:
         token_prefix = "nbt_"  # noqa: S105
         nb_v2_support_version = "4.5"
         v2_token = bool(token.startswith(token_prefix) and "." in token)
-        v2_error_token = bool(token.startswith(
-            token_prefix) and "." not in token)
+        v2_error_token = bool(token.startswith(token_prefix) and "." not in token)
         # Check if the token is passed without a proper key.token format
         if v2_error_token:
             logger.error(
@@ -229,8 +226,7 @@ class Sync:
                     **self.config["nb_vm_filter"]
                 )
             )
-        netbox_site_groups = convert_recordset(
-            self.netbox.dcim.site_groups.all())
+        netbox_site_groups = convert_recordset(self.netbox.dcim.site_groups.all())
         netbox_regions = convert_recordset(self.netbox.dcim.regions.all())
         netbox_journals = self.netbox.extras.journal_entries
         zabbix_groups = self.zabbix.hostgroup.get(  # type: ignore
@@ -281,8 +277,7 @@ class Sync:
                 if not vm.hostgroups:
                     continue
                 if self.config["extended_site_properties"] and nb_vm.site:
-                    logger.debug(
-                        "Host %s: extending site information.", vm.name)
+                    logger.debug("Host %s: extending site information.", vm.name)
                     vm.site = convert_recordset(
                         self.netbox.dcim.sites.filter(id=nb_vm.site.id)
                     )
@@ -326,8 +321,7 @@ class Sync:
                     )
                     continue
                 # Add VM to Zabbix
-                vm.create_in_zabbix(
-                    zabbix_groups, zabbix_templates, zabbix_proxy_list)
+                vm.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
             except SyncError:
                 pass
 
@@ -343,8 +337,7 @@ class Sync:
                     logger,
                     config=self.config,
                 )
-                logger.debug(
-                    "Host %s: Started operations on device.", device.name)
+                logger.debug("Host %s: Started operations on device.", device.name)
                 device.set_template(
                     self.config["templates_config_context"],
                     self.config["templates_config_context_overrule"],
@@ -363,8 +356,7 @@ class Sync:
                     )
                     continue
                 if self.config["extended_site_properties"] and nb_device.site:
-                    logger.debug(
-                        "Host %s: extending site information.", device.name)
+                    logger.debug("Host %s: extending site information.", device.name)
                     device.site = convert_recordset(
                         self.netbox.dcim.sites.filter(id=nb_device.site.id)
                     )
