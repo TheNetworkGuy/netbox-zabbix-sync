@@ -214,7 +214,7 @@ class Sync:
                 logger=logger,
             )
         # Set API parameter mapping based on API version
-        proxy_name = "host" if not str(self.zabbix.version).startswith("7") else "name"
+        proxy_name = "host" if str(self.zabbix.version) < "7" else "name"
         # Get all Zabbix and NetBox data
         netbox_devices = list(
             self.netbox.dcim.devices.filter(**self.config["nb_device_filter"])
@@ -240,7 +240,7 @@ class Sync:
         )
         # Set empty list for proxy processing Zabbix <= 6
         zabbix_proxygroups = []
-        if self.zabbix.version >= "7":
+        if str(self.zabbix.version) >= "7":
             zabbix_proxygroups = self.zabbix.proxygroup.get(  # type: ignore
                 output=["proxy_groupid", "name"]
             )
