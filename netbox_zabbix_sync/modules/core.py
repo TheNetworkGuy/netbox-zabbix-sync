@@ -5,6 +5,7 @@ from os import environ
 from typing import Any
 
 from pynetbox import api as nbapi
+from pynetbox.core.query import RequestError as NetBoxRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 
@@ -88,6 +89,9 @@ class Sync:
             # Get NetBox version
             nb_version = netbox.version
             logger.debug("NetBox version is %s.", nb_version)
+            # Test API access by attempting to access a basic endpoint
+            # This will catch authorization errors early
+            netbox.dcim.sites.all()
             self.netbox = netbox
             self.nb_version = nb_version
         except RequestsConnectionError:
@@ -96,13 +100,13 @@ class Sync:
                 nb_host,
             )
             return False
-        # Warning message for Netbox token v1 with Netbox v4.5 and higher
-        if not str(nb_token).startswith("nbt_") and self.nb_version >= "4.5":
-            logger.warning(
-                "Using Netbox v1 token format. "
-                "Consider updating to a v2 token. For more info, see "
-                "https://netboxlabs.com/docs/netbox/integrations/rest-api/#v1-and-v2-tokens"
-            )
+        except NetBoxRequestError as nb_error:
+            e = f"NetBox returned the following error: {nb_error}."
+            logger.error(e)
+            return False
+        # Check Netbox API token format based on NetBox version
+        if not self._validate_netbox_token(nb_token, self.nb_version):
+            return False
         # Set Zabbix API
         if (zbx_pass or zbx_user) and zbx_token:
             e = (
@@ -130,6 +134,35 @@ class Sync:
             e = f"Zabbix returned the following error: {zbx_error}."
             logger.error(e)
             return False
+        return True
+
+    def _validate_netbox_token(self, token: str, nb_version: str) -> bool:
+        """Validate the format of the NetBox token based on the NetBox version.
+        :param token: The NetBox token to validate.
+        :param nb_version: The version of NetBox being used.
+        :return: True if the token format is valid for the given NetBox version, False otherwise.
+        """
+        support_token_url = (
+            "https://netboxlabs.com/docs/netbox/integrations/rest-api/#v1-and-v2-tokens"  # noqa: S105
+        )
+        # Warning message for Netbox token v1 with Netbox v4.5 and higher
+        if not str(token).startswith("nbt_") and nb_version >= "4.5":
+            logger.warning(
+                "Using Netbox v1 token format. "
+                "Consider updating to a v2 token. For more info, see %s",
+                support_token_url,
+            )
+        elif nb_version < "4.5" and str(token).startswith("nbt_"):
+            logger.error(
+                "Using Netbox v2 token format with Netbox version lower than 4.5. "
+                "Revert to v1 token or upgrade Netbox to 4.5 or higher. For more info, see %s",
+                support_token_url,
+            )
+            return False
+        elif nb_version >= "4.5" and str(token).startswith("nbt_"):
+            logger.debug("Using NetBox v2 token format.")
+        else:
+            logger.debug("Using NetBox v1 token format.")
         return True
 
     def start(self):
@@ -184,13 +217,15 @@ class Sync:
         netbox_site_groups = convert_recordset(self.netbox.dcim.site_groups.all())
         netbox_regions = convert_recordset(self.netbox.dcim.regions.all())
         netbox_journals = self.netbox.extras.journal_entries
-        zabbix_groups = self.zabbix.hostgroup.get(output=["groupid", "name"])  # type: ignore[attr-defined]
-        zabbix_templates = self.zabbix.template.get(output=["templateid", "name"])  # type: ignore[attr-defined]
-        zabbix_proxies = self.zabbix.proxy.get(output=["proxyid", proxy_name])  # type: ignore[attr-defined]
+        zabbix_groups = self.zabbix.hostgroup.get(output=["groupid", "name"])  # type: ignore
+        zabbix_templates = self.zabbix.template.get(  # type: ignore
+            output=["templateid", "name"]
+        )
+        zabbix_proxies = self.zabbix.proxy.get(output=["proxyid", proxy_name])  # type: ignore
         # Set empty list for proxy processing Zabbix <= 6
         zabbix_proxygroups = []
         if str(self.zabbix.version).startswith("7"):
-            zabbix_proxygroups = self.zabbix.proxygroup.get(  # type: ignore[attr-defined]
+            zabbix_proxygroups = self.zabbix.proxygroup.get(  # type: ignore
                 output=["proxy_groupid", "name"]
             )
         # Sanitize proxy data
