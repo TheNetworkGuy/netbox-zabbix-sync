@@ -12,14 +12,6 @@ class DummyNB:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    def __getitem__(self, key):
-        # Allow dict-style access for test compatibility
-        if hasattr(self, key):
-            return getattr(self, key)
-        if key in self.config_context:
-            return self.config_context[key]
-        raise KeyError(key)
-
 
 class TestUsermacroSync(unittest.TestCase):
     def setUp(self):
