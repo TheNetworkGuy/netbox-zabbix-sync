@@ -91,7 +91,7 @@ class Sync:
             logger.debug("NetBox version is %s.", nb_version)
             # Test API access by attempting to access a basic endpoint
             # This will catch authorization errors early
-            netbox.dcim.sites.all()
+            netbox.dcim.devices.count()
             self.netbox = netbox
             self.nb_version = nb_version
         except RequestsConnectionError:
