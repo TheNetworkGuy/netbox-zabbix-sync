@@ -277,7 +277,7 @@ class Sync:
                 if not vm.hostgroups:
                     continue
                 if self.config["extended_site_properties"] and nb_vm.site:
-                    logger.debug("VM %s: extending site information.", vm.name)
+                    logger.debug("Host %s: extending site information.", vm.name)
                     vm.site = convert_recordset(
                         self.netbox.dcim.sites.filter(id=nb_vm.site.id)
                     )
@@ -290,12 +290,12 @@ class Sync:
                         # Delete device from Zabbix
                         # and remove hostID from self.netbox.
                         vm.cleanup()
-                        logger.info("VM %s: cleanup complete", vm.name)
+                        logger.info("Host %s: cleanup complete", vm.name)
                         continue
                     # Device has been added to NetBox
                     # but is not in Activate state
                     logger.info(
-                        "VM %s: Skipping since this VM is not in the active state.",
+                        "Host %s: Skipping since this host is not in the active state.",
                         vm.name,
                     )
                     continue
@@ -351,12 +351,12 @@ class Sync:
                 # Check if a valid hostgroup has been found for this VM.
                 if not device.hostgroups:
                     logger.warning(
-                        "Host %s: Host has no valid hostgroups, Skipping this host...",
+                        "Host %s: has no valid hostgroups, Skipping this host...",
                         device.name,
                     )
                     continue
                 if self.config["extended_site_properties"] and nb_device.site:
-                    logger.debug("Device %s: extending site information.", device.name)
+                    logger.debug("Host %s: extending site information.", device.name)
                     device.site = convert_recordset(
                         self.netbox.dcim.sites.filter(id=nb_device.site.id)
                     )
@@ -369,13 +369,13 @@ class Sync:
                     # Check if device is primary or secondary
                     if device.promote_primary_device():
                         logger.info(
-                            "Device %s: is part of cluster and primary.", device.name
+                            "Host %s: is part of cluster and primary.", device.name
                         )
                     else:
                         # Device is secondary in cluster.
                         # Don't continue with this device.
                         logger.info(
-                            "Device %s: Is part of cluster but not primary. Skipping this host...",
+                            "Host %s: Is part of cluster but not primary. Skipping this host...",
                             device.name,
                         )
                         continue
@@ -385,12 +385,12 @@ class Sync:
                         # Delete device from Zabbix
                         # and remove hostID from NetBox.
                         device.cleanup()
-                        logger.info("Device %s: cleanup complete", device.name)
+                        logger.info("Host %s: cleanup complete", device.name)
                         continue
                     # Device has been added to NetBox
                     # but is not in Activate state
                     logger.info(
-                        "Device %s: Skipping since this device is not in the active state.",
+                        "Host %s: Skipping since this host is not in the active state.",
                         device.name,
                     )
                     continue

@@ -7,10 +7,6 @@ from netbox_zabbix_sync.modules.exceptions import EnvironmentVarError
 from netbox_zabbix_sync.modules.logging import get_logger, set_log_levels, setup_logger
 from netbox_zabbix_sync.modules.settings import load_config
 
-# Set logging
-setup_logger()
-logger = get_logger()
-
 # Boolean settings that can be toggled via --flag / --no-flag
 _BOOL_ARGS = [
     ("clustering", "Enable clustering of devices with virtual chassis setup."),
@@ -84,6 +80,9 @@ def _apply_cli_overrides(config: dict, arguments: argparse.Namespace) -> dict:
 
 def main(arguments):
     """Run the sync process."""
+    # Set logging
+    setup_logger()
+    logger = get_logger()
     # Set log levels based on verbosity flags
     if arguments.verbose:
         set_log_levels(logging.WARNING, logging.INFO)
@@ -137,6 +136,9 @@ def main(arguments):
 
 
 def parse_cli():
+    """
+    Parse command-line arguments and run the main function.
+    """
     parser = argparse.ArgumentParser(
         description="Synchronise NetBox device data to Zabbix."
     )
