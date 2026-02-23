@@ -197,6 +197,63 @@ class MockNetboxVM:
         """Mock save method."""
 
 
+class TestNetboxv2TokenHandling(unittest.TestCase):
+    """Test that sync properly handles NetBox v2 token authentication."""
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_sync_uses_token_for_netbox_v2(self, mock_api, mock_zabbix_api):
+        """Test that sync uses token authentication for NetBox v2."""
+        # Setup NetBox mock
+        mock_netbox = MagicMock()
+        mock_api.return_value = mock_netbox
+        mock_netbox.version = "4.5"
+
+        # Setup Zabbix mock
+        mock_zabbix = MagicMock()
+        mock_zabbix_api.return_value = mock_zabbix
+        mock_zabbix.check_auth.return_value = True
+
+        # Test v1 token (should log warning)
+        with self.assertLogs("NetBox-Zabbix-sync", level="WARNING") as log_context:
+            syncer_with_v1_token = Sync()
+            result_v1_token = syncer_with_v1_token.connect(
+                nb_host="http://netbox.local",
+                nb_token="token123",  # v1 token (doesn't start with "nbt_")
+                zbx_host="http://zabbix.local",
+                zbx_user="user",
+                zbx_pass="pass",
+                zbx_token=None,
+            )
+
+        # Verify v1 token connection succeeded and warning was logged
+        self.assertTrue(result_v1_token)
+        self.assertTrue(
+            any("v1 token format" in record.message for record in log_context.records)
+        )
+
+        # Test v2 token (should not log warning)
+        # Reset the log capture context
+        syncer_with_v2_token = Sync()
+        with self.assertLogs("NetBox-Zabbix-sync", level="DEBUG") as log_context_v2:
+            result_v2_token = syncer_with_v2_token.connect(
+                nb_host="http://netbox.local",
+                nb_token="nbt_token123",  # v2 token (starts with "nbt_")
+                zbx_host="http://zabbix.local",
+                zbx_user="user",
+                zbx_pass="pass",
+                zbx_token=None,
+            )
+
+        # Verify v2 token connection succeeded and NO warning was logged
+        self.assertTrue(result_v2_token)
+        self.assertFalse(
+            any(
+                "v1 token format" in record.message for record in log_context_v2.records
+            )
+        )
+
+
 class TestSyncNetboxConnection(unittest.TestCase):
     """Test NetBox connection handling in sync function."""
 
@@ -268,6 +325,16 @@ class TestSyncZabbixConnection(unittest.TestCase):
         )
         # Start syncer and set connection details
         syncer = Sync()
+        result = syncer.connect(
+            nb_host="http://netbox.local",
+            nb_token="token",
+            zbx_host="http://zabbix.local",
+            zbx_user="user",
+            zbx_pass="pass",
+            zbx_token=None,
+        )
+        # Should return False due to Zabbix API error
+        self.assertFalse(result)
         result = syncer.connect(
             "http://netbox.local",
             "token",

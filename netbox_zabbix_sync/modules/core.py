@@ -96,6 +96,13 @@ class Sync:
                 nb_host,
             )
             return False
+        # Warning message for Netbox token v1 with Netbox v4.5 and higher
+        if not str(nb_token).startswith("nbt_") and self.nb_version >= "4.5":
+            logger.warning(
+                "Using Netbox v1 token format. "
+                "Consider updating to a v2 token. For more info, see "
+                "https://netboxlabs.com/docs/netbox/integrations/rest-api/#v1-and-v2-tokens"
+            )
         # Set Zabbix API
         if (zbx_pass or zbx_user) and zbx_token:
             e = (
