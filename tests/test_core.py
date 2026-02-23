@@ -217,7 +217,7 @@ class TestNetboxTokenHandling(unittest.TestCase):
         syncer = Sync()
 
         with self.assertLogs("NetBox-Zabbix-sync", level="ERROR") as log_context:
-            result = syncer._validate_netbox_token("nbt_token123", "3.5")
+            result = syncer._validate_netbox_token("nbt_key123.token123", "3.5")
 
         self.assertFalse(result)
         self.assertTrue(
@@ -232,7 +232,7 @@ class TestNetboxTokenHandling(unittest.TestCase):
         syncer = Sync()
 
         with self.assertLogs("NetBox-Zabbix-sync", level="DEBUG") as log_context:
-            result = syncer._validate_netbox_token("nbt_token123", "4.5")
+            result = syncer._validate_netbox_token("nbt_key123.token123", "4.5")
 
         self.assertTrue(result)
         self.assertTrue(

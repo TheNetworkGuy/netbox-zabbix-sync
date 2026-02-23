@@ -145,21 +145,32 @@ class Sync:
         support_token_url = (
             "https://netboxlabs.com/docs/netbox/integrations/rest-api/#v1-and-v2-tokens"  # noqa: S105
         )
+        token_prefix = "nbt_"  # noqa: S105
+        nb_v2_support_version = "4.5"
+        v2_token = bool(token.startswith(token_prefix) and "." in token)
+        v2_error_token = bool(token.startswith(token_prefix) and "." not in token)
+        # Check if the token is passed without a proper key.token format
+        if v2_error_token:
+            logger.error(
+                "It looks like an invalid v2 token was passed. For more info, see %s",
+                support_token_url,
+            )
+            return False
         # Warning message for Netbox token v1 with Netbox v4.5 and higher
-        if not str(token).startswith("nbt_") and nb_version >= "4.5":
+        if not v2_token and nb_version >= nb_v2_support_version:
             logger.warning(
                 "Using Netbox v1 token format. "
                 "Consider updating to a v2 token. For more info, see %s",
                 support_token_url,
             )
-        elif nb_version < "4.5" and str(token).startswith("nbt_"):
+        elif v2_token and nb_version < nb_v2_support_version:
             logger.error(
                 "Using Netbox v2 token format with Netbox version lower than 4.5. "
                 "Revert to v1 token or upgrade Netbox to 4.5 or higher. For more info, see %s",
                 support_token_url,
             )
             return False
-        elif nb_version >= "4.5" and str(token).startswith("nbt_"):
+        elif v2_token and nb_version >= nb_v2_support_version:
             logger.debug("Using NetBox v2 token format.")
         else:
             logger.debug("Using NetBox v1 token format.")
@@ -217,11 +228,15 @@ class Sync:
         netbox_site_groups = convert_recordset(self.netbox.dcim.site_groups.all())
         netbox_regions = convert_recordset(self.netbox.dcim.regions.all())
         netbox_journals = self.netbox.extras.journal_entries
-        zabbix_groups = self.zabbix.hostgroup.get(output=["groupid", "name"])  # type: ignore
+        zabbix_groups = self.zabbix.hostgroup.get(  # type: ignore
+            output=["groupid", "name"]
+        )
         zabbix_templates = self.zabbix.template.get(  # type: ignore
             output=["templateid", "name"]
         )
-        zabbix_proxies = self.zabbix.proxy.get(output=["proxyid", proxy_name])  # type: ignore
+        zabbix_proxies = self.zabbix.proxy.get(  # type: ignore
+            output=["proxyid", proxy_name]
+        )
         # Set empty list for proxy processing Zabbix <= 6
         zabbix_proxygroups = []
         if str(self.zabbix.version).startswith("7"):
