@@ -12,6 +12,9 @@ class DummyNB:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+    def __getitem__(self, key):
+        return getattr(self, key)
+
 
 class TestUsermacroSync(unittest.TestCase):
     def setUp(self):
