@@ -521,7 +521,10 @@ class PhysicalDevice:
                     # If the proxy name matches
                     if proxy["name"] == proxy_name:
                         self.logger.debug(
-                            "Host %s: using {proxy['type']} '%s'", self.name, proxy_name
+                            "Host %s: using %s '%s'",
+                            self.name,
+                            proxy["type"],
+                            proxy_name,
                         )
                         self.zbxproxy = proxy
                         return True
