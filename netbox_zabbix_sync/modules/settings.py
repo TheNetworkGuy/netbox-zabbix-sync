@@ -82,6 +82,8 @@ DEFAULT_CONFIG = {
         "cluster/name": "cluster",
         "platform/name": "target",
     },
+    "description_dt_format": "%Y-%m-%d %H:%M:%S",
+    "description": "static",
 }
 
 

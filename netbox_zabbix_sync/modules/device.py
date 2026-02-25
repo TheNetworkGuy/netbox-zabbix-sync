@@ -17,6 +17,7 @@ from netbox_zabbix_sync.modules.exceptions import (
     SyncInventoryError,
     TemplateError,
 )
+from netbox_zabbix_sync.modules.host_description import Description
 from netbox_zabbix_sync.modules.hostgroups import Hostgroup
 from netbox_zabbix_sync.modules.interface import ZabbixInterface
 from netbox_zabbix_sync.modules.settings import load_config
@@ -534,13 +535,7 @@ class PhysicalDevice:
                 )
         return False
 
-    def create_in_zabbix(
-        self,
-        groups,
-        templates,
-        proxies,
-        description="Host added by NetBox sync script.",
-    ):
+    def create_in_zabbix(self, groups, templates, proxies):
         """
         Creates Zabbix host object with parameters from NetBox object.
         """
@@ -562,6 +557,14 @@ class PhysicalDevice:
             interfaces = self.set_interface_details()
             # Set Zabbix proxy if defined
             self._set_proxy(proxies)
+            # Set description
+            description_handler = Description(
+                self.nb,
+                self.config,
+                logger=self.logger,
+                nb_version=self.nb_api_version,
+            )
+            description = description_handler.generate()
             # Set basic data for host creation
             create_data = {
                 "host": self.name,
