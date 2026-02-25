@@ -164,6 +164,9 @@ def parse_cli():
         metavar="FILE",
         default=None,
     )
+    parser.add_argument(
+        "--version", action="version", version="NetBox-Zabbix Sync 3.4.0"
+    )
 
     # ── Boolean config overrides ───────────────────────────────────────────────
     bool_group = parser.add_argument_group(
