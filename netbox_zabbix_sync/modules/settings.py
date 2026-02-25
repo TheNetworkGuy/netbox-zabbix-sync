@@ -82,13 +82,19 @@ DEFAULT_CONFIG = {
         "cluster/name": "cluster",
         "platform/name": "target",
     },
+    "description_dt_format": "%Y-%m-%d %H:%M:%S",
+    "description": "static",
 }
 
 
-def load_config():
+def load_config(config_file=None):
     """Returns combined config from all sources"""
-    # Overwrite default config with config.py
-    conf = load_config_file(config_default=DEFAULT_CONFIG)
+    # Overwrite default config with config file.
+    # Default config file is config.py but can be overridden by providing a different file path.
+    conf = load_config_file(
+        config_default=DEFAULT_CONFIG,
+        config_file=config_file if config_file else "config.py",
+    )
     # Overwrite default config and config.py with environment variables
     for key in conf:
         value_setting = load_env_variable(key)

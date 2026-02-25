@@ -12,6 +12,15 @@ templates_config_context_overrule = False
 template_cf = "zabbix_template"
 device_cf = "zabbix_hostid"
 
+# Zabbix host description
+# The following options are available for the description of all created hosts in Zabbix
+# static: Uses the default static string "Host added by NetBox sync script."
+# dynamic: "Uses a predefined dynamic string which resolves the owner of an object and datetime. Recommended for users who use Netbox 4.5+
+# custom: Use a custom string such as "This host was created by Zabbix-sync on machine MGMT01.internal". It is also posible to resolve dynamic values in this string using {} markers.
+description = "static"
+# The timedate format which is used for generating the datetime macro when used in the dynamic description type or custom type.
+description_dt_format = "%Y-%m-%d %H:%M:%S"
+
 ## Enable clustering of devices with virtual chassis setup
 clustering = False
 

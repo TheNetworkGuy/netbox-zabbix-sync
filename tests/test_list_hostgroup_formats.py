@@ -3,9 +3,9 @@
 import unittest
 from unittest.mock import MagicMock
 
-from modules.exceptions import HostgroupError
-from modules.hostgroups import Hostgroup
-from modules.tools import verify_hg_format
+from netbox_zabbix_sync.modules.exceptions import HostgroupError
+from netbox_zabbix_sync.modules.hostgroups import Hostgroup
+from netbox_zabbix_sync.modules.tools import verify_hg_format
 
 
 class TestListHostgroupFormats(unittest.TestCase):

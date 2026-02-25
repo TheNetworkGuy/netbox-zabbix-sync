@@ -2,8 +2,8 @@
 
 from logging import getLogger
 
-from modules.exceptions import HostgroupError
-from modules.tools import build_path, cf_to_string
+from netbox_zabbix_sync.modules.exceptions import HostgroupError
+from netbox_zabbix_sync.modules.tools import build_path, cf_to_string
 
 
 class Hostgroup:

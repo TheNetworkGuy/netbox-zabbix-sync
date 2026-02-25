@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from modules.device import PhysicalDevice
-from modules.usermacros import ZabbixUsermacros
+from netbox_zabbix_sync.modules.device import PhysicalDevice
+from netbox_zabbix_sync.modules.usermacros import ZabbixUsermacros
 
 
 class DummyNB:
@@ -13,12 +13,7 @@ class DummyNB:
             setattr(self, k, v)
 
     def __getitem__(self, key):
-        # Allow dict-style access for test compatibility
-        if hasattr(self, key):
-            return getattr(self, key)
-        if key in self.config_context:
-            return self.config_context[key]
-        raise KeyError(key)
+        return getattr(self, key)
 
 
 class TestUsermacroSync(unittest.TestCase):
@@ -27,7 +22,7 @@ class TestUsermacroSync(unittest.TestCase):
         self.logger = MagicMock()
         self.usermacro_map = {"serial": "{$HW_SERIAL}"}
 
-    def create_mock_device(self):
+    def create_mock_device(self, config=None):
         """Helper method to create a properly mocked PhysicalDevice"""
         # Mock the NetBox device with all required attributes
         mock_nb = MagicMock()
@@ -39,6 +34,8 @@ class TestUsermacroSync(unittest.TestCase):
         mock_nb.primary_ip.address = "192.168.1.1/24"
         mock_nb.custom_fields = {"zabbix_hostid": None}
 
+        device_config = config if config is not None else {"device_cf": "zabbix_hostid"}
+
         # Create device with proper initialization
         device = PhysicalDevice(
             nb=mock_nb,
@@ -46,18 +43,21 @@ class TestUsermacroSync(unittest.TestCase):
             nb_journal_class=MagicMock(),
             nb_version="3.0",
             logger=self.logger,
+            config=device_config,
         )
 
         return device
 
-    @patch(
-        "modules.device.config",
-        {"usermacro_sync": False, "device_cf": "zabbix_hostid", "tag_sync": False},
-    )
     @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_false(self, mock_usermacro_map):
         mock_usermacro_map.return_value = self.usermacro_map
-        device = self.create_mock_device()
+        device = self.create_mock_device(
+            config={
+                "usermacro_sync": False,
+                "device_cf": "zabbix_hostid",
+                "tag_sync": False,
+            }
+        )
 
         # Call set_usermacros
         result = device.set_usermacros()
@@ -65,11 +65,7 @@ class TestUsermacroSync(unittest.TestCase):
         self.assertEqual(device.usermacros, [])
         self.assertTrue(result is True or result is None)
 
-    @patch(
-        "modules.device.config",
-        {"usermacro_sync": True, "device_cf": "zabbix_hostid", "tag_sync": False},
-    )
-    @patch("modules.device.ZabbixUsermacros")
+    @patch("netbox_zabbix_sync.modules.device.ZabbixUsermacros")
     @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_true(self, mock_usermacro_map, mock_usermacros_class):
         mock_usermacro_map.return_value = self.usermacro_map
@@ -81,7 +77,13 @@ class TestUsermacroSync(unittest.TestCase):
         ]
         mock_usermacros_class.return_value = mock_macros_instance
 
-        device = self.create_mock_device()
+        device = self.create_mock_device(
+            config={
+                "usermacro_sync": True,
+                "device_cf": "zabbix_hostid",
+                "tag_sync": False,
+            }
+        )
 
         # Call set_usermacros
         device.set_usermacros()
@@ -89,11 +91,7 @@ class TestUsermacroSync(unittest.TestCase):
         self.assertIsInstance(device.usermacros, list)
         self.assertGreater(len(device.usermacros), 0)
 
-    @patch(
-        "modules.device.config",
-        {"usermacro_sync": "full", "device_cf": "zabbix_hostid", "tag_sync": False},
-    )
-    @patch("modules.device.ZabbixUsermacros")
+    @patch("netbox_zabbix_sync.modules.device.ZabbixUsermacros")
     @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_full(self, mock_usermacro_map, mock_usermacros_class):
         mock_usermacro_map.return_value = self.usermacro_map
@@ -105,7 +103,13 @@ class TestUsermacroSync(unittest.TestCase):
         ]
         mock_usermacros_class.return_value = mock_macros_instance
 
-        device = self.create_mock_device()
+        device = self.create_mock_device(
+            config={
+                "usermacro_sync": "full",
+                "device_cf": "zabbix_hostid",
+                "tag_sync": False,
+            }
+        )
 
         # Call set_usermacros
         device.set_usermacros()

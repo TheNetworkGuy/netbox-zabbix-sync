@@ -4,7 +4,7 @@ All of the Zabbix Usermacro related configuration
 
 from logging import getLogger
 
-from modules.tools import field_mapper, remove_duplicates
+from netbox_zabbix_sync.modules.tools import field_mapper, remove_duplicates
 
 
 class ZabbixTags:

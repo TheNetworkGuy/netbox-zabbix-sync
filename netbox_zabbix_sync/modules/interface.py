@@ -2,7 +2,7 @@
 All of the Zabbix interface related configuration
 """
 
-from modules.exceptions import InterfaceConfigError
+from netbox_zabbix_sync.modules.exceptions import InterfaceConfigError
 
 
 class ZabbixInterface:
