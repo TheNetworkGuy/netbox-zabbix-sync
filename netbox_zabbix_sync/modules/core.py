@@ -12,7 +12,7 @@ from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import SyncError
 from netbox_zabbix_sync.modules.logging import get_logger
-from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG, load_config
+from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
     convert_recordset,
     proxy_prepper,
