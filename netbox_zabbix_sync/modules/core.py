@@ -38,36 +38,16 @@ class Sync:
         """
         self.netbox = None
         self.zabbix = None
-        self.config: dict[str, Any] = config if config else {}
         self.nb_version = None
-        self._config()
 
-    def _config(self):
-        """
-        Load config and check if provided config is valid.
-        """
-        if not self.config:
-            self.config = load_config()
-            return True
-        # Check if provided config is valid
-        if not isinstance(self.config, dict):
-            e = "Provided config is not a dictionary."
-            logger.error(e)
-            raise SyncError(e)
-        # Combine default options and provided config
         default_config = DEFAULT_CONFIG.copy()
-        for key in self.config:
-            # Check if the user provided an invalid option parameter
-            if key not in default_config:
-                e = f"Provided config contains invalid key: {key}."
-                logger.error(e)
-                raise SyncError(e)
-            # Remove keys from default config to keep track of missing keys
-            default_config.pop(key)
-        # Add missing options with default values
-        for key in default_config:
-            self.config[key] = default_config[key]
-        return True
+
+        combined_config = {
+            **default_config,
+            **(config if config else {}),
+        }
+
+        self.config: dict[str, Any] = combined_config
 
     def connect(
         self, nb_host, nb_token, zbx_host, zbx_user=None, zbx_pass=None, zbx_token=None
