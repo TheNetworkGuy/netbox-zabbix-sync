@@ -663,49 +663,6 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.proxygroup.get.assert_not_called()
 
 
-class TestSyncLogout(unittest.TestCase):
-    """Test that sync properly logs out from Zabbix."""
-
-    def _setup_netbox_mock(self, mock_api):
-        """Helper to setup a working NetBox mock."""
-        mock_netbox = MagicMock()
-        mock_api.return_value = mock_netbox
-        mock_netbox.version = "3.5"
-        mock_netbox.extras.custom_fields.filter.return_value = []
-        mock_netbox.dcim.devices.filter.return_value = []
-        mock_netbox.virtualization.virtual_machines.filter.return_value = []
-        mock_netbox.dcim.site_groups.all.return_value = []
-        mock_netbox.dcim.regions.all.return_value = []
-        return mock_netbox
-
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
-    def test_sync_logs_out_from_zabbix(self, mock_api, mock_zabbix_api):
-        """Test that sync calls logout on Zabbix API after completion."""
-        self._setup_netbox_mock(mock_api)
-
-        mock_zabbix = MagicMock()
-        mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = "6.0"
-        mock_zabbix.hostgroup.get.return_value = []
-        mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = []
-
-        syncer = Sync()
-        syncer.connect(
-            "http://netbox.local",
-            "nb_token",
-            "http://zabbix.local",
-            "user",
-            "pass",
-            None,
-        )
-        syncer.start()
-
-        # Verify logout was called
-        mock_zabbix.logout.assert_called_once()
-
-
 class TestSyncProxyNameSanitization(unittest.TestCase):
     """Test proxy name field sanitization for Zabbix 6."""
 
@@ -791,7 +748,6 @@ class TestDeviceHandeling(unittest.TestCase):
         ]
         mock_zabbix.proxy.get.return_value = []
         mock_zabbix.proxygroup.get.return_value = []
-        mock_zabbix.logout = MagicMock()
         # Mock host.get to return empty (host doesn't exist yet)
         mock_zabbix.host.get.return_value = []
         # Mock host.create to return success
@@ -1030,7 +986,6 @@ class TestDeviceStatusHandling(unittest.TestCase):
         ]
         mock_zabbix.proxy.get.return_value = []
         mock_zabbix.proxygroup.get.return_value = []
-        mock_zabbix.logout = MagicMock()
         mock_zabbix.host.get.return_value = []
         mock_zabbix.host.create.return_value = {"hostids": ["1"]}
         mock_zabbix.host.update.return_value = {"hostids": ["42"]}
@@ -1335,7 +1290,6 @@ class TestVMStatusHandling(unittest.TestCase):
         ]
         mock_zabbix.proxy.get.return_value = []
         mock_zabbix.proxygroup.get.return_value = []
-        mock_zabbix.logout = MagicMock()
         mock_zabbix.host.get.return_value = []
         mock_zabbix.host.create.return_value = {"hostids": ["1"]}
         mock_zabbix.host.update.return_value = {"hostids": ["42"]}

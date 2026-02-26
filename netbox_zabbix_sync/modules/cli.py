@@ -133,6 +133,7 @@ def main(arguments):
         zbx_token=zabbix_token,
     )
     syncer.start()
+    syncer.logout()
 
 
 def parse_cli():

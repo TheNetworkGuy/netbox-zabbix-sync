@@ -49,6 +49,58 @@ class Sync:
 
         self.config: dict[str, Any] = combined_config
 
+    def _combine_filters(self, config_filter, method_filter):
+        """
+        Combine filters from config and method parameters.
+        Method parameters will overwrite config filters if there are overlaps.
+        """
+        # Check if method filter is provided,
+        # if not return config filter directly
+        combined_filter = config_filter.copy()
+        if method_filter:
+            combined_filter.update(method_filter)
+        return combined_filter
+
+    def _validate_netbox_token(self, token: str, nb_version: str) -> bool:
+        """Validate the format of the NetBox token based on the NetBox version.
+        :param token: The NetBox token to validate.
+        :param nb_version: The version of NetBox being used.
+        :return: True if the token format is valid for the given NetBox version, False otherwise.
+        """
+        support_token_url = (
+            "https://netboxlabs.com/docs/netbox/integrations/rest-api/#v1-and-v2-tokens"  # noqa: S105
+        )
+        token_prefix = "nbt_"  # noqa: S105
+        nb_v2_support_version = "4.5"
+        v2_token = bool(token.startswith(token_prefix) and "." in token)
+        v2_error_token = bool(token.startswith(token_prefix) and "." not in token)
+        # Check if the token is passed without a proper key.token format
+        if v2_error_token:
+            logger.error(
+                "It looks like an invalid v2 token was passed. For more info, see %s",
+                support_token_url,
+            )
+            return False
+        # Warning message for Netbox token v1 with Netbox v4.5 and higher
+        if not v2_token and nb_version >= nb_v2_support_version:
+            logger.warning(
+                "Using Netbox v1 token format. "
+                "Consider updating to a v2 token. For more info, see %s",
+                support_token_url,
+            )
+        elif v2_token and nb_version < nb_v2_support_version:
+            logger.error(
+                "Using Netbox v2 token format with Netbox version lower than 4.5. "
+                "Revert to v1 token or upgrade Netbox to 4.5 or higher. For more info, see %s",
+                support_token_url,
+            )
+            return False
+        elif v2_token and nb_version >= nb_v2_support_version:
+            logger.debug("Using NetBox v2 token format.")
+        else:
+            logger.debug("Using NetBox v1 token format.")
+        return True
+
     def connect(
         self, nb_host, nb_token, zbx_host, zbx_user=None, zbx_pass=None, zbx_token=None
     ):
@@ -117,47 +169,17 @@ class Sync:
             return False
         return True
 
-    def _validate_netbox_token(self, token: str, nb_version: str) -> bool:
-        """Validate the format of the NetBox token based on the NetBox version.
-        :param token: The NetBox token to validate.
-        :param nb_version: The version of NetBox being used.
-        :return: True if the token format is valid for the given NetBox version, False otherwise.
+    def logout(self):
         """
-        support_token_url = (
-            "https://netboxlabs.com/docs/netbox/integrations/rest-api/#v1-and-v2-tokens"  # noqa: S105
-        )
-        token_prefix = "nbt_"  # noqa: S105
-        nb_v2_support_version = "4.5"
-        v2_token = bool(token.startswith(token_prefix) and "." in token)
-        v2_error_token = bool(token.startswith(token_prefix) and "." not in token)
-        # Check if the token is passed without a proper key.token format
-        if v2_error_token:
-            logger.error(
-                "It looks like an invalid v2 token was passed. For more info, see %s",
-                support_token_url,
-            )
-            return False
-        # Warning message for Netbox token v1 with Netbox v4.5 and higher
-        if not v2_token and nb_version >= nb_v2_support_version:
-            logger.warning(
-                "Using Netbox v1 token format. "
-                "Consider updating to a v2 token. For more info, see %s",
-                support_token_url,
-            )
-        elif v2_token and nb_version < nb_v2_support_version:
-            logger.error(
-                "Using Netbox v2 token format with Netbox version lower than 4.5. "
-                "Revert to v1 token or upgrade Netbox to 4.5 or higher. For more info, see %s",
-                support_token_url,
-            )
-            return False
-        elif v2_token and nb_version >= nb_v2_support_version:
-            logger.debug("Using NetBox v2 token format.")
-        else:
-            logger.debug("Using NetBox v1 token format.")
-        return True
+        Logout from Zabbix API
+        """
+        if self.zabbix:
+            self.zabbix.logout()
+            logger.debug("Logged out from Zabbix API.")
+            return True
+        return False
 
-    def start(self):
+    def start(self, device_filter=None, vm_filter=None):
         """
         Run the NetBox to Zabbix sync process.
         """
@@ -196,15 +218,17 @@ class Sync:
         # Set API parameter mapping based on API version
         proxy_name = "host" if str(self.zabbix.version) < "7" else "name"
         # Get all Zabbix and NetBox data
-        netbox_devices = list(
-            self.netbox.dcim.devices.filter(**self.config["nb_device_filter"])
+        dev_filter_combined = self._combine_filters(
+            self.config["nb_device_filter"], device_filter
         )
+        netbox_devices = list(self.netbox.dcim.devices.filter(**dev_filter_combined))
         netbox_vms = []
         if self.config["sync_vms"]:
+            vm_filter_combined = self._combine_filters(
+                self.config["nb_vm_filter"], vm_filter
+            )
             netbox_vms = list(
-                self.netbox.virtualization.virtual_machines.filter(
-                    **self.config["nb_vm_filter"]
-                )
+                self.netbox.virtualization.virtual_machines.filter(**vm_filter_combined)
             )
         netbox_site_groups = convert_recordset(self.netbox.dcim.site_groups.all())
         netbox_regions = convert_recordset(self.netbox.dcim.regions.all())
@@ -401,5 +425,4 @@ class Sync:
                 )
             except SyncError:
                 pass
-        self.zabbix.logout()
         return True
