@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments, logging-fstring-interpolation
 """
 All of the Zabbix Usermacro related configuration
 """
@@ -6,7 +5,7 @@ All of the Zabbix Usermacro related configuration
 from logging import getLogger
 from re import match
 
-from modules.tools import field_mapper, sanatize_log_output
+from netbox_zabbix_sync.modules.tools import field_mapper, sanatize_log_output
 
 
 class ZabbixUsermacros:

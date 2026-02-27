@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from modules.exceptions import HostgroupError
-from modules.hostgroups import Hostgroup
+from netbox_zabbix_sync.modules.exceptions import HostgroupError
+from netbox_zabbix_sync.modules.hostgroups import Hostgroup
 
 
 class TestHostgroups(unittest.TestCase):
@@ -78,8 +78,12 @@ class TestHostgroups(unittest.TestCase):
         location.__str__.return_value = "TestLocation"
         self.mock_device.location = location
 
-        # Custom fields
-        self.mock_device.custom_fields = {"test_cf": "TestCF"}
+        rack = MagicMock()
+        rack.name = "TestRack"
+        self.mock_device.rack = rack
+
+        # Custom fields — empty_cf is intentionally None to test the empty CF path
+        self.mock_device.custom_fields = {"test_cf": "TestCF", "empty_cf": None}
 
         # *** Mock NetBox VM setup ***
         # Create mock VM with all properties
@@ -137,6 +141,7 @@ class TestHostgroups(unittest.TestCase):
         self.assertEqual(hostgroup.format_options["platform"], "TestPlatform")
         self.assertEqual(hostgroup.format_options["manufacturer"], "TestManufacturer")
         self.assertEqual(hostgroup.format_options["location"], "TestLocation")
+        self.assertEqual(hostgroup.format_options["rack"], "TestRack")
 
     def test_vm_hostgroup_creation(self):
         """Test basic VM hostgroup creation."""
@@ -192,16 +197,40 @@ class TestHostgroups(unittest.TestCase):
         self.assertEqual(complex_result, "TestCluster/TestClusterType/TestPlatform")
 
     def test_device_netbox_version_differences(self):
-        """Test hostgroup generation with different NetBox versions."""
-        # NetBox v2.x
-        hostgroup_v2 = Hostgroup("dev", self.mock_device, "2.11", self.mock_logger)
-        self.assertEqual(hostgroup_v2.format_options["role"], "TestRole")
+        """Test hostgroup generation with different NetBox versions.
 
-        # NetBox v3.x
-        hostgroup_v3 = Hostgroup("dev", self.mock_device, "3.5", self.mock_logger)
-        self.assertEqual(hostgroup_v3.format_options["role"], "TestRole")
+        device_role (v2/v3) and role (v4+) are set to different values so the
+        test can verify that the correct attribute is read for each version.
+        """
+        # Build a device with deliberately different names on each role attribute
+        versioned_device = MagicMock()
+        versioned_device.name = "versioned-device"
+        versioned_device.site = self.mock_device.site
+        versioned_device.tenant = self.mock_device.tenant
+        versioned_device.platform = self.mock_device.platform
+        versioned_device.location = self.mock_device.location
+        versioned_device.rack = self.mock_device.rack
+        versioned_device.device_type = self.mock_device.device_type
+        versioned_device.custom_fields = self.mock_device.custom_fields
 
-        # NetBox v4.x (already tested in other methods)
+        old_role = MagicMock()
+        old_role.name = "OldRole"
+        new_role = MagicMock()
+        new_role.name = "NewRole"
+        versioned_device.device_role = old_role  # read by NetBox v2 / v3 code path
+        versioned_device.role = new_role  # read by NetBox v4+ code path
+
+        # v2 must use device_role
+        hostgroup_v2 = Hostgroup("dev", versioned_device, "2.11", self.mock_logger)
+        self.assertEqual(hostgroup_v2.format_options["role"], "OldRole")
+
+        # v3 must also use device_role
+        hostgroup_v3 = Hostgroup("dev", versioned_device, "3.5", self.mock_logger)
+        self.assertEqual(hostgroup_v3.format_options["role"], "OldRole")
+
+        # v4+ must use role
+        hostgroup_v4 = Hostgroup("dev", versioned_device, "4.0", self.mock_logger)
+        self.assertEqual(hostgroup_v4.format_options["role"], "NewRole")
 
     def test_custom_field_lookup(self):
         """Test custom field lookup functionality."""
@@ -216,6 +245,11 @@ class TestHostgroups(unittest.TestCase):
         cf_result = hostgroup.custom_field_lookup("nonexistent_cf")
         self.assertFalse(cf_result["result"])
         self.assertIsNone(cf_result["cf"])
+
+        # Test custom field exists but has no value (None)
+        cf_result = hostgroup.custom_field_lookup("empty_cf")
+        self.assertTrue(cf_result["result"])  # key is present
+        self.assertIsNone(cf_result["cf"])  # value is empty
 
     def test_hostgroup_with_custom_field(self):
         """Test hostgroup generation including a custom field."""
@@ -262,7 +296,9 @@ class TestHostgroups(unittest.TestCase):
     def test_nested_region_hostgroups(self):
         """Test hostgroup generation with nested regions."""
         # Mock the build_path function to return a predictable result
-        with patch("modules.hostgroups.build_path") as mock_build_path:
+        with patch(
+            "netbox_zabbix_sync.modules.hostgroups.build_path"
+        ) as mock_build_path:
             # Configure the mock to return a list of regions in the path
             mock_build_path.return_value = ["ParentRegion", "TestRegion"]
 
@@ -284,7 +320,9 @@ class TestHostgroups(unittest.TestCase):
     def test_nested_sitegroup_hostgroups(self):
         """Test hostgroup generation with nested site groups."""
         # Mock the build_path function to return a predictable result
-        with patch("modules.hostgroups.build_path") as mock_build_path:
+        with patch(
+            "netbox_zabbix_sync.modules.hostgroups.build_path"
+        ) as mock_build_path:
             # Configure the mock to return a list of site groups in the path
             mock_build_path.return_value = ["ParentSiteGroup", "TestSiteGroup"]
 
@@ -356,6 +394,69 @@ class TestHostgroups(unittest.TestCase):
         self.assertEqual(results["manufacturer/role"], "TestManufacturer/TestRole")
         self.assertEqual(results["platform/location"], "TestPlatform/TestLocation")
         self.assertEqual(results["tenant_group/tenant"], "TestTenantGroup/TestTenant")
+
+    def test_literal_string_in_format(self):
+        """Test that quoted literal strings in a format are used verbatim."""
+        hostgroup = Hostgroup("dev", self.mock_device, "4.0", self.mock_logger)
+
+        # Single-quoted literal
+        result = hostgroup.generate("'MyDevices'/role")
+        self.assertEqual(result, "MyDevices/TestRole")
+
+        # Double-quoted literal
+        result = hostgroup.generate('"MyDevices"/role')
+        self.assertEqual(result, "MyDevices/TestRole")
+
+    def test_generate_returns_none_when_all_fields_empty(self):
+        """Test that generate() returns None when every format field resolves to no value."""
+        empty_device = MagicMock()
+        empty_device.name = "empty-device"
+        empty_device.site = None
+        empty_device.tenant = None
+        empty_device.platform = None
+        empty_device.role = None
+        empty_device.location = None
+        empty_device.rack = None
+        empty_device.custom_fields = {}
+        device_type = MagicMock()
+        manufacturer = MagicMock()
+        manufacturer.name = "SomeManufacturer"
+        device_type.manufacturer = manufacturer
+        empty_device.device_type = device_type
+
+        hostgroup = Hostgroup("dev", empty_device, "4.0", self.mock_logger)
+        # site, tenant and platform all have no value → hg_output stays empty → None
+        result = hostgroup.generate("site/tenant/platform")
+        self.assertIsNone(result)
+
+    def test_vm_without_cluster(self):
+        """Test that cluster/cluster_type are absent from format_options when VM has no cluster."""
+        clusterless_vm = MagicMock()
+        clusterless_vm.name = "clusterless-vm"
+        clusterless_vm.site = self.mock_vm.site
+        clusterless_vm.tenant = self.mock_vm.tenant
+        clusterless_vm.platform = self.mock_vm.platform
+        clusterless_vm.role = self.mock_device_role
+        clusterless_vm.cluster = None
+        clusterless_vm.custom_fields = {}
+
+        hostgroup = Hostgroup("vm", clusterless_vm, "4.0", self.mock_logger)
+
+        # cluster and cluster_type must not appear in format_options
+        self.assertNotIn("cluster", hostgroup.format_options)
+        self.assertNotIn("cluster_type", hostgroup.format_options)
+
+        # Requesting cluster in a format must raise HostgroupError
+        with self.assertRaises(HostgroupError):
+            hostgroup.generate("cluster/role")
+
+    def test_empty_custom_field_skipped_in_format(self):
+        """Test that an empty (None) custom field is silently omitted from the hostgroup name."""
+        hostgroup = Hostgroup("dev", self.mock_device, "4.0", self.mock_logger)
+
+        # empty_cf has no value → it is skipped; only site and role appear
+        result = hostgroup.generate("site/empty_cf/role")
+        self.assertEqual(result, "TestSite/TestRole")
 
 
 if __name__ == "__main__":

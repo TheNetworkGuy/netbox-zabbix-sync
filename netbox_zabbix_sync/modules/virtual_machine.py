@@ -1,13 +1,12 @@
-# pylint: disable=duplicate-code
 """Module that hosts all functions for virtual machine processing"""
 
-from modules.config import load_config
-from modules.device import PhysicalDevice
-from modules.exceptions import InterfaceConfigError, SyncInventoryError, TemplateError
-from modules.interface import ZabbixInterface
-
-# Load config
-config = load_config()
+from netbox_zabbix_sync.modules.device import PhysicalDevice
+from netbox_zabbix_sync.modules.exceptions import (
+    InterfaceConfigError,
+    SyncInventoryError,
+    TemplateError,
+)
+from netbox_zabbix_sync.modules.interface import ZabbixInterface
 
 
 class VirtualMachine(PhysicalDevice):
@@ -21,15 +20,15 @@ class VirtualMachine(PhysicalDevice):
 
     def _inventory_map(self):
         """use VM inventory maps"""
-        return config["vm_inventory_map"]
+        return self.config["vm_inventory_map"]
 
     def _usermacro_map(self):
         """use VM usermacro maps"""
-        return config["vm_usermacro_map"]
+        return self.config["vm_usermacro_map"]
 
     def _tag_map(self):
         """use VM tag maps"""
-        return config["vm_tag_map"]
+        return self.config["vm_tag_map"]
 
     def set_vm_template(self):
         """Set Template for VMs. Overwrites default class

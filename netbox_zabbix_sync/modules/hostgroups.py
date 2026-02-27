@@ -2,16 +2,14 @@
 
 from logging import getLogger
 
-from modules.exceptions import HostgroupError
-from modules.tools import build_path, cf_to_string
+from netbox_zabbix_sync.modules.exceptions import HostgroupError
+from netbox_zabbix_sync.modules.tools import build_path, cf_to_string
 
 
 class Hostgroup:
     """Hostgroup class for devices and VM's
     Takes type (vm or dev) and NB object"""
 
-    # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
-    # pylint: disable=logging-fstring-interpolation
     def __init__(
         self,
         obj_type,

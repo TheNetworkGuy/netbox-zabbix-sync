@@ -1,4 +1,3 @@
-# pylint: disable=invalid-name, logging-not-lazy, too-many-locals, logging-fstring-interpolation, too-many-lines, too-many-public-methods, duplicate-code
 """
 Device specific handeling for NetBox to Zabbix
 """
@@ -12,37 +11,43 @@ from typing import Any
 from pynetbox import RequestError as NetboxRequestError
 from zabbix_utils import APIRequestError
 
-from modules.config import load_config
-from modules.exceptions import (
+from netbox_zabbix_sync.modules.exceptions import (
     InterfaceConfigError,
     SyncExternalError,
     SyncInventoryError,
     TemplateError,
 )
-from modules.hostgroups import Hostgroup
-from modules.interface import ZabbixInterface
-from modules.tags import ZabbixTags
-from modules.tools import (
+from netbox_zabbix_sync.modules.host_description import Description
+from netbox_zabbix_sync.modules.hostgroups import Hostgroup
+from netbox_zabbix_sync.modules.interface import ZabbixInterface
+from netbox_zabbix_sync.modules.settings import load_config
+from netbox_zabbix_sync.modules.tags import ZabbixTags
+from netbox_zabbix_sync.modules.tools import (
     cf_to_string,
     field_mapper,
     remove_duplicates,
     sanatize_log_output,
 )
-from modules.usermacros import ZabbixUsermacros
-
-config = load_config()
+from netbox_zabbix_sync.modules.usermacros import ZabbixUsermacros
 
 
 class PhysicalDevice:
-    # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments
     """
     Represents Network device.
     INPUT: (NetBox device class, ZabbixAPI class, journal flag, NB journal class)
     """
 
     def __init__(
-        self, nb, zabbix, nb_journal_class, nb_version, journal=None, logger=None
+        self,
+        nb,
+        zabbix,
+        nb_journal_class,
+        nb_version,
+        journal=None,
+        logger=None,
+        config=None,
     ):
+        self.config = config if config is not None else load_config()
         self.nb = nb
         self.id = nb.id
         self.name = nb.name
@@ -57,6 +62,7 @@ class PhysicalDevice:
         self.hostgroups = []
         self.hostgroup_type = "dev"
         self.tenant = nb.tenant
+        self.site = nb.site
         self.config_context = nb.config_context
         self.zbxproxy = None
         self.zabbix_state = 0
@@ -77,15 +83,15 @@ class PhysicalDevice:
 
     def _inventory_map(self):
         """Use device inventory maps"""
-        return config["device_inventory_map"]
+        return self.config["device_inventory_map"]
 
     def _usermacro_map(self):
         """Use device inventory maps"""
-        return config["device_usermacro_map"]
+        return self.config["device_usermacro_map"]
 
     def _tag_map(self):
         """Use device host tag maps"""
-        return config["device_tag_map"]
+        return self.config["device_tag_map"]
 
     def _set_basics(self):
         """
@@ -101,10 +107,10 @@ class PhysicalDevice:
             raise SyncInventoryError(e)
 
         # Check if device has custom field for ZBX ID
-        if config["device_cf"] in self.nb.custom_fields:
-            self.zabbix_id = self.nb.custom_fields[config["device_cf"]]
+        if self.config["device_cf"] in self.nb.custom_fields:
+            self.zabbix_id = self.nb.custom_fields[self.config["device_cf"]]
         else:
-            e = f"Host {self.name}: Custom field {config['device_cf']} not present"
+            e = f"Host {self.name}: Custom field {self.config['device_cf']} not present"
             self.logger.error(e)
             raise SyncInventoryError(e)
 
@@ -135,8 +141,8 @@ class PhysicalDevice:
             self.nb,
             self.nb_api_version,
             logger=self.logger,
-            nested_sitegroup_flag=config["traverse_site_groups"],
-            nested_region_flag=config["traverse_regions"],
+            nested_sitegroup_flag=self.config["traverse_site_groups"],
+            nested_region_flag=self.config["traverse_regions"],
             nb_groups=nb_site_groups,
             nb_regions=nb_regions,
         )
@@ -183,12 +189,12 @@ class PhysicalDevice:
         # Get Zabbix templates from the device type
         device_type_cfs = self.nb.device_type.custom_fields
         # Check if the ZBX Template CF is present
-        if config["template_cf"] in device_type_cfs:
+        if self.config["template_cf"] in device_type_cfs:
             # Set value to template
-            return [device_type_cfs[config["template_cf"]]]
+            return [device_type_cfs[self.config["template_cf"]]]
         # Custom field not found, return error
         e = (
-            f"Custom field {config['template_cf']} not "
+            f"Custom field {self.config['template_cf']} not "
             f"found for {self.nb.device_type.manufacturer.name}"
             f" - {self.nb.device_type.display}."
         )
@@ -217,27 +223,27 @@ class PhysicalDevice:
     def set_inventory(self, nbdevice):
         """Set host inventory"""
         # Set inventory mode. Default is disabled (see class init function).
-        if config["inventory_mode"] == "disabled":
-            if config["inventory_sync"]:
+        if self.config["inventory_mode"] == "disabled":
+            if self.config["inventory_sync"]:
                 self.logger.error(
                     "Host %s: Unable to map NetBox inventory to Zabbix."
                     "Inventory sync is enabled in  config but inventory mode is disabled",
                     self.name,
                 )
             return True
-        if config["inventory_mode"] == "manual":
+        if self.config["inventory_mode"] == "manual":
             self.inventory_mode = 0
-        elif config["inventory_mode"] == "automatic":
+        elif self.config["inventory_mode"] == "automatic":
             self.inventory_mode = 1
         else:
             self.logger.error(
                 "Host %s: Specified value for inventory mode in config is not valid. Got value %s",
                 self.name,
-                config["inventory_mode"],
+                self.config["inventory_mode"],
             )
             return False
         self.inventory = {}
-        if config["inventory_sync"] and self.inventory_mode in [0, 1]:
+        if self.config["inventory_sync"] and self.inventory_mode in [0, 1]:
             self.logger.debug("Host %s: Starting inventory mapper.", self.name)
             self.inventory = field_mapper(
                 self.name, self._inventory_map(), nbdevice, self.logger
@@ -383,7 +389,7 @@ class PhysicalDevice:
     def _zeroize_cf(self):
         """Sets the hostID custom field in NetBox to zero,
         effectively destroying the link"""
-        self.nb.custom_fields[config["device_cf"]] = None
+        self.nb.custom_fields[self.config["device_cf"]] = None
         self.nb.save()
 
     def _zabbix_hostname_exists(self):
@@ -428,7 +434,7 @@ class PhysicalDevice:
         macros = ZabbixUsermacros(
             self.nb,
             self._usermacro_map(),
-            config["usermacro_sync"],
+            self.config["usermacro_sync"],
             logger=self.logger,
             host=self.name,
         )
@@ -446,14 +452,14 @@ class PhysicalDevice:
         tags = ZabbixTags(
             self.nb,
             self._tag_map(),
-            tag_sync=config["tag_sync"],
-            tag_lower=config["tag_lower"],
-            tag_name=config["tag_name"],
-            tag_value=config["tag_value"],
+            tag_sync=self.config["tag_sync"],
+            tag_lower=self.config["tag_lower"],
+            tag_name=self.config["tag_name"],
+            tag_value=self.config["tag_value"],
             logger=self.logger,
             host=self.name,
         )
-        if config["tag_sync"] is False:
+        if self.config["tag_sync"] is False:
             self.tags = []
             return False
         self.tags = tags.generate()
@@ -483,20 +489,20 @@ class PhysicalDevice:
         for proxy_type in proxy_types:
             # Check if we should use custom fields for proxy config
             field_config = "proxy_cf" if proxy_type == "proxy" else "proxy_group_cf"
-            if config[field_config]:
+            if self.config[field_config]:
                 if (
-                    config[field_config] in self.nb.custom_fields
-                    and self.nb.custom_fields[config[field_config]]
+                    self.config[field_config] in self.nb.custom_fields
+                    and self.nb.custom_fields[self.config[field_config]]
                 ):
                     proxy_name = cf_to_string(
-                        self.nb.custom_fields[config[field_config]]
+                        self.nb.custom_fields[self.config[field_config]]
                     )
                 elif (
-                    config[field_config] in self.nb.site.custom_fields
-                    and self.nb.site.custom_fields[config[field_config]]
+                    self.config[field_config] in self.nb.site.custom_fields
+                    and self.nb.site.custom_fields[self.config[field_config]]
                 ):
                     proxy_name = cf_to_string(
-                        self.nb.site.custom_fields[config[field_config]]
+                        self.nb.site.custom_fields[self.config[field_config]]
                     )
 
             # Otherwise check if the proxy is configured in NetBox CC
@@ -516,7 +522,10 @@ class PhysicalDevice:
                     # If the proxy name matches
                     if proxy["name"] == proxy_name:
                         self.logger.debug(
-                            "Host %s: using {proxy['type']} '%s'", self.name, proxy_name
+                            "Host %s: using %s '%s'",
+                            self.name,
+                            proxy["type"],
+                            proxy_name,
                         )
                         self.zbxproxy = proxy
                         return True
@@ -526,13 +535,7 @@ class PhysicalDevice:
                 )
         return False
 
-    def create_in_zabbix(
-        self,
-        groups,
-        templates,
-        proxies,
-        description="Host added by NetBox sync script.",
-    ):
+    def create_in_zabbix(self, groups, templates, proxies):
         """
         Creates Zabbix host object with parameters from NetBox object.
         """
@@ -554,6 +557,14 @@ class PhysicalDevice:
             interfaces = self.set_interface_details()
             # Set Zabbix proxy if defined
             self._set_proxy(proxies)
+            # Set description
+            description_handler = Description(
+                self.nb,
+                self.config,
+                logger=self.logger,
+                nb_version=self.nb_api_version,
+            )
+            description = description_handler.generate()
             # Set basic data for host creation
             create_data = {
                 "host": self.name,
@@ -587,7 +598,7 @@ class PhysicalDevice:
                 self.logger.error(msg)
                 raise SyncExternalError(msg) from e
             # Set NetBox custom field to hostID value.
-            self.nb.custom_fields[config["device_cf"]] = int(self.zabbix_id)
+            self.nb.custom_fields[self.config["device_cf"]] = int(self.zabbix_id)
             self.nb.save()
             msg = f"Host {self.name}: Created host in Zabbix. (ID:{self.zabbix_id})"
             self.logger.info(msg)
@@ -657,12 +668,12 @@ class PhysicalDevice:
     def consistency_check(
         self, groups, templates, proxies, proxy_power, create_hostgroups
     ):
-        # pylint: disable=too-many-branches, too-many-statements
         """
         Checks if Zabbix object is still valid with NetBox parameters.
         """
         # If group is found or if the hostgroup is nested
-        if not self.set_zbx_groupid(groups):  # or len(self.hostgroups.split("/")) > 1:
+        # or len(self.hostgroups.split("/")) > 1:
+        if not self.set_zbx_groupid(groups):
             if create_hostgroups:
                 # Script is allowed to create a new hostgroup
                 new_groups = self.create_zbx_hostgroup(groups)
@@ -829,7 +840,7 @@ class PhysicalDevice:
         else:
             self.logger.info("Host %s: inventory_mode OUT of sync.", self.name)
             self.update_zabbix_host(inventory_mode=str(self.inventory_mode))
-        if config["inventory_sync"] and self.inventory_mode in [0, 1]:
+        if self.config["inventory_sync"] and self.inventory_mode in [0, 1]:
             # Check host inventory mapping
             if host["inventory"] == self.inventory:
                 self.logger.debug("Host %s: Inventory in-sync.", self.name)
@@ -838,12 +849,12 @@ class PhysicalDevice:
                 self.update_zabbix_host(inventory=self.inventory)
 
         # Check host usermacros
-        if config["usermacro_sync"]:
+        if self.config["usermacro_sync"]:
             # Make a full copy synce we dont want to lose the original value
             # of secret type macros from Netbox
             netbox_macros = deepcopy(self.usermacros)
             # Set the sync bit
-            full_sync_bit = bool(str(config["usermacro_sync"]).lower() == "full")
+            full_sync_bit = bool(str(self.config["usermacro_sync"]).lower() == "full")
             for macro in netbox_macros:
                 # If the Macro is a secret and full sync is NOT activated
                 if macro["type"] == str(1) and not full_sync_bit:
@@ -866,7 +877,7 @@ class PhysicalDevice:
                 self.update_zabbix_host(macros=self.usermacros)
 
         # Check host tags
-        if config["tag_sync"]:
+        if self.config["tag_sync"]:
             if remove_duplicates(
                 host["tags"], lambda tag: f"{tag['tag']}{tag['value']}"
             ) == remove_duplicates(
@@ -878,7 +889,6 @@ class PhysicalDevice:
                 self.update_zabbix_host(tags=self.tags)
 
         # If only 1 interface has been found
-        # pylint: disable=too-many-nested-blocks
         if len(host["interfaces"]) == 1:
             updates = {}
             # Go through each key / item and check if it matches Zabbix

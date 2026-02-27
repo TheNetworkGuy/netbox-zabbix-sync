@@ -191,8 +191,7 @@ wheels = [
 
 [[package]]
 name = "netbox-zabbix-sync"
-version = "3.3.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "igraph" },
     { name = "pynetbox" },

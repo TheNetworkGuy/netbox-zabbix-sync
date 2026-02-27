@@ -82,13 +82,19 @@ DEFAULT_CONFIG = {
         "cluster/name": "cluster",
         "platform/name": "target",
     },
+    "description_dt_format": "%Y-%m-%d %H:%M:%S",
+    "description": "static",
 }
 
 
-def load_config():
+def load_config(config_file=None):
     """Returns combined config from all sources"""
-    # Overwrite default config with config.py
-    conf = load_config_file(config_default=DEFAULT_CONFIG)
+    # Overwrite default config with config file.
+    # Default config file is config.py but can be overridden by providing a different file path.
+    conf = load_config_file(
+        config_default=DEFAULT_CONFIG,
+        config_file=config_file if config_file else "config.py",
+    )
     # Overwrite default config and config.py with environment variables
     for key in conf:
         value_setting = load_env_variable(key)
@@ -108,8 +114,9 @@ def load_env_variable(config_environvar):
 
 def load_config_file(config_default, config_file="config.py"):
     """Returns config from config.py file"""
+
     # Find the script path and config file next to it.
-    script_dir = path.dirname(path.dirname(path.abspath(__file__)))
+    script_dir = path.dirname(path.dirname(path.dirname(path.abspath(__file__))))
     config_path = Path(path.join(script_dir, config_file))
 
     # If the script directory is not found, try the current working directory

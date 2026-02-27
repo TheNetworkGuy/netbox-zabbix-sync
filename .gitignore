@@ -1,7 +1,7 @@
 *.log
 .venv
 .env
-config.py
+/config.py
 Pipfile
 Pipfile.lock
 # Byte-compiled / optimized / DLL files
@@ -10,3 +10,9 @@ __pycache__/
 .vscode
 .flake
 .coverage
+
+*.egg-info
+dist
+build
+
+netbox_zabbix_sync/_version.py

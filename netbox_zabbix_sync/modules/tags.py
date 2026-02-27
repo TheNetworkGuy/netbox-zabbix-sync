@@ -1,11 +1,10 @@
-# pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments, logging-fstring-interpolation
 """
 All of the Zabbix Usermacro related configuration
 """
 
 from logging import getLogger
 
-from modules.tools import field_mapper, remove_duplicates
+from netbox_zabbix_sync.modules.tools import field_mapper, remove_duplicates
 
 
 class ZabbixTags:
@@ -101,7 +100,6 @@ class ZabbixTags:
         """
         Generate full set of Usermacros
         """
-        # pylint: disable=too-many-branches
         tags = []
         # Parse the field mapper for tags
         if self.tag_map:
