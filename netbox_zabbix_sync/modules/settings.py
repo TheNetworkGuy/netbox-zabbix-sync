@@ -114,8 +114,9 @@ def load_env_variable(config_environvar):
 
 def load_config_file(config_default, config_file="config.py"):
     """Returns config from config.py file"""
+
     # Find the script path and config file next to it.
-    script_dir = path.dirname(path.dirname(path.abspath(__file__)))
+    script_dir = path.dirname(path.dirname(path.dirname(path.abspath(__file__))))
     config_path = Path(path.join(script_dir, config_file))
 
     # If the script directory is not found, try the current working directory
