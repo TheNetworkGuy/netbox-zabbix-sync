@@ -2,6 +2,8 @@
 Module for parsing configuration from the top level config.py file
 """
 
+from sys import argv
+
 from importlib import util
 from logging import getLogger
 from os import environ, path
@@ -114,6 +116,17 @@ def load_env_variable(config_environvar):
 
 def load_config_file(config_default, config_file="config.py"):
     """Returns config from config.py file"""
+
+    first_cli_arg = argv[0] if len(argv) > 1 else None
+    config_path = None
+
+    # If the script was run by the old .py file extension, use path as root of the config file.
+    if first_cli_arg and first_cli_arg.endswith(".py"):
+        logger.debug(
+            "Using legacy script path detection for config file location. Please switch to --config to specify the config file location."
+        )
+        config_path = Path(first_cli_arg).parent / config_file
+
     if not config_path or not config_path.exists():
         # Find the script path and config file next to it.
         script_dir = path.dirname(path.dirname(path.dirname(path.abspath(__file__))))
