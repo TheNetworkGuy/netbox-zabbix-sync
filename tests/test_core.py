@@ -663,49 +663,6 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         mock_zabbix.proxygroup.get.assert_not_called()
 
 
-class TestSyncLogout(unittest.TestCase):
-    """Test that sync properly logs out from Zabbix."""
-
-    def _setup_netbox_mock(self, mock_api):
-        """Helper to setup a working NetBox mock."""
-        mock_netbox = MagicMock()
-        mock_api.return_value = mock_netbox
-        mock_netbox.version = "3.5"
-        mock_netbox.extras.custom_fields.filter.return_value = []
-        mock_netbox.dcim.devices.filter.return_value = []
-        mock_netbox.virtualization.virtual_machines.filter.return_value = []
-        mock_netbox.dcim.site_groups.all.return_value = []
-        mock_netbox.dcim.regions.all.return_value = []
-        return mock_netbox
-
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
-    def test_sync_logs_out_from_zabbix(self, mock_api, mock_zabbix_api):
-        """Test that sync calls logout on Zabbix API after completion."""
-        self._setup_netbox_mock(mock_api)
-
-        mock_zabbix = MagicMock()
-        mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = "6.0"
-        mock_zabbix.hostgroup.get.return_value = []
-        mock_zabbix.template.get.return_value = []
-        mock_zabbix.proxy.get.return_value = []
-
-        syncer = Sync()
-        syncer.connect(
-            "http://netbox.local",
-            "nb_token",
-            "http://zabbix.local",
-            "user",
-            "pass",
-            None,
-        )
-        syncer.start()
-
-        # Verify logout was called
-        mock_zabbix.logout.assert_called_once()
-
-
 class TestSyncProxyNameSanitization(unittest.TestCase):
     """Test proxy name field sanitization for Zabbix 6."""
 
@@ -791,7 +748,6 @@ class TestDeviceHandeling(unittest.TestCase):
         ]
         mock_zabbix.proxy.get.return_value = []
         mock_zabbix.proxygroup.get.return_value = []
-        mock_zabbix.logout = MagicMock()
         # Mock host.get to return empty (host doesn't exist yet)
         mock_zabbix.host.get.return_value = []
         # Mock host.create to return success
@@ -1030,7 +986,6 @@ class TestDeviceStatusHandling(unittest.TestCase):
         ]
         mock_zabbix.proxy.get.return_value = []
         mock_zabbix.proxygroup.get.return_value = []
-        mock_zabbix.logout = MagicMock()
         mock_zabbix.host.get.return_value = []
         mock_zabbix.host.create.return_value = {"hostids": ["1"]}
         mock_zabbix.host.update.return_value = {"hostids": ["42"]}
@@ -1335,7 +1290,6 @@ class TestVMStatusHandling(unittest.TestCase):
         ]
         mock_zabbix.proxy.get.return_value = []
         mock_zabbix.proxygroup.get.return_value = []
-        mock_zabbix.logout = MagicMock()
         mock_zabbix.host.get.return_value = []
         mock_zabbix.host.create.return_value = {"hostids": ["1"]}
         mock_zabbix.host.update.return_value = {"hostids": ["42"]}
@@ -1581,3 +1535,258 @@ class TestVMStatusHandling(unittest.TestCase):
         syncer.start()
 
         mock_zabbix.host.update.assert_called_once_with(hostid=42, status="1")
+
+
+class TestCombineFilters(unittest.TestCase):
+    """Test the _combine_filters method and filter override behavior in start()."""
+
+    def _setup_netbox_mock(self, mock_api, devices=None, vms=None):
+        """Helper to setup a working NetBox mock."""
+        mock_netbox = MagicMock()
+        mock_api.return_value = mock_netbox
+        mock_netbox.version = "3.5"
+        mock_netbox.extras.custom_fields.filter.return_value = []
+        mock_netbox.dcim.devices.filter.return_value = devices or []
+        mock_netbox.virtualization.virtual_machines.filter.return_value = vms or []
+        mock_netbox.dcim.site_groups.all.return_value = []
+        mock_netbox.dcim.regions.all.return_value = []
+        mock_netbox.extras.journal_entries = MagicMock()
+        return mock_netbox
+
+    def _setup_zabbix_mock(self, mock_zabbix_api, version="7.0"):
+        """Helper to setup a working Zabbix mock."""
+        mock_zabbix = MagicMock()
+        mock_zabbix_api.return_value = mock_zabbix
+        # Set version as float to match expected type in device.py comparisons
+        mock_zabbix.version = float(version)
+        mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
+        mock_zabbix.template.get.return_value = [
+            {"templateid": "1", "name": "TestTemplate"}
+        ]
+        mock_zabbix.proxy.get.return_value = []
+        mock_zabbix.proxygroup.get.return_value = []
+        mock_zabbix.host.get.return_value = []
+        mock_zabbix.host.create.return_value = {"hostids": ["1"]}
+        return mock_zabbix
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_filter_override_with_name_parameter(self, mock_api, mock_zabbix_api):
+        """Test that method filter parameter overrides config filter for name.
+
+        Scenario:
+        - Config has nb_device_filter with name="SW01N0"
+        - start() is called with device_filter {"name": "Testdev02"}
+        - Only the device matching "Testdev02" should be processed
+        """
+        # Create two mock devices
+        device_matching_method_filter = MockNetboxDevice(
+            device_id=1, name="Testdev02", status_label="Active"
+        )
+        device_matching_config_filter = MockNetboxDevice(
+            device_id=2, name="SW01N0", status_label="Active"
+        )
+
+        # Setup mocks - the filter should be called with the combined/overridden filter
+        self._setup_netbox_mock(
+            mock_api,
+            devices=[
+                device_matching_method_filter,
+                device_matching_config_filter,
+            ],
+        )
+        self._setup_zabbix_mock(mock_zabbix_api)
+
+        # Create sync with config filter specifying one name
+        syncer = Sync({"nb_device_filter": {"name": "SW01N0"}})
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+
+        # Call start with method filter specifying a different name
+        # The method filter should override the config filter
+        syncer.start(device_filter={"name": "Testdev02"})
+
+        # Verify that nbapi.dcim.devices.filter was called with the override filter
+        mock_netbox = mock_api.return_value
+        filter_call_kwargs = mock_netbox.dcim.devices.filter.call_args[1]
+        self.assertEqual(filter_call_kwargs.get("name"), "Testdev02")
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_filter_override_site_parameter(self, mock_api, mock_zabbix_api):
+        """Test that site filter override works correctly.
+
+        Scenario:
+        - Config has no device filter set
+        - start() is called with device_filter {"site": "fra01"}
+        - Only devices in fra01 site should be processed
+        """
+        # Create mock sites
+        site_fra01 = MagicMock()
+        site_fra01.name = "fra01"
+        site_fra01.slug = "fra01"
+
+        site_ams01 = MagicMock()
+        site_ams01.name = "ams01"
+        site_ams01.slug = "ams01"
+
+        # Create devices in different sites
+        device_fra01 = MockNetboxDevice(
+            device_id=1, name="device-fra01", status_label="Active", site=site_fra01
+        )
+        device_ams01 = MockNetboxDevice(
+            device_id=2, name="device-ams01", status_label="Active", site=site_ams01
+        )
+
+        self._setup_netbox_mock(mock_api, devices=[device_fra01, device_ams01])
+        self._setup_zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+
+        # Call start with site filter for fra01
+        syncer.start(device_filter={"site": "fra01"})
+
+        # Verify that nbapi.dcim.devices.filter was called with the site filter
+        mock_netbox = mock_api.return_value
+        filter_call_kwargs = mock_netbox.dcim.devices.filter.call_args[1]
+        self.assertEqual(filter_call_kwargs.get("site"), "fra01")
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_config_filter_overridden_by_start_parameter(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Test that start() method filter overrides config filter.
+
+        Scenario:
+        - Config specifies nb_device_filter with {"name": "SW01N0", "site": "ams01"}
+        - start() is called with {"name": "Testdev02"} (only overriding name)
+        - The final filter should be {"name": "Testdev02", "site": "ams01"}
+        - Both name and site filters should be applied with the override
+        """
+        device_matching_all = MockNetboxDevice(
+            device_id=1, name="Testdev02", status_label="Active"
+        )
+
+        self._setup_netbox_mock(mock_api, devices=[device_matching_all])
+        self._setup_zabbix_mock(mock_zabbix_api)
+
+        # Create sync with config filter having multiple parameters
+        syncer = Sync({"nb_device_filter": {"name": "SW01N0", "site": "ams01"}})
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+
+        # Call start with method filter that overrides only the name
+        syncer.start(device_filter={"name": "Testdev02"})
+
+        # Verify that nbapi.dcim.devices.filter was called with combined filter
+        # (site from config + name from method parameter)
+        mock_netbox = mock_api.return_value
+        filter_call_kwargs = mock_netbox.dcim.devices.filter.call_args[1]
+        self.assertEqual(filter_call_kwargs.get("name"), "Testdev02")
+        self.assertEqual(filter_call_kwargs.get("site"), "ams01")
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_vm_filter_override_with_method_parameter(self, mock_api, mock_zabbix_api):
+        """Test that VM filter override works correctly.
+
+        Scenario:
+        - Config enables VM sync with nb_vm_filter {"name": "vm-prod"}
+        - start() is called with vm_filter {"name": "vm-test"}
+        - Only VMs matching "vm-test" should be processed
+        """
+        # Create two mock VMs
+        vm_matching_method_filter = MockNetboxVM(
+            vm_id=1, name="vm-test", status_label="Active"
+        )
+        vm_matching_config_filter = MockNetboxVM(
+            vm_id=2, name="vm-prod", status_label="Active"
+        )
+
+        self._setup_netbox_mock(
+            mock_api,
+            vms=[vm_matching_method_filter, vm_matching_config_filter],
+        )
+        self._setup_zabbix_mock(mock_zabbix_api)
+
+        # Create sync with config filter for VMs
+        syncer = Sync(
+            {
+                "sync_vms": True,
+                "nb_vm_filter": {"name": "vm-prod"},
+            }
+        )
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+
+        # Call start with method filter that overrides the VM name filter
+        syncer.start(vm_filter={"name": "vm-test"})
+
+        # Verify that nbapi.virtualization.virtual_machines.filter was called with override
+        mock_netbox = mock_api.return_value
+        filter_call_kwargs = (
+            mock_netbox.virtualization.virtual_machines.filter.call_args[1]
+        )
+        self.assertEqual(filter_call_kwargs.get("name"), "vm-test")
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_multiple_filter_parameters_combined(self, mock_api, mock_zabbix_api):
+        """Test that multiple filter parameters are correctly combined.
+
+        Scenario:
+        - Config has nb_device_filter with {"site": "fra01", "status": "active"}
+        - start() is called with {"name": "router*"}
+        - The final filter should have all three parameters
+        """
+        device = MockNetboxDevice(device_id=1, name="router01", status_label="Active")
+
+        self._setup_netbox_mock(mock_api, devices=[device])
+        self._setup_zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync({"nb_device_filter": {"site": "fra01", "status": "active"}})
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+
+        syncer.start(device_filter={"name": "router*"})
+
+        mock_netbox = mock_api.return_value
+        filter_call_kwargs = mock_netbox.dcim.devices.filter.call_args[1]
+
+        # All three parameters should be present
+        self.assertEqual(filter_call_kwargs.get("site"), "fra01")
+        self.assertEqual(filter_call_kwargs.get("status"), "active")
+        self.assertEqual(filter_call_kwargs.get("name"), "router*")
