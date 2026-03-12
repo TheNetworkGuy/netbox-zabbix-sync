@@ -2,6 +2,7 @@
 
 import ssl
 from os import environ
+from pprint import pformat
 from typing import Any
 
 from pynetbox import api as nbapi
@@ -282,12 +283,11 @@ class Sync:
                     continue
                 if self.config["extended_site_properties"] and nb_vm.site:
                     logger.debug("Host %s: extending site information.", vm.name)
-                    vm.site = convert_recordset(
-                        self.netbox.dcim.sites.filter(id=nb_vm.site.id)
-                    )
+                    nb_vm.site.full_details()
                 vm.set_inventory(nb_vm)
                 vm.set_usermacros()
                 vm.set_tags()
+                logger.debug("Host %s NetBox data: %s", vm.name, pformat(dict(nb_vm)))
                 # Checks if device is in cleanup state
                 if vm.status in self.config["zabbix_device_removal"]:
                     if vm.zabbix_id:
@@ -361,12 +361,11 @@ class Sync:
                     continue
                 if self.config["extended_site_properties"] and nb_device.site:
                     logger.debug("Host %s: extending site information.", device.name)
-                    device.site = convert_recordset(
-                        self.netbox.dcim.sites.filter(id=nb_device.site.id)
-                    )
+                    nb_device.site.full_details()
                 device.set_inventory(nb_device)
                 device.set_usermacros()
                 device.set_tags()
+                logger.debug("Host %s NetBox data: %s", device.name, pformat(dict(nb_device)))
                 # Checks if device is part of cluster.
                 # Requires clustering variable
                 if device.is_cluster() and self.config["clustering"]:
