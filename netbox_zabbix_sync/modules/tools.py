@@ -89,7 +89,7 @@ def field_mapper(host, mapper, nbdevice, logger):
         # Check if the result is usable and expected
         # We want to apply any int or float 0 values,
         # even if python thinks those are empty.
-        if (value and isinstance(value, int | float | str)) or (
+        if (value and isinstance(value, int | float | str | list | dict)) or (
             isinstance(value, int | float) and int(value) == 0
         ):
             data[zbx_field] = str(value)
@@ -102,7 +102,7 @@ def field_mapper(host, mapper, nbdevice, logger):
             )
             data[zbx_field] = ""
         else:
-            # Value is not a string or numeral, probably not what the user expected.
+            # Value is not of known type, probably not what the user expected.
             logger.info(
                 "Host %s: Lookup for '%s' returned an unexpected type: it will be skipped.",
                 host,

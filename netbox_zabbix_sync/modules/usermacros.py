@@ -98,6 +98,14 @@ class ZabbixUsermacros:
                 macro_name,
             )
             return False
+        if len(macro["value"])>2048:
+            self.logger.warning(
+                "Host %s: Usermacro %s has a value that is %s bytes which is too large, skipping.",
+                self.name,
+                macro_name,
+                len(macro["value"])
+            )
+            return False
         return macro
 
     def generate(self):

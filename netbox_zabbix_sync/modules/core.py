@@ -366,6 +366,14 @@ class Sync:
                 if self.config["extended_site_properties"] and nb_device.site:
                     logger.debug("Host %s: extending site information.", device.name)
                     nb_device.site.full_details()
+                if (
+                    self.config["extended_virtual_chassis"]
+                    and nb_device.virtual_chassis
+                ):
+                    logger.debug(
+                        "Host %s: extending virtual chassis information.", device.name
+                    )
+                    nb_device.virtual_chassis.full_details()
                 device.set_inventory(nb_device)
                 device.set_usermacros()
                 device.set_tags()
