@@ -10,7 +10,81 @@ from zabbix_utils import APIRequestError
 from netbox_zabbix_sync.modules.core import Sync
 
 
-class MockNetboxDevice:
+class MockListObject:
+    def __repr__(self):
+        return str(self.object)
+
+    def serialize(self):
+        ret = {k: getattr(self, k) for k in ["object_id", "object_type"]}
+        return ret
+
+    def __getattr__(self, k):
+        return getattr(self.object, k)
+
+    def __iter__(self):
+        for i in ["object_id", "object_type", "object"]:
+            cur_attr = getattr(self, i)
+            if isinstance(cur_attr, MockRecord):
+                cur_attr = dict(cur_attr)
+            yield i, cur_attr
+
+
+class MockRecord:
+    def __init__(self, values, api, endpoint):
+        self.has_details = False
+        self._full_cache = []
+        self._init_cache = []
+        self.api = api
+        self.default_ret = MockRecord
+
+    def __iter__(self):
+        for i in dict(self._init_cache):
+            cur_attr = getattr(self, i)
+            if isinstance(cur_attr, MockRecord):
+                yield i, dict(cur_attr)
+            elif isinstance(cur_attr, list) and all(
+                isinstance(i, (MockRecord, MockListObject)) for i in cur_attr
+            ):
+                yield i, [dict(x) for x in cur_attr]
+            else:
+                yield i, cur_attr
+
+    def __getitem__(self, k):
+        return dict(self)[k]
+
+    def __str__(self):
+        return (
+            getattr(self, "name", None)
+            or getattr(self, "label", None)
+            or getattr(self, "display", None)
+            or ""
+        )
+
+    def __repr__(self):
+        return str(self)
+
+    def __getstate__(self):
+        return self.__dict__
+
+    def __setstate__(self, d):
+        self.__dict__.update(d)
+
+    def __key__(self):
+        if hasattr(self, "id"):
+            return ("mock", self.id)
+        else:
+            return "mock"
+
+    def __hash__(self):
+        return hash(self.__key__())
+
+    def __eq__(self, other):
+        if isinstance(other, MockRecord):
+            return self.__key__() == other.__key__()
+        return NotImplemented
+
+
+class MockNetboxDevice(MockRecord):
     """Mock NetBox device object."""
 
     def __init__(
@@ -31,6 +105,7 @@ class MockNetboxDevice:
         serial="",
         tags=None,
     ):
+        super().__init__(values={}, api=None, endpoint=None)
         self.id = device_id
         self.name = name
         self.status = MagicMock()
@@ -108,7 +183,7 @@ class MockNetboxDevice:
         """Mock save method for NetBox device."""
 
 
-class MockNetboxVM:
+class MockNetboxVM(MockRecord):
     """Mock NetBox virtual machine object.
 
     Mirrors the real NetBox API response structure so the full VirtualMachine
@@ -130,6 +205,7 @@ class MockNetboxVM:
         platform=None,
         tags=None,
     ):
+        super().__init__(values={}, api=None, endpoint=None)
         self.id = vm_id
         self.name = name
         self.status = MagicMock()

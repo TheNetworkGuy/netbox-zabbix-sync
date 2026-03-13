@@ -62,7 +62,6 @@ class PhysicalDevice:
         self.hostgroups = []
         self.hostgroup_type = "dev"
         self.tenant = nb.tenant
-        self.site = nb.site
         self.config_context = nb.config_context
         self.zbxproxy = None
         self.zabbix_state = 0
