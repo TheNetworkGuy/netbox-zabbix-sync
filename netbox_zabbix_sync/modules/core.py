@@ -290,7 +290,7 @@ class Sync:
                 logger.debug(
                     "Host %s NetBox data: %s",
                     vm.name,
-                    pformat(nb_vm if isinstance(nb_vm, dict) else dict(nb_vm)),
+                    pformat(dict(nb_vm)),
                 )
                 # Checks if device is in cleanup state
                 if vm.status in self.config["zabbix_device_removal"]:
@@ -371,11 +371,7 @@ class Sync:
                 device.set_tags()
 
                 logger.debug(
-                    "Host %s NetBox data: %s",
-                    device.name,
-                    pformat(
-                        nb_device if isinstance(nb_device, dict) else dict(nb_device)
-                    ),
+                    "Host %s NetBox data: %s", device.name, pformat(dict(nb_device))
                 )
                 # Checks if device is part of cluster.
                 # Requires clustering variable
