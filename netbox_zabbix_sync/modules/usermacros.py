@@ -7,6 +7,7 @@ from re import match
 
 from netbox_zabbix_sync.modules.tools import field_mapper, sanatize_log_output
 
+MAX_VALUE_SIZE=2048
 
 class ZabbixUsermacros:
     """Class that represents Zabbix usermacros."""
@@ -98,7 +99,7 @@ class ZabbixUsermacros:
                 macro_name,
             )
             return False
-        if len(macro["value"])>2048:
+        if len(macro["value"]) > MAX_VALUE_SIZE:
             self.logger.warning(
                 "Host %s: Usermacro %s has a value that is %s bytes which is too large, skipping.",
                 self.name,
