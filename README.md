@@ -353,8 +353,8 @@ For Virtual Machines, use `vm_inventory_map`.
 ```python
 inventory_sync = True
 inventory_mode = "manual"
-device_inventory_map = {"custom_fields/mycustomfield/name": "alias"}
-vm_inventory_map = {"custom_fields/mycustomfield/name": "alias"}
+device_inventory_map = {"custom_fields/mycustomfield": "alias"}
+vm_inventory_map = {"custom_fields/mycustomfield": "alias"}
 ```
 
 See `config.py.example` for an extensive example map. Any Zabbix Inventory fields
