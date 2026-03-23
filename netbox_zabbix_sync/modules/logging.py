@@ -21,9 +21,10 @@ def setup_logger():
     """
     # Set logging
     lgout = logging.StreamHandler()
-    # Logfile in the project root
-    project_root = path.dirname(path.dirname(path.realpath(__file__)))
-    logfile_path = path.join(project_root, "sync.log")
+
+    # Create log file in current working directory
+    working_dir = path.realpath(path.curdir)
+    logfile_path = path.join(working_dir, "sync.log")
     lgfile = logging.FileHandler(logfile_path)
 
     logging.basicConfig(
