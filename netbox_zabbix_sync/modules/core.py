@@ -366,13 +366,26 @@ class Sync:
                 if self.config["extended_site_properties"] and nb_device.site:
                     logger.debug("Host %s: extending site information.", device.name)
                     nb_device.site.full_details()
-                device.set_inventory(nb_device)
-                device.set_usermacros()
-                device.set_tags()
+                if (
+                    self.config["extended_virtual_chassis"]
+                    and nb_device.virtual_chassis
+                ):
+                    logger.debug(
+                        "Host %s: extending virtual chassis information.", device.name
+                    )
+                    nb_device.virtual_chassis.full_details()
+                    if "members" in dict(nb_device.virtual_chassis):
+                        for member in nb_device.virtual_chassis.members:
+                            member.full_details()
 
                 logger.debug(
                     "Host %s NetBox data: %s", device.name, pformat(dict(nb_device))
                 )
+
+                device.set_inventory(nb_device)
+                device.set_usermacros()
+                device.set_tags()
+
                 # Checks if device is part of cluster.
                 # Requires clustering variable
                 if device.is_cluster() and self.config["clustering"]:
