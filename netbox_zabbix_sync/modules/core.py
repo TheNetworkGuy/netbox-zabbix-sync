@@ -374,13 +374,18 @@ class Sync:
                         "Host %s: extending virtual chassis information.", device.name
                     )
                     nb_device.virtual_chassis.full_details()
-                device.set_inventory(nb_device)
-                device.set_usermacros()
-                device.set_tags()
+                    if "members" in dict(nb_device.virtual_chassis):
+                        for member in nb_device.virtual_chassis.members:
+                            member.full_details()
 
                 logger.debug(
                     "Host %s NetBox data: %s", device.name, pformat(dict(nb_device))
                 )
+
+                device.set_inventory(nb_device)
+                device.set_usermacros()
+                device.set_tags()
+
                 # Checks if device is part of cluster.
                 # Requires clustering variable
                 if device.is_cluster() and self.config["clustering"]:

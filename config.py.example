@@ -24,6 +24,11 @@ description_dt_format = "%Y-%m-%d %H:%M:%S"
 ## Enable clustering of devices with virtual chassis setup
 clustering = False
 
+## Extend Virtual Chassis Information
+# When set to True, the script will  pull extended virtual chassis information which is then available for use in usermacros, tags and inventory.
+# Be aware that this will increase the number of API queries to NetBox.
+extended_virtual_chassis = False
+
 ## Enable hostgroup generation. Requires permissions in Zabbix
 create_hostgroups = True
 
