@@ -239,7 +239,7 @@ def sanatize_log_output(data):
     if "ipmi_password" in sanitized_data:
         ipmi_password = sanitized_data["ipmi_password"]
         if not (ipmi_password.startswith("{$") and ipmi_password.endswith("}")):
-            sanitized_data["ipmi_password"] = "********" # noqa: S105
+            sanitized_data["ipmi_password"] = "********"  # noqa: S105
     # Check for interface data
     if "interfaceid" in data:
         # Interface ID is a value which is most likely not helpful
