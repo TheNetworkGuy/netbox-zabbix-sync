@@ -31,6 +31,10 @@ _BOOL_ARGS = [
         "extended_site_properties",
         "Fetch additional site info from NetBox (increases API queries).",
     ),
+    (
+        "extended_virtual_chassis",
+        "Fetch additional virtual chassis info from NetBox (increases API queries).",
+    ),
     ("inventory_sync", "Sync NetBox device properties to Zabbix inventory."),
     ("usermacro_sync", "Sync usermacros from NetBox to Zabbix."),
     ("tag_sync", "Sync host tags to Zabbix."),
@@ -133,6 +137,7 @@ def main(arguments):
         zbx_token=zabbix_token,
     )
     syncer.start()
+    syncer.logout()
 
 
 def parse_cli():
@@ -165,7 +170,7 @@ def parse_cli():
         default=None,
     )
     parser.add_argument(
-        "--version", action="version", version="NetBox-Zabbix Sync 3.4.0"
+        "--version", action="version", version="NetBox-Zabbix Sync 4.0.1"
     )
 
     # ── Boolean config overrides ───────────────────────────────────────────────
