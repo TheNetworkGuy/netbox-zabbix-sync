@@ -857,15 +857,12 @@ class PhysicalDevice:
             }
             for key, prop in ipmi_params.items():
                 # If defined, check if values match
-                if key in self.ipmi and host[prop] != str(self.ipmi[key]):
-                    ipmi_in_sync = False
-                # privilege and authtype have defaults, we must take these into account.
-                elif not key in self.ipmi and (
-                    key == "privilege"
-                    and host[prop] != str(privilege)
-                    or key == "authtype"
-                    and host[prop] != str(authtype)
-                ):
+                if (key in self.ipmi and host[prop] != str(self.ipmi[key])) or (key not in self.ipmi and (
+                    (key == "privilege"
+                    and host[prop] != str(privilege))
+                    or (key == "authtype"
+                    and host[prop] != str(authtype))
+                )):
                     ipmi_in_sync = False
 
             if ipmi_in_sync:
