@@ -1029,73 +1029,134 @@ class PhysicalDevice:
                 self.logger.info("Host %s: Tags OUT of sync.", self.name)
                 self.update_zabbix_host(tags=self.tags)
 
-        # If only 1 interface has been found
-        if len(host["interfaces"]) == 1:
-            updates = {}
-            # Go through each key / item and check if it matches Zabbix
-            for key, item in self.set_interface_details()[0].items():
-                # Check if NetBox value is found in Zabbix
-                if key in host["interfaces"][0]:
-                    # If SNMP is used, go through nested dict
-                    # to compare SNMP parameters
-                    if isinstance(item, dict) and key == "details":
-                        for k, i in item.items():
-                            # Check if the key is found in Zabbix and if the value matches
-                            if k in host["interfaces"][0][key] and host["interfaces"][
-                                0
-                            ][key][k] != str(i):
-                                # If dict has not been created, add it
-                                if key not in updates:
-                                    updates[key] = {}
-                                updates[key][k] = str(i)
-                                # If SNMP version has been changed
-                                # break loop and force full SNMP update
-                                if k == "version":
-                                    break
-                        # Force full SNMP config update
-                        # when version has changed.
-                        if key in updates and "version" in updates[key]:
-                            for k, i in item.items():
-                                updates[key][k] = str(i)
-                        continue
-                    # Set update if values don't match
-                    if host["interfaces"][0][key] != str(item):
-                        updates[key] = item
-            if updates:
-                # If interface updates have been found: push to Zabbix
-                self.logger.info("Host %s: Interface OUT of sync.", self.name)
-                if "type" in updates:
-                    # Changing interface type not supported. Raise exception.
+        # Verify interfaces
+        interfaces = []
+        interfaces.append(self.set_interface_details())
+        if self.config["oob_sync"] and "oob_ip" in dict(self.nb) and self.nb.oob_ip:
+            interfaces.append(self.set_interface_details(oob=True))
+        if not self._verify_interfaces(interfaces):
+            e = f"Inconsistent interface configuration for host {self.name}."
+            self.logger.error(e)
+            raise SyncInventoryError(e)
+        if interfaces:
+            upd_ints = []
+            add_ints = []
+            del_ints = False
+            if len(host["interfaces"]) > len(interfaces):
+                del_ints = True
+            for interface in interfaces:
+                z_interface = list(
+                    filter(
+                        lambda z_int: z_int["type"] == str(interface["type"]),
+                        host["interfaces"],
+                    )
+                )
+                if not z_interface:
+                    add_ints.append(interface)
+                elif len(z_interface) > 1:
+                    e = f"Multiple interfaces of the same type detecten on host {self.name}, manual intervention required."
+                    self.logger.error(e)
+                    raise SyncInventoryError(e)
+                else:
+                    z_interface = z_interface[0]
+                    # Go through each key / item and check if it matches Zabbix
+                    updates = {}
+                    for key, item in interface.items():
+                        # Check if NetBox value is found in Zabbix
+                        if key in z_interface:
+                            # If SNMP is used, go through nested dict
+                            # to compare SNMP parameters
+                            if isinstance(item, dict) and key == "details":
+                                for k, i in item.items():
+                                    # Check if the key is found in Zabbix and if the value matches
+                                    if k in z_interface[key] and z_interface[key][
+                                        k
+                                    ] != str(i):
+                                        # If dict has not been created, add it
+                                        if key not in updates:
+                                            updates[key] = {}
+                                        updates[key][k] = str(i)
+                                        # If SNMP version has been changed
+                                        # break loop and force full SNMP update
+                                        if k == "version":
+                                            break
+                                # Force full SNMP config update
+                                # when version has changed.
+                                if key in updates and "version" in updates[key]:
+                                    for k, i in item.items():
+                                        updates[key][k] = str(i)
+                                continue
+                            # Set update if values don't match
+                            if z_interface[key] != str(item):
+                                updates[key] = item
+                    if updates:
+                        updates["interfaceid"] = z_interface["interfaceid"]
+                        upd_ints.append(updates)
+
+            if upd_ints or add_ints or del_ints:
+                # Push changed interface settings
+                for updates in upd_ints:
+                    # If interface updates have been found: push to Zabbix
+                    self.logger.info(
+                        "Host %s: Interface %s OUT of sync.",
+                        self.name,
+                        updates["interfaceid"],
+                    )
+                    if "type" in updates:
+                        # Changing interface type not supported. Raise exception.
+                        e = (
+                            f"Host {self.name}: Changing interface type to "
+                            f"{updates['type']} is not supported."
+                        )
+                        self.logger.error(e)
+                        raise InterfaceConfigError(e)
+                    try:
+                        # API call to Zabbix
+                        self.zabbix.hostinterface.update(updates)
+                        err_msg = (
+                            f"Host {self.name}: Updated interface "
+                            f"with data {sanatize_log_output(updates)}."
+                        )
+                        self.logger.info(err_msg)
+                        self.create_journal_entry("info", err_msg)
+                    except APIRequestError as e:
+                        msg = f"Zabbix returned the following error: {e}."
+                        self.logger.error(msg)
+                        raise SyncExternalError(msg) from e
+
+                # Create any new interfaces
+                for addition in add_ints:
+                    # If interface updates have been found: push to Zabbix
+                    self.logger.info("Host %s: Interface OUT of sync.", self.name)
+                    addition["hostid"] = host["hostid"]
+                    try:
+                        # API call to Zabbix
+                        self.zabbix.hostinterface.create(addition)
+                        err_msg = (
+                            f"Host {self.name}: Added interface "
+                            f"with data {sanatize_log_output(addition)}."
+                        )
+                        self.logger.info(err_msg)
+                        self.create_journal_entry("info", err_msg)
+                    except APIRequestError as e:
+                        msg = f"Zabbix returned the following error: {e}."
+                        self.logger.error(msg)
+                        raise SyncExternalError(msg) from e
+
+                if del_ints:
+                    self.logger.info("Host %s: Interface OUT of sync.", self.name)
+                    # Removing interfaces is not supported. Raise exception.
                     e = (
-                        f"Host {self.name}: Changing interface type to "
-                        f"{updates['type']} is not supported."
+                        f"Host {self.name}: Need to remove interface(s) and this is not supported. "
+                        f"Manual intervention is required."
                     )
                     self.logger.error(e)
                     raise InterfaceConfigError(e)
-                # Set interfaceID for Zabbix config
-                updates["interfaceid"] = host["interfaces"][0]["interfaceid"]
-                try:
-                    # API call to Zabbix
-                    self.zabbix.hostinterface.update(updates)
-                    err_msg = (
-                        f"Host {self.name}: Updated interface "
-                        f"with data {sanatize_log_output(updates)}."
-                    )
-                    self.logger.info(err_msg)
-                    self.create_journal_entry("info", err_msg)
-                except APIRequestError as e:
-                    msg = f"Zabbix returned the following error: {e}."
-                    self.logger.error(msg)
-                    raise SyncExternalError(msg) from e
             else:
                 # If no updates are found, Zabbix interface is in-sync
-                self.logger.debug("Host %s: Interface in-sync.", self.name)
+                self.logger.debug("Host %s: Interface(s) in-sync.", self.name)
         else:
-            err_msg = (
-                f"Host {self.name}: Has unsupported interface configuration."
-                f" Host has total of {len(host['interfaces'])} interfaces. "
-                "Manual intervention required."
-            )
+            err_msg = f"Host {self.name}: Has has no interface configuration."
             self.logger.error(err_msg)
             raise SyncInventoryError(err_msg)
 
