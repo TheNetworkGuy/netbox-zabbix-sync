@@ -108,7 +108,7 @@ class PhysicalDevice:
             raise SyncInventoryError(e)
 
         # Set OOB IP if available
-        if self.nb.oob_ip:
+        if "oob_ip" in dict(self.nb) and self.nb.oob_ip:
             self.oob_cidr = self.nb.oob_ip.address
             self.oob_ip = self.oob_cidr.split("/")[0]
 

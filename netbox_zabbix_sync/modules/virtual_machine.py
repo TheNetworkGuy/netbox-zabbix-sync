@@ -57,7 +57,7 @@ class VirtualMachine(PhysicalDevice):
                     interface.set_snmp()
             else:
                 interface.set_default_agent()
-            return [interface.interface]
+            return interface.interface
         except InterfaceConfigError as e:
             message = f"{self.name}: {e}"
             self.logger.warning(message)
