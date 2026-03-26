@@ -40,7 +40,7 @@ class VirtualMachine(PhysicalDevice):
             self.logger.warning(e)
         return True
 
-    def set_interface_details(self):
+    def set_interface_details(self,oob=False):
         """
         Overwrites device function to select an agent interface type by default
         Agent type interfaces are more likely to be used with VMs then SNMP
