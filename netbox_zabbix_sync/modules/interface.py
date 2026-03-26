@@ -38,10 +38,12 @@ class ZabbixInterface:
         if "zabbix" in self.context:
             zabbix = self.context["zabbix"]
             if int_type in zabbix:
+                # Use valid integer for type if set
                 if str(zabbix[int_type]).isdigit() and (
                     int(zabbix[int_type]) > 0 and int(zabbix[int_type]) < max_type
                 ):
                     self.interface["type"] = zabbix[int_type]
+                # Otherwise, convert string to type integer
                 elif zabbix[int_type].lower() in int_types:
                     self.interface["type"] = int_types[zabbix[int_type].lower()]
                 else:
