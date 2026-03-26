@@ -1081,7 +1081,7 @@ class TestDeviceStatusHandling(unittest.TestCase):
                 "status": status,
                 # Single empty-dict interface: len==1 avoids SyncInventoryError,
                 # empty keys prevent any spurious interface-update calls.
-                "interfaces": [{}],
+                "interfaces": [{"type": "1", "port": "10050"}],
                 "inventory_mode": "-1",
                 "inventory": {},
                 "macros": [],
@@ -1385,7 +1385,7 @@ class TestVMStatusHandling(unittest.TestCase):
                 "status": status,
                 # Single empty-dict interface: len==1 avoids SyncInventoryError,
                 # empty keys mean no spurious interface-update calls.
-                "interfaces": [{}],
+                "interfaces": [{"type": "1", "port": "10050"}],
                 "inventory_mode": "-1",
                 "inventory": {},
                 "macros": [],
