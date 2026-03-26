@@ -410,6 +410,27 @@ class PhysicalDevice:
         host = self.zabbix.host.get(filter=zbx_filter, output=[])
         return bool(host)
 
+    def _verify_interfaces(self, interfaces: list) -> bool:
+        """
+        Checks if all interfaces are of a unique type
+        """
+        max_interfaces = 2
+        min_interfaces = 1
+        int_types = []
+        if len(interfaces) == min_interfaces:
+            return True
+        elif len(interfaces) > min_interfaces and len(interfaces) <= max_interfaces:
+            int_types = [t.get("type") for t in interfaces]
+            if len(set(int_types)) < len(interfaces):
+                message = "Dublicate interface types found."
+                self.logger.error(message)
+            else:
+                return True
+        else:
+            message = f"Unsupported number of interfaces ({len(interfaces)})."
+            self.logger.error(message)
+        return False
+
     def set_interface_details(self, oob=False):
         """
         Checks interface parameters from NetBox and
@@ -625,6 +646,10 @@ class PhysicalDevice:
             interfaces.append(self.set_interface_details())
             if self.config["oob_sync"] and "oob_ip" in dict(self.nb) and self.nb.oob_ip:
                 interfaces.append(self.set_interface_details(oob=True))
+            if not self._verify_interfaces(interfaces):
+                e = f"Inconsistent interface configuration for host {self.name}."
+                self.logger.error(e)
+                raise SyncInventoryError(e)
             # Set Zabbix proxy if defined
             self._set_proxy(proxies)
             # Set description

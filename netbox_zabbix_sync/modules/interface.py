@@ -75,13 +75,13 @@ class ZabbixInterface:
                 self.interface["details"] = details
                 # Checks if bulk config has been defined
                 if "bulk" in snmp:
-                    details["bulk"] = str(snmp.pop("bulk"))
+                    details["bulk"] = str(snmp.get("bulk"))
                 else:
                     # Fallback to bulk enabled if not specified
                     details["bulk"] = "1"
                 # SNMP Version config is required in NetBox config context
                 if snmp.get("version"):
-                    details["version"] = str(snmp.pop("version"))
+                    details["version"] = str(snmp.get("version"))
                 else:
                     e = "SNMP version option is not defined."
                     raise InterfaceConfigError(e)
