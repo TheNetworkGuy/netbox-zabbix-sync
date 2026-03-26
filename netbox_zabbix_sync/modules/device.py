@@ -422,7 +422,7 @@ class PhysicalDevice:
         elif len(interfaces) > min_interfaces and len(interfaces) <= max_interfaces:
             int_types = [t.get("type") for t in interfaces]
             if len(set(int_types)) < len(interfaces):
-                message = "Dublicate interface types found."
+                message = "Duplicate interface types found."
                 self.logger.error(message)
             else:
                 return True
