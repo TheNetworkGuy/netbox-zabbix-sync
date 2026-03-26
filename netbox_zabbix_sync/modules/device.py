@@ -67,6 +67,7 @@ class PhysicalDevice:
         self.zabbix_state = 0
         self.journal = journal
         self.nb_journals = nb_journal_class
+        self.oob_ip = None
         self.inventory_mode = -1
         self.inventory = {}
         self.ipmi = {}
@@ -105,6 +106,11 @@ class PhysicalDevice:
             e = f"Host {self.name}: no primary IP."
             self.logger.warning(e)
             raise SyncInventoryError(e)
+
+        # Set OOB IP if available
+        if self.nb.oob_ip:
+            self.oob_cidr = self.nb.oob_ip.address
+            self.oob_ip = self.oob_cidr.split("/")[0]
 
         # Check if device has custom field for ZBX ID
         if self.config["device_cf"] in self.nb.custom_fields:
@@ -404,27 +410,29 @@ class PhysicalDevice:
         host = self.zabbix.host.get(filter=zbx_filter, output=[])
         return bool(host)
 
-    def set_interface_details(self):
+    def set_interface_details(self, oob=False):
         """
         Checks interface parameters from NetBox and
         creates a model for the interface to be used in Zabbix.
         """
+        snmp_interface_type = 2
+        ipmi_interface_type = 3
+        int_ip = self.oob_ip if oob else self.ip
         try:
             # Initiate interface class
-            interface = ZabbixInterface(self.nb.config_context, self.ip)
+            interface = ZabbixInterface(self.nb.config_context, int_ip, oob=oob)
             # Check if NetBox has device context.
             # If not fall back to old config.
             if interface.get_context():
                 # If device is SNMP type, add aditional information.
-                snmp_interface_type = 2
-                ipmi_interface_type = 3
                 if interface.interface["type"] == snmp_interface_type:
                     interface.set_snmp()
+                # Likewise for IPMI
                 elif interface.interface["type"] == ipmi_interface_type:
                     interface.set_ipmi()
             else:
                 interface.set_default_snmp()
-            return [interface.interface]
+            return interface.interface
         except InterfaceConfigError as e:
             message = f"{self.name}: {e}"
             self.logger.warning(message)
@@ -451,12 +459,13 @@ class PhysicalDevice:
             "admin": 4,
             "OEM": 5,
         }
-
+        # See if IPMI is defined in Config Context
         if (
             "zabbix" in self.nb.config_context
             and "ipmi" in self.nb.config_context["zabbix"]
         ):
             ipmi = self.nb.config_context["zabbix"]["ipmi"]
+
             # Check for IPMI user
             if ipmi.get("username"):
                 self.ipmi["username"] = ipmi.get("username")
@@ -597,6 +606,7 @@ class PhysicalDevice:
         """
         Creates Zabbix host object with parameters from NetBox object.
         """
+        interfaces = []
         # Check if hostname is already present in Zabbix
         if not self._zabbix_hostname_exists():
             # Set group and template ID's for host
@@ -611,8 +621,10 @@ class PhysicalDevice:
             templateids = []
             for template in self.zbx_templates:
                 templateids.append({"templateid": template["templateid"]})
-            # Set interface, group and template configuration
-            interfaces = self.set_interface_details()
+            # Setup interfaces
+            interfaces.append(self.set_interface_details())
+            if self.config["oob_sync"] and "oob_ip" in dict(self.nb) and self.nb.oob_ip:
+                interfaces.append(self.set_interface_details(oob=True))
             # Set Zabbix proxy if defined
             self._set_proxy(proxies)
             # Set description

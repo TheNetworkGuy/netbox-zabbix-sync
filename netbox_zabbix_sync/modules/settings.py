@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = getLogger(__name__)
 
-# PLEASE NOTE: This is a sample config file. Please do NOT make any edits in this file!
+# PLEASE NOTE: This is a defaults config file. Please do NOT make any edits in this file!
 # You should create your own config.py and it will overwrite the default config.
 
 DEFAULT_CONFIG = {
@@ -20,6 +20,7 @@ DEFAULT_CONFIG = {
     "proxy_cf": False,
     "proxy_group_cf": False,
     "clustering": False,
+    "oob_sync": False,
     "create_hostgroups": True,
     "create_journal": False,
     "sync_vms": False,
