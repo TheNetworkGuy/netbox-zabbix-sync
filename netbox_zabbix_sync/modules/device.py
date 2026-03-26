@@ -69,6 +69,7 @@ class PhysicalDevice:
         self.nb_journals = nb_journal_class
         self.inventory_mode = -1
         self.inventory = {}
+        self.ipmi = {}
         self.usermacros = []
         self.tags = {}
         self.logger = logger if logger else getLogger(__name__)
@@ -416,8 +417,11 @@ class PhysicalDevice:
             if interface.get_context():
                 # If device is SNMP type, add aditional information.
                 snmp_interface_type = 2
+                ipmi_interface_type = 3
                 if interface.interface["type"] == snmp_interface_type:
                     interface.set_snmp()
+                elif interface.interface["type"] == ipmi_interface_type:
+                    interface.set_ipmi()
             else:
                 interface.set_default_snmp()
             return [interface.interface]
@@ -425,6 +429,61 @@ class PhysicalDevice:
             message = f"{self.name}: {e}"
             self.logger.warning(message)
             raise SyncInventoryError(message) from e
+
+    def set_ipmi(self):
+        """
+        Sets IPMI parameters from config context
+        """
+        authtypes = {
+            "default": -1,
+            "none": 0,
+            "md2": 1,
+            "md5": 2,
+            "straight": 4,
+            "OEM": 5,
+            "rmcp+": 6,
+        }
+
+        privilege = {
+            "callback": 1,
+            "user": 2,
+            "operator": 3,
+            "admin": 4,
+            "OEM": 5,
+        }
+
+        if (
+            "zabbix" in self.nb.config_context
+            and "ipmi" in self.nb.config_context["zabbix"]
+        ):
+            ipmi = self.nb.config_context["zabbix"]["ipmi"]
+            # Check for IPMI user
+            if ipmi.get("username"):
+                self.ipmi["username"] = ipmi.get("username")
+            else:
+                e = "IPMI is set but no IPMI user was provided."
+                raise SyncInventoryError(e)
+
+            # Check for IPMI password
+            if ipmi.get("password"):
+                self.ipmi["password"] = ipmi.get("password")
+            else:
+                e = "IPMI was set but no IPMI password provided."
+                raise SyncInventoryError(e)
+
+            # configure authtype if set
+            if ipmi.get("authtype") and ipmi.get("authtype").lower() in authtypes:
+                self.ipmi["authtype"] = authtypes[ipmi.get("authtype").lower()]
+            elif ipmi.get("authtype"):
+                e = "Unsupported IPMI authtype."
+                raise SyncInventoryError(e)
+
+            # configure privilege if set
+            if ipmi.get("privilege") and ipmi.get("privilege").lower() in privilege:
+                self.ipmi["privilege"] = privilege[ipmi.get("privilege").lower()]
+            elif ipmi.get("privilege"):
+                e = "Unsupported IPMI privilege."
+                raise SyncInventoryError(e)
 
     def set_usermacros(self):
         """
@@ -578,6 +637,15 @@ class PhysicalDevice:
                 "macros": self.usermacros,
                 "tags": self.tags,
             }
+            # Add IPMI parameters if set
+            if self.ipmi:
+                create_data["ipmi_username"] = self.ipmi.get("username")
+                create_data["ipmi_password"] = self.ipmi.get("password")
+                if "authtype" in self.ipmi:
+                    create_data["ipmi_authtype"] = self.ipmi.get("authtype")
+                if "privilege" in self.ipmi:
+                    create_data["ipmi_privilege"] = self.ipmi.get("privilege")
+
             # If a Zabbix proxy or Zabbix Proxy group has been defined
             if self.zbxproxy:
                 # If a lower version than 7 is used, we can assume that
@@ -731,7 +799,7 @@ class PhysicalDevice:
             )
             self.update_zabbix_host(host=self.name)
 
-        # Execute check depending on wether the name is special or not
+        # Execute check depending on whether the name is special or not
         if self.use_visible_name:
             if host["name"] == self.visible_name:
                 self.logger.debug("Host %s: Visible name in-sync.", self.name)
@@ -757,8 +825,8 @@ class PhysicalDevice:
         else:
             self.logger.debug("Host %s: Template(s) in-sync.", self.name)
 
-        # Check if Zabbix version is 6 or higher. Issue #93
         group_dictname = "hostgroups"
+        # Check if Zabbix version is 6 or higher. Issue #93
         if str(self.zabbix.version).startswith(("6", "5")):
             group_dictname = "groups"
         # Check if hostgroups match
@@ -775,6 +843,43 @@ class PhysicalDevice:
         else:
             self.logger.info("Host %s: Status OUT of sync.", self.name)
             self.update_zabbix_host(status=str(self.zabbix_state))
+
+        # If IPMI is set, check if the parameters are in sync.
+        if self.ipmi:
+            ipmi_in_sync = True
+            privilege = 2
+            authtype = -1
+            ipmi_params = {
+                "username": "ipmi_username",
+                "password": "ipmi_password",
+                "privilege": "ipmi_privilege",
+                "authtype": "ipmi_authtype",
+            }
+            for key, prop in ipmi_params.items():
+                # If defined, check if values match
+                if (key in self.ipmi and host[prop] != str(self.ipmi[key])) or (
+                    key not in self.ipmi
+                    and (
+                        (key == "privilege" and host[prop] != str(privilege))
+                        or (key == "authtype" and host[prop] != str(authtype))
+                    )
+                ):
+                    ipmi_in_sync = False
+
+            if ipmi_in_sync:
+                self.logger.debug("Host %s: IPMI in-sync.", self.name)
+            else:
+                self.logger.info("Host %s: IPMI is OUT of sync.", self.name)
+                if "privilege" in self.ipmi:
+                    privilege = self.ipmi["privilege"]
+                if "authtype" in self.ipmi:
+                    authtype = self.ipmi["authtype"]
+                self.update_zabbix_host(
+                    ipmi_username=self.ipmi["username"],
+                    ipmi_password=self.ipmi["password"],
+                    ipmi_privilege=str(privilege),
+                    ipmi_authtype=str(authtype),
+                )
 
         # Check if a proxy has been defined
         if self.zbxproxy:

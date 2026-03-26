@@ -93,6 +93,30 @@ class ZabbixInterface:
             e = "Interface type is not SNMP, unable to set SNMP details"
             raise InterfaceConfigError(e)
 
+    def set_ipmi(self):
+        """Check if interface is type IPMI"""
+        ipmi_interface_type = 3
+        if self.interface["type"] == ipmi_interface_type:
+            # Checks if IPMI settings are defined in NetBox
+            if "ipmi" in self.context["zabbix"]:
+                ipmi = self.context["zabbix"]["ipmi"]
+                details: dict[str, str] = {}
+                self.interface["details"] = details
+                # Check for IPMI username
+                if not ipmi.get("username"):
+                    e = "No IPMI user provided."
+                    raise InterfaceConfigError(e)
+                # Check for IPMI password
+                if not ipmi.get("password"):
+                    e = "No IPMI password provided."
+                    raise InterfaceConfigError(e)
+            else:
+                e = "Interface type IPMI but no parameters provided."
+                raise InterfaceConfigError(e)
+        else:
+            e = "Interface type is not IPMI, unable to set IPMI details"
+            raise InterfaceConfigError(e)
+
     def set_default_snmp(self):
         """Set default config to SNMPv2, port 161 and community macro."""
         self.interface = self.skelet

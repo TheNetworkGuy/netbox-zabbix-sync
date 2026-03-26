@@ -356,6 +356,10 @@ class Sync:
                 device.set_hostgroup(
                     self.config["hostgroup_format"], netbox_site_groups, netbox_regions
                 )
+
+                # Set IPMI
+                device.set_ipmi()
+
                 # Check if a valid hostgroup has been found for this VM.
                 if not device.hostgroups:
                     logger.warning(
