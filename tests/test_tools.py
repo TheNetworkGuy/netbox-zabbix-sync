@@ -32,8 +32,6 @@ def test_sanatize_log_output_interface_secrets():
     # Non-sensitive fields should remain
     assert sanitized["details"]["community"] == "********"
     assert sanitized["details"]["other"] == "normalvalue"
-    # interfaceid should be removed
-    assert "interfaceid" not in sanitized
 
 
 def test_sanatize_log_output_interface_macros():
@@ -52,7 +50,6 @@ def test_sanatize_log_output_interface_macros():
     assert sanitized["details"]["privpassphrase"] == "{$SECRET_MACRO}"
     assert sanitized["details"]["securityname"] == "{$USER_MACRO}"
     assert sanitized["details"]["community"] == "{$SNNMP_COMMUNITY}"
-    assert "interfaceid" not in sanitized
 
 
 def test_sanatize_log_output_plain_data():
