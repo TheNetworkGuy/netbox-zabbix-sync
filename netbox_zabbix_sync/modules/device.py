@@ -1184,9 +1184,12 @@ class PhysicalDevice:
                                 self.logger.info(err_msg)
                                 self.create_journal_entry("info", err_msg)
                             except APIRequestError as e:
-                                msg = f"Zabbix returned the following error: {e}."
+                                msg = (
+                                    f"Host {self.name}: Zabbix returned the following error "
+                                    f"while removing an interface: {e} "
+                                    f"Interface: {sanatize_log_output(interface)}."
+                                )
                                 self.logger.error(msg)
-                                raise SyncExternalError(msg) from e
             else:
                 # If no updates are found, Zabbix interface is in-sync
                 self.logger.debug("Host %s: Interface(s) in-sync.", self.name)
