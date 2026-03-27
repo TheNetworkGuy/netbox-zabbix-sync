@@ -1042,8 +1042,6 @@ class PhysicalDevice:
             upd_ints = []
             add_ints = []
             del_ints = False
-            if len(host["interfaces"]) > len(interfaces):
-                del_ints = True
             for interface in interfaces:
                 z_interface = list(
                     filter(
@@ -1059,8 +1057,9 @@ class PhysicalDevice:
                     raise SyncInventoryError(e)
                 else:
                     z_interface = z_interface[0]
-                    # Go through each key / item and check if it matches Zabbix
+                    interface["interfaceid"] = z_interface["interfaceid"]
                     updates = {}
+                    # Go through each key / item and check if it matches Zabbix
                     for key, item in interface.items():
                         # Check if NetBox value is found in Zabbix
                         if key in z_interface:
@@ -1092,6 +1091,11 @@ class PhysicalDevice:
                     if updates:
                         updates["interfaceid"] = z_interface["interfaceid"]
                         upd_ints.append(updates)
+
+            # if we have more interfaces in Zabbix than we expect from netbox,
+            # we'll need to remove some.
+            if len(host["interfaces"]) + len(add_ints) > len(interfaces):
+                del_ints = True
 
             if upd_ints or add_ints or del_ints:
                 # Push changed interface settings
@@ -1129,9 +1133,10 @@ class PhysicalDevice:
                     # If interface updates have been found: push to Zabbix
                     self.logger.info("Host %s: Interface OUT of sync.", self.name)
                     addition["hostid"] = host["hostid"]
+                    response = None
                     try:
                         # API call to Zabbix
-                        self.zabbix.hostinterface.create(addition)
+                        response = self.zabbix.hostinterface.create(addition)
                         err_msg = (
                             f"Host {self.name}: Added interface "
                             f"with data {sanatize_log_output(addition)}."
@@ -1142,16 +1147,46 @@ class PhysicalDevice:
                         msg = f"Zabbix returned the following error: {e}."
                         self.logger.error(msg)
                         raise SyncExternalError(msg) from e
+                    if (
+                        response
+                        and "interfaceids" in response
+                        and len(response["interfaceids"]) == 1
+                    ):
+                        # We need this to not accidentally remove the newly created interface
+                        addition["interfaceid"] = response["interfaceids"][0]
 
                 if del_ints:
-                    self.logger.info("Host %s: Interface OUT of sync.", self.name)
-                    # Removing interfaces is not supported. Raise exception.
-                    e = (
-                        f"Host {self.name}: Need to remove interface(s) and this is not supported. "
-                        f"Manual intervention is required."
-                    )
-                    self.logger.error(e)
-                    raise InterfaceConfigError(e)
+                    # Any interface found in Zabbix but not NetBox will need to be removed.
+                    for interface in host["interfaces"]:
+                        n_interface = []
+                        n_interface = list(
+                            filter(
+                                lambda n_int: n_int["interfaceid"]
+                                == str(interface["interfaceid"]),
+                                interfaces,
+                            )
+                        )
+                        # No matching NetBox interface found, so we remove it.
+                        if not n_interface:
+                            self.logger.info(
+                                "Host %s: Interface OUT of sync.", self.name
+                            )
+                            response = None
+                            try:
+                                # API call to Zabbix
+                                response = self.zabbix.hostinterface.delete(
+                                    interface["interfaceid"]
+                                )
+                                err_msg = (
+                                    f"Host {self.name}: Removed interface "
+                                    f"with data {sanatize_log_output(interface)}."
+                                )
+                                self.logger.info(err_msg)
+                                self.create_journal_entry("info", err_msg)
+                            except APIRequestError as e:
+                                msg = f"Zabbix returned the following error: {e}."
+                                self.logger.error(msg)
+                                raise SyncExternalError(msg) from e
             else:
                 # If no updates are found, Zabbix interface is in-sync
                 self.logger.debug("Host %s: Interface(s) in-sync.", self.name)
