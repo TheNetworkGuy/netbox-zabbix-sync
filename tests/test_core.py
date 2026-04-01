@@ -1064,6 +1064,7 @@ class TestDeviceStatusHandling(unittest.TestCase):
         mock_zabbix.proxygroup.get.return_value = []
         mock_zabbix.host.get.return_value = []
         mock_zabbix.host.create.return_value = {"hostids": ["1"]}
+        mock_zabbix.hostinterface.create.return_value = {"interfaceids": ["92"]}
         mock_zabbix.host.update.return_value = {"hostids": ["42"]}
         mock_zabbix.host.delete.return_value = [42]
         return mock_zabbix
@@ -1081,7 +1082,7 @@ class TestDeviceStatusHandling(unittest.TestCase):
                 "status": status,
                 # Single empty-dict interface: len==1 avoids SyncInventoryError,
                 # empty keys prevent any spurious interface-update calls.
-                "interfaces": [{"type": "1", "port": "10050"}],
+                "interfaces": [{"type": "1", "port": "10050", "interfaceid": "69"}],
                 "inventory_mode": "-1",
                 "inventory": {},
                 "macros": [],
@@ -1385,7 +1386,7 @@ class TestVMStatusHandling(unittest.TestCase):
                 "status": status,
                 # Single empty-dict interface: len==1 avoids SyncInventoryError,
                 # empty keys mean no spurious interface-update calls.
-                "interfaces": [{"type": "1", "port": "10050"}],
+                "interfaces": [{"type": "1", "port": "10050", "interfaceid": "123"}],
                 "inventory_mode": "-1",
                 "inventory": {},
                 "macros": [],
