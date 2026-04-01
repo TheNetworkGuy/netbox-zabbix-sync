@@ -59,7 +59,7 @@ class PhysicalDevice:
         self.nb_api_version = nb_version
         self.zbx_template_names = []
         self.zbx_templates = []
-        self.hostgroups = []
+        self.hostgroups: list[str] = []
         self.hostgroup_type = "dev"
         self.tenant = nb.tenant
         self.config_context = nb.config_context
@@ -139,7 +139,7 @@ class PhysicalDevice:
         else:
             pass
 
-    def set_hostgroup(self, hg_format, nb_site_groups, nb_regions):
+    def set_hostgroup(self, hg_format: list | str, nb_site_groups, nb_regions):
         """Set the hostgroup for this device"""
         # Create new Hostgroup instance
         hg = Hostgroup(
@@ -154,9 +154,11 @@ class PhysicalDevice:
         )
         # Generate hostgroup based on hostgroup format
         if isinstance(hg_format, list):
-            self.hostgroups = [hg.generate(f) for f in hg_format]
-        else:
-            self.hostgroups.append(hg.generate(hg_format))
+            for f in hg_format:
+                if gen := hg.generate(f):
+                    self.hostgroups.append(gen)
+        elif full_hostgroup := hg.generate(hg_format):
+            self.hostgroups.append(full_hostgroup)
         # Remove duplicates and None values
         self.hostgroups = list(filter(None, list(set(self.hostgroups))))
         if self.hostgroups:

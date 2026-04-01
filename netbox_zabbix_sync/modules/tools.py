@@ -1,9 +1,13 @@
 """A collection of tools used by several classes"""
 
 from collections.abc import Callable
+from copy import copy
+from json import JSONDecodeError, dumps, loads
 from typing import Any, cast, overload
 
-from netbox_zabbix_sync.modules.exceptions import HostgroupError
+from jinja2 import Environment, TemplateError, TemplateSyntaxError
+
+from netbox_zabbix_sync.modules.exceptions import HostgroupError, JinjaRenderError
 
 
 def convert_recordset(recordset):
@@ -55,6 +59,36 @@ def proxy_prepper(proxy_list, proxy_group_list):
         group["monitored_by"] = 2
         output.append(group)
     return output
+
+
+def jinjafy_config_context(nb, context=None):
+    # Set our context to the Zabbix key within the config context
+    if (
+        not context
+        and "config_context" in dict(nb)
+        and "zabbix" in dict(nb)["config_context"]
+    ):
+        context = nb.config_context["zabbix"]
+    elif not context:
+        context = {}
+    # Copy nb and delete the config context to prevent issues
+    data = dict(copy(nb))
+    if "config_context" in data:
+        data.pop("config_context")
+    if context and isinstance(context, dict):
+        # Use our local context as the Jinja2 template
+        try:
+            template = Environment(autoescape=True).from_string(str(dumps(context)))
+            rendered_context = loads(template.render(data=data))
+        except JSONDecodeError as e:
+            raise JinjaRenderError(e) from e
+        except TemplateSyntaxError as e:
+            raise JinjaRenderError(e) from e
+        except TemplateError as e:
+            raise JinjaRenderError(e) from e
+        else:
+            return rendered_context
+    return context
 
 
 def cf_to_string(cf, key="name", logger=None):

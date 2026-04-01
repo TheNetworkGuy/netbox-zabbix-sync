@@ -3,7 +3,7 @@ name = "netbox-zabbix-sync"
 description = "Python script to synchronize Netbox devices to Zabbix."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["igraph>=1.0.0", "pynetbox>=7.6.1", "zabbix-utils>=2.0.4"]
+dependencies = ["igraph>=1.0.0", "jinja2>=3.1.6", "pynetbox>=7.6.1", "zabbix-utils>=2.0.4"]
 dynamic = ["version"]
 
 [project.urls]
