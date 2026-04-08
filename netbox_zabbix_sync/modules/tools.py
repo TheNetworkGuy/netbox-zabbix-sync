@@ -83,7 +83,7 @@ def jinjafy_config_context(nb, context=None):
         # create Jinja2 environment
         j2env = Environment(autoescape=True)
         # Load additional Jinja2 filters
-        j2env.filters.update(j2ipfilters.load_all()) # j2ipaddr filters
+        j2env.filters.update(j2ipfilters.load_all())  # j2ipaddr filters
         try:
             # Use our local context as the Jinja2 template
             # and render it using the objects data
