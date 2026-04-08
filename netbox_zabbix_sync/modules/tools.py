@@ -2,12 +2,14 @@
 
 from collections.abc import Callable
 from copy import copy
+from inspect import getmembers, isfunction
 from json import JSONDecodeError, dumps, loads
 from typing import Any, cast, overload
 
 from j2ipaddr import filters as j2ipfilters  # adds IP filtering to jinja2
 from jinja2 import Environment, TemplateError, TemplateSyntaxError
 
+from netbox_zabbix_sync.modules import jinja_filters
 from netbox_zabbix_sync.modules.exceptions import HostgroupError, JinjaRenderError
 
 
@@ -84,6 +86,7 @@ def jinjafy_config_context(nb, context=None):
         j2env = Environment(autoescape=True)
         # Load additional Jinja2 filters
         j2env.filters.update(j2ipfilters.load_all())  # j2ipaddr filters
+        j2env.filters.update(getmembers(jinja_filters, isfunction))
         try:
             # Use our local context as the Jinja2 template
             # and render it using the objects data
