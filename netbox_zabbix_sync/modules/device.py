@@ -1117,12 +1117,12 @@ class PhysicalDevice:
                     try:
                         # API call to Zabbix
                         self.zabbix.hostinterface.update(updates)
-                        err_msg = (
+                        log_msg = (
                             f"Host {self.name}: Updated interface "
                             f"with data {sanatize_log_output(updates)}."
                         )
-                        self.logger.info(err_msg)
-                        self.create_journal_entry("info", err_msg)
+                        self.logger.info(log_msg)
+                        self.create_journal_entry("info", log_msg)
                     except APIRequestError as e:
                         msg = f"Zabbix returned the following error: {e}."
                         self.logger.error(msg)
@@ -1137,12 +1137,12 @@ class PhysicalDevice:
                     try:
                         # API call to Zabbix
                         response = self.zabbix.hostinterface.create(addition)
-                        err_msg = (
+                        log_msg = (
                             f"Host {self.name}: Added interface "
                             f"with data {sanatize_log_output(addition)}."
                         )
-                        self.logger.info(err_msg)
-                        self.create_journal_entry("info", err_msg)
+                        self.logger.info(log_msg)
+                        self.create_journal_entry("info", log_msg)
                     except APIRequestError as e:
                         msg = f"Zabbix returned the following error: {e}."
                         self.logger.error(msg)
@@ -1154,6 +1154,10 @@ class PhysicalDevice:
                     ):
                         # We need this to not accidentally remove the newly created interface
                         addition["interfaceid"] = response["interfaceids"][0]
+                    else:
+                        msg = f"Host {self.name}: Unexpected response from Zabbix while adding interface: '{addition['type']}'"
+                        self.logger.error(msg)
+                        raise SyncExternalError(msg)
 
                 if del_ints:
                     # Any interface found in Zabbix but not NetBox will need to be removed.
