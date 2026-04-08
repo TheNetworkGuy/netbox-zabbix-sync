@@ -8,8 +8,9 @@ from netbox_zabbix_sync.modules.exceptions import InterfaceConfigError
 class ZabbixInterface:
     """Class that represents a Zabbix interface."""
 
-    def __init__(self, context, ip):
+    def __init__(self, context, ip, oob=False):
         self.context = context
+        self.is_oob = oob
         self.ip = ip
         self.skelet = {"main": "1", "useip": "1", "dns": "", "ip": self.ip}
         self.interface = self.skelet
@@ -26,15 +27,42 @@ class ZabbixInterface:
 
     def get_context(self):
         """check if NetBox custom context has been defined."""
+        int_types = {"agent": 1, "snmp": 2, "ipmi": 3, "jmx": 4}
+        int_type = "interface_type"
+        int_port = "interface_port"
+        max_port = 65536
+        max_type = 5
+        if self.is_oob:
+            int_type = "oob_interface_type"
+            int_port = "oob_interface_port"
         if "zabbix" in self.context:
             zabbix = self.context["zabbix"]
-            if "interface_type" in zabbix:
-                self.interface["type"] = zabbix["interface_type"]
-                if "interface_port" not in zabbix:
+            if int_type in zabbix:
+                # Use valid integer for type if set
+                if str(zabbix[int_type]).isdigit() and (
+                    int(zabbix[int_type]) > 0 and int(zabbix[int_type]) < max_type
+                ):
+                    self.interface["type"] = zabbix[int_type]
+                # Otherwise, convert string to type integer
+                elif zabbix[int_type].lower() in int_types:
+                    self.interface["type"] = int_types[zabbix[int_type].lower()]
+                else:
+                    e = f"Interface type '{zabbix[int_type]}' is not valid."
+                    raise InterfaceConfigError(e)
+                # Use default port if not specified in Config Context
+                if int_port not in zabbix:
                     self._set_default_port()
                     return True
-                self.interface["port"] = zabbix["interface_port"]
-                return True
+                # Otherwise, validate Config Context port value
+                elif str(zabbix[int_port]).isdigit() and (
+                    int(zabbix[int_port]) > 0 and int(zabbix[int_port]) < max_port
+                ):
+                    self.interface["port"] = zabbix[int_port]
+                    return True
+                else:
+                    e = f"Interface port '{zabbix[int_port]}' is not valid."
+                    raise InterfaceConfigError(e)
+                return False
             return False
         return False
 
@@ -49,13 +77,13 @@ class ZabbixInterface:
                 self.interface["details"] = details
                 # Checks if bulk config has been defined
                 if "bulk" in snmp:
-                    details["bulk"] = str(snmp.pop("bulk"))
+                    details["bulk"] = str(snmp.get("bulk"))
                 else:
                     # Fallback to bulk enabled if not specified
                     details["bulk"] = "1"
                 # SNMP Version config is required in NetBox config context
                 if snmp.get("version"):
-                    details["version"] = str(snmp.pop("version"))
+                    details["version"] = str(snmp.get("version"))
                 else:
                     e = "SNMP version option is not defined."
                     raise InterfaceConfigError(e)

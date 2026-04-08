@@ -242,20 +242,23 @@ def sanatize_log_output(data):
             sanitized_data["ipmi_password"] = "********"  # noqa: S105
     # Check for interface data
     if "interfaceid" in data:
-        # Interface ID is a value which is most likely not helpful
-        # in logging output or for troubleshooting.
-        del sanitized_data["interfaceid"]
-        # InterfaceID also hints that this is a interface update.
+        # InterfaceID hints that this is a interface update.
         # A check is required if there are no macro's used for SNMP security parameters.
-        if "details" not in data:
+        if data.get("details"):
+            for key, detail in sanitized_data["details"].items():
+                # If the detail is a secret, we don't want to log it.
+                if key in (
+                    "authpassphrase",
+                    "privpassphrase",
+                    "securityname",
+                    "community",
+                ):
+                    # Check if a macro is used.
+                    # If so then logging the output is not a security issue.
+                    if detail.startswith("{$") and detail.endswith("}"):
+                        continue
+                    # A macro is not used, so we sanitize the value.
+                    sanitized_data["details"][key] = "********"
+        else:
             return sanitized_data
-        for key, detail in sanitized_data["details"].items():
-            # If the detail is a secret, we don't want to log it.
-            if key in ("authpassphrase", "privpassphrase", "securityname", "community"):
-                # Check if a macro is used.
-                # If so then logging the output is not a security issue.
-                if detail.startswith("{$") and detail.endswith("}"):
-                    continue
-                # A macro is not used, so we sanitize the value.
-                sanitized_data["details"][key] = "********"
     return sanitized_data
