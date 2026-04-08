@@ -40,6 +40,10 @@ _BOOL_ARGS = [
     ("usermacro_sync", "Sync usermacros from NetBox to Zabbix."),
     ("tag_sync", "Sync host tags to Zabbix."),
     ("tag_lower", "Lowercase tag names and values before syncing."),
+    (
+        "render_config_context",
+        "Enables *EXPERIMENTAL* support for Jinja2 config context rendering.",
+    ),
 ]
 
 # String settings that can be set via --option VALUE
@@ -137,6 +141,10 @@ def main(arguments):
         zbx_pass=zabbix_pass,
         zbx_token=zabbix_token,
     )
+    if config["render_config_context"]:
+        logger.warning(
+            "*EXPERIMENTAL* Features have been enabled, see https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features for more information."
+        )
     syncer.start()
     syncer.logout()
 
