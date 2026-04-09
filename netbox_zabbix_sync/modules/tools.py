@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from copy import copy
+from html import unescape
 from inspect import getmembers, isfunction
 from json import JSONDecodeError, dumps, loads
 from typing import Any, cast, overload
@@ -86,12 +87,12 @@ def jinjafy_config_context(nb, context=None):
         j2env = Environment(autoescape=True)
         # Load additional Jinja2 filters
         j2env.filters.update(j2ipfilters.load_all())  # j2ipaddr filters
-        j2env.filters.update(getmembers(jinja_filters, isfunction))
+        j2env.filters.update(getmembers(jinja_filters, isfunction))  # custom filters
         try:
-            # Use our local context as the Jinja2 template
-            # and render it using the objects data
+            # Use our Zabbix config context as the Jinja2 template
+            # and render it using the objects data dictionary
             template = j2env.from_string(str(dumps(context)))
-            rendered_context = loads(template.render(data=data))
+            rendered_context = loads(unescape(str(template.render(data=data))))
         except JSONDecodeError as e:
             raise JinjaRenderError(e) from e
         except TemplateSyntaxError as e:

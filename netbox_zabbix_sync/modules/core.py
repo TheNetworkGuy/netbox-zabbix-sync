@@ -408,6 +408,12 @@ class Sync:
                         continue
                     if rendered_context and isinstance(rendered_context, dict):
                         device.config_context["zabbix"] = rendered_context
+                    else:
+                        logger.error(
+                            "Host %s: Skipping due to unknown issue while rendering config context.",
+                            device.name,
+                        )
+                        continue
                 # Debug log of the enitre NetBox data set
                 logger.debug(
                     "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
