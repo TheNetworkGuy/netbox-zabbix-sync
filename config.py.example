@@ -32,9 +32,10 @@ extended_virtual_chassis = False
 ## Preferred IP version
 # This setting determines which IP address will be used for the Zabbix host interface when a device has multiple IP addresses assigned.
 # The following options are available:
-# ipv4: Use the IPv4 address (default)
-# ipv6: Use the IPv6 address
-preferred_ip = "ipv4"
+# auto: Use primary_ip field by NetBox. (default)
+# ipv4: Prefer IPv4 address over IPv6 address.
+# ipv6: Prefer IPv6 address over IPv4 address.
+preferred_ip = "auto"
 
 ## Enable hostgroup generation. Requires permissions in Zabbix
 create_hostgroups = True

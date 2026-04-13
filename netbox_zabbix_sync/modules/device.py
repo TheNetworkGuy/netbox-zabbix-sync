@@ -101,8 +101,10 @@ class PhysicalDevice:
 
         primary = None
 
-        # Return error if device does not have primary IP.
-        if self.config["preferred_ip"] == "ipv6":
+        # Determine which IP address to use based on config setting. Default is to use the primary IP as set in NetBox, but can be overruled to prefer IPv4 or IPv6 addresses.
+        if self.config["preferred_ip"] == "auto":
+            primary = self.nb.primary_ip
+        elif self.config["preferred_ip"] == "ipv6":
             primary = self.nb.primary_ip6 or self.nb.primary_ip4
         else:
             primary = self.nb.primary_ip4 or self.nb.primary_ip6
