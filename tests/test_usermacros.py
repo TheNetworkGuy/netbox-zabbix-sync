@@ -34,7 +34,11 @@ class TestUsermacroSync(unittest.TestCase):
         mock_nb.primary_ip.address = "192.168.1.1/24"
         mock_nb.custom_fields = {"zabbix_hostid": None}
 
-        device_config = config if config is not None else {"device_cf": "zabbix_hostid"}
+        device_config = (
+            config
+            if config is not None
+            else {"device_cf": "zabbix_hostid", "preferred_ip": "auto"}
+        )
 
         # Create device with proper initialization
         device = PhysicalDevice(
@@ -56,6 +60,7 @@ class TestUsermacroSync(unittest.TestCase):
                 "usermacro_sync": False,
                 "device_cf": "zabbix_hostid",
                 "tag_sync": False,
+                "preferred_ip": "auto",
             }
         )
 
@@ -82,6 +87,7 @@ class TestUsermacroSync(unittest.TestCase):
                 "usermacro_sync": True,
                 "device_cf": "zabbix_hostid",
                 "tag_sync": False,
+                "preferred_ip": "auto",
             }
         )
 
@@ -108,6 +114,7 @@ class TestUsermacroSync(unittest.TestCase):
                 "usermacro_sync": "full",
                 "device_cf": "zabbix_hostid",
                 "tag_sync": False,
+                "preferred_ip": "auto",
             }
         )
 
