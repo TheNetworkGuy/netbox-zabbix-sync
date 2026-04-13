@@ -98,9 +98,17 @@ class PhysicalDevice:
         """
         Sets basic information like IP address.
         """
+
+        primary = None
+
         # Return error if device does not have primary IP.
-        if self.nb.primary_ip:
-            self.cidr = self.nb.primary_ip.address
+        if self.config["preferred_ip"] == "ipv6":
+            primary = self.nb.primary_ip6 or self.nb.primary_ip4
+        else:
+            primary = self.nb.primary_ip4 or self.nb.primary_ip6
+
+        if primary:
+            self.cidr = primary.address
             self.ip = self.cidr.split("/")[0]
         else:
             e = f"Host {self.name}: no primary IP."

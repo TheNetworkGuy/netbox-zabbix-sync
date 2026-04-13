@@ -67,6 +67,11 @@ _STR_ARGS = [
         "NetBox tag property to use as the Zabbix tag value (name, slug, or display).",
         "PROPERTY",
     ),
+    (
+        "preferred_ip",
+        "Preferred IP version for inventory sync (ipv4 (default) or ipv6).",
+        "IP_VERSION",
+    ),
 ]
 
 

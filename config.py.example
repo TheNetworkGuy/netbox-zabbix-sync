@@ -29,6 +29,13 @@ clustering = False
 # Be aware that this will increase the number of API queries to NetBox.
 extended_virtual_chassis = False
 
+## Preferred IP version
+# This setting determines which IP address will be used for the Zabbix host interface when a device has multiple IP addresses assigned.
+# The following options are available:
+# ipv4: Use the IPv4 address (default)
+# ipv6: Use the IPv6 address
+preferred_ip = "ipv4"
+
 ## Enable hostgroup generation. Requires permissions in Zabbix
 create_hostgroups = True
 
