@@ -7,7 +7,7 @@ from json import JSONDecodeError, dumps, loads
 from typing import Any, cast, overload
 
 from j2ipaddr import filters as j2ipfilters  # adds IP filtering to jinja2
-from jinja2 import Environment, TemplateError, TemplateSyntaxError
+from jinja2 import Environment, TemplateError
 
 from netbox_zabbix_sync.modules import jinja_filters
 from netbox_zabbix_sync.modules.exceptions import HostgroupError, JinjaRenderError
