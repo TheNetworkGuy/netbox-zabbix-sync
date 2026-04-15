@@ -92,13 +92,7 @@ def jinjafy_config_context(nb, context=None):
             # and render it using the objects data
             template = j2env.from_string(str(dumps(context)))
             rendered_context = loads(template.render(data=data))
-        except JSONDecodeError as e:
-            raise JinjaRenderError(e) from e
-        except TemplateSyntaxError as e:
-            raise JinjaRenderError(e) from e
-        except TemplateError as e:
-            raise JinjaRenderError(e) from e
-        except TypeError as e:
+        except (JSONDecodeError, TemplateError, TypeError) as e:
             raise JinjaRenderError(e) from e
         else:
             return rendered_context
