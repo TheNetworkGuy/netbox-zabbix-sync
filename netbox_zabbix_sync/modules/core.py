@@ -127,7 +127,7 @@ class Sync:
             netbox.dcim.devices.count()
             logger.debug("NetBox version is %s.", nb_version)
             self.netbox = netbox
-            self.nb_version = nb_version
+            self.nb_version = str(nb_version)
         except RequestsConnectionError:
             logger.error(
                 "Unable to connect to NetBox with URL %s. Please check the URL and status of NetBox.",
