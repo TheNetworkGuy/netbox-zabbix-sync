@@ -182,7 +182,7 @@ vm_tag_map = {"site/name": "site",
 
 
 ### EXPERIMENTAL FEATURES
-# The features below are expermental and should be run on your own risk.
+# The features below are experimental and should be run on your own risk.
 # Please see https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features
 
 ## Render Config Context with Jinja2
