@@ -2,13 +2,10 @@
 Device specific handeling for NetBox to Zabbix
 """
 
-from logging import getLogger
-
 from netbox_zabbix_sync.modules.exceptions import (
     SyncInventoryError,
 )
 from netbox_zabbix_sync.modules.host import Host
-from netbox_zabbix_sync.modules.settings import load_config
 
 
 class PhysicalDevice(Host):
