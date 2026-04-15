@@ -260,9 +260,15 @@ class Sync:
         Run the NetBox to Zabbix sync process.
         """
         if not self.netbox or not self.zabbix:
-            e = "Not able to start sync: No connection to NetBox or Zabbix API."
-            logger.error(e)
+            logger.error(
+                "Not able to start sync: No connection to NetBox or Zabbix API."
+            )
             return False
+
+        if not self.nb_version:
+            logger.error("NetBox version is not set. Cannot proceed with sync.")
+            return False
+
         device_cfs = []
         vm_cfs = []
         # Create API call to get all custom fields which are on the device objects
