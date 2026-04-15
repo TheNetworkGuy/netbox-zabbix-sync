@@ -216,7 +216,13 @@ class Sync:
             return False
         return True
 
-    def _sync_host(self, host, zabbix_groups, zabbix_templates, zabbix_proxy_list):
+    def _sync_host(
+        self,
+        host: Host,
+        zabbix_groups: list[dict],
+        zabbix_templates: list[dict],
+        zabbix_proxy_list: list[dict],
+    ):
         """
         Handle the shared sync steps for any Host (device or VM):
         inventory, usermacros, tags, status/cleanup, hostgroup creation,
