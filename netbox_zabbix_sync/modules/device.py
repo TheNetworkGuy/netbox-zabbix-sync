@@ -98,9 +98,19 @@ class PhysicalDevice:
         """
         Sets basic information like IP address.
         """
-        # Return error if device does not have primary IP.
-        if self.nb.primary_ip:
-            self.cidr = self.nb.primary_ip.address
+
+        primary = None
+
+        # Determine which IP address to use based on config setting. Default is to use the primary IP as set in NetBox, but can be overruled to prefer IPv4 or IPv6 addresses.
+        if self.config["preferred_ip"] == "auto":
+            primary = self.nb.primary_ip
+        elif self.config["preferred_ip"] == "ipv6":
+            primary = self.nb.primary_ip6 or self.nb.primary_ip4
+        else:
+            primary = self.nb.primary_ip4 or self.nb.primary_ip6
+
+        if primary:
+            self.cidr = primary.address
             self.ip = self.cidr.split("/")[0]
         else:
             e = f"Host {self.name}: no primary IP."
