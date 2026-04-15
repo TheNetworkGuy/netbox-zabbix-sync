@@ -179,3 +179,14 @@ device_tag_map = {"site/name": "site",
 vm_tag_map = {"site/name": "site",
               "cluster/name": "cluster",
               "platform/name": "target"}
+
+
+### EXPERIMENTAL FEATURES
+# The features below are experimental and should be run on your own risk.
+# Please see https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features
+
+## Render Config Context with Jinja2
+# When set to true, this will enable rendering of Jinja2 within the zabbix key in config context.
+# This will allow you to perform advanced NetBox lookups and transform data before passing it to Zabbix.
+# See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features#config-context-rendering
+render_config_context = False

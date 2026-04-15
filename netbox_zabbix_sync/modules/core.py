@@ -11,11 +11,12 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 
 from netbox_zabbix_sync.modules.device import PhysicalDevice
-from netbox_zabbix_sync.modules.exceptions import SyncError
+from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
 from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
     convert_recordset,
+    jinjafy_config_context,
     proxy_prepper,
     verify_hg_format,
 )
@@ -269,6 +270,39 @@ class Sync:
                     config=self.config,
                 )
                 logger.debug("Host %s: Started operations on VM.", vm.name)
+                if self.config["extended_site_properties"] and nb_vm.site:
+                    logger.debug("Host %s: Extending site information.", vm.name)
+                    nb_vm.site.full_details()
+
+                if self.config["render_config_context"]:
+                    logger.debug(
+                        "Host %s: *EXPERIMENTAL* Rendering config context with Jinja2.",
+                        vm.name,
+                    )
+                    try:
+                        rendered_context = jinjafy_config_context(nb_vm)
+                    except JinjaRenderError as e:
+                        logger.error(
+                            "Host %s: Skipping due to error while rendering config context: %s",
+                            vm.name,
+                            e,
+                        )
+                        logger.debug(
+                            "Host %s: Source Config Context:\n%s",
+                            vm.name,
+                            pformat(nb_vm.config_context),
+                        )
+                        continue
+                    if rendered_context and isinstance(rendered_context, dict):
+                        vm.config_context["zabbix"] = rendered_context
+
+                # Debug log of the entire NetBox data set
+                logger.debug(
+                    "Host %s: NetBox data:\n%s",
+                    vm.name,
+                    pformat(dict(nb_vm)),
+                )
+
                 vm.set_vm_template()
                 # Check if a valid template has been found for this VM.
                 if not vm.zbx_template_names:
@@ -281,17 +315,10 @@ class Sync:
                 # Check if a valid hostgroup has been found for this VM.
                 if not vm.hostgroups:
                     continue
-                if self.config["extended_site_properties"] and nb_vm.site:
-                    logger.debug("Host %s: extending site information.", vm.name)
-                    nb_vm.site.full_details()
+
                 vm.set_inventory(nb_vm)
                 vm.set_usermacros()
                 vm.set_tags()
-                logger.debug(
-                    "Host %s NetBox data: %s",
-                    vm.name,
-                    pformat(dict(nb_vm)),
-                )
                 # Checks if device is in cleanup state
                 if vm.status in self.config["zabbix_device_removal"]:
                     if vm.zabbix_id:
@@ -346,6 +373,46 @@ class Sync:
                     config=self.config,
                 )
                 logger.debug("Host %s: Started operations on device.", device.name)
+                if self.config["extended_site_properties"] and nb_device.site:
+                    logger.debug("Host %s: Extending site information.", device.name)
+                    nb_device.site.full_details()
+                if (
+                    self.config["extended_virtual_chassis"]
+                    and nb_device.virtual_chassis
+                ):
+                    logger.debug(
+                        "Host %s: Extending virtual chassis information.", device.name
+                    )
+                    nb_device.virtual_chassis.full_details()
+                    if "members" in dict(nb_device.virtual_chassis):
+                        for member in nb_device.virtual_chassis.members:
+                            member.full_details()
+                if self.config["render_config_context"]:
+                    logger.debug(
+                        "Host %s: *EXPERIMENTAL* Rendering config context with Jinja2.",
+                        device.name,
+                    )
+                    try:
+                        rendered_context = jinjafy_config_context(nb_device)
+                    except JinjaRenderError as e:
+                        logger.error(
+                            "Host %s: Skipping due to error while rendering config context: %s",
+                            device.name,
+                            e,
+                        )
+                        logger.debug(
+                            "Host %s: Source Config Context:\n%s",
+                            device.name,
+                            pformat(nb_device.config_context),
+                        )
+                        continue
+                    if rendered_context and isinstance(rendered_context, dict):
+                        device.config_context["zabbix"] = rendered_context
+                # Debug log of the enitre NetBox data set
+                logger.debug(
+                    "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
+                )
+
                 device.set_template(
                     self.config["templates_config_context"],
                     self.config["templates_config_context_overrule"],
@@ -367,24 +434,6 @@ class Sync:
                         device.name,
                     )
                     continue
-                if self.config["extended_site_properties"] and nb_device.site:
-                    logger.debug("Host %s: extending site information.", device.name)
-                    nb_device.site.full_details()
-                if (
-                    self.config["extended_virtual_chassis"]
-                    and nb_device.virtual_chassis
-                ):
-                    logger.debug(
-                        "Host %s: extending virtual chassis information.", device.name
-                    )
-                    nb_device.virtual_chassis.full_details()
-                    if "members" in dict(nb_device.virtual_chassis):
-                        for member in nb_device.virtual_chassis.members:
-                            member.full_details()
-
-                logger.debug(
-                    "Host %s NetBox data: %s", device.name, pformat(dict(nb_device))
-                )
 
                 device.set_inventory(nb_device)
                 device.set_usermacros()
