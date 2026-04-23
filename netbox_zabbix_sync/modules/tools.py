@@ -83,7 +83,7 @@ def jinjafy_config_context(nb, context=None):
         data.pop("config_context")
     if context and isinstance(context, dict):
         # create Jinja2 environment
-        j2env = Environment(autoescape=False) # noqa: S701
+        j2env = Environment(autoescape=False)  # noqa: S701
         # Load additional Jinja2 filters
         j2env.filters.update(j2ipfilters.load_all())  # j2ipaddr filters
         j2env.filters.update(getmembers(jinja_filters, isfunction))  # custom filters
