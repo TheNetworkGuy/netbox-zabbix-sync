@@ -395,7 +395,7 @@ class Sync:
                     try:
                         rendered_context = jinjafy_config_context(nb_device)
                     except JinjaRenderError as e:
-                        logger.error(
+                        logger.exception(
                             "Host %s: Skipping due to error while rendering config context: %s",
                             device.name,
                             e,
