@@ -194,7 +194,7 @@ vm_tag_map = {"site/name": "site",
 # Please see https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features
 
 ## Render Config Context with Jinja2
-# When set to true, this will enable rendering of Jinja2 within the zabbix key in config context.
+# When set to true, this will enable rendering of Jinja2 within the Zabbix key in config context.
 # This will allow you to perform advanced NetBox lookups and transform data before passing it to Zabbix.
 # See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features#config-context-rendering
 render_config_context = False

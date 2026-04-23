@@ -39,6 +39,10 @@ class JinjaRenderError(SyncError):
     """Class JinjaRenderError"""
 
 
+class JinjaFilterError(SyncError):
+    """Class JinjaFilterError"""
+
+
 class HostgroupError(SyncError):
     """Class HostgroupError"""
 
