@@ -7,7 +7,7 @@ from json import JSONDecodeError, dumps, loads
 from typing import Any, cast, overload
 
 from j2ipaddr import filters as j2ipfilters  # adds IP filtering to jinja2
-from jinja2 import Environment, TemplateError, TemplateSyntaxError
+from jinja2 import Environment, TemplateError
 
 from netbox_zabbix_sync.modules import jinja_filters
 from netbox_zabbix_sync.modules.exceptions import HostgroupError, JinjaRenderError
@@ -91,14 +91,8 @@ def jinjafy_config_context(nb, context=None):
             # Use our Zabbix config context as the Jinja2 template
             # and render it using the objects data dictionary
             template = j2env.from_string(str(dumps(context)))
-            rendered_context = loads(str(template.render(data=data)))
-        except JSONDecodeError as e:
-            raise JinjaRenderError(e) from e
-        except TemplateSyntaxError as e:
-            raise JinjaRenderError(e) from e
-        except TemplateError as e:
-            raise JinjaRenderError(e) from e
-        except TypeError as e:
+            rendered_context = loads(template.render(data=data))
+        except (JSONDecodeError, TemplateError, TypeError) as e:
             raise JinjaRenderError(e) from e
         else:
             return rendered_context

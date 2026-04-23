@@ -37,6 +37,7 @@ DEFAULT_CONFIG = {
     "inventory_sync": False,
     "extended_site_properties": False,
     "extended_virtual_chassis": False,
+    "preferred_ip": "auto",
     "device_inventory_map": {
         "asset_tag": "asset_tag",
         "virtual_chassis/name": "chassis",

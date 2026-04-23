@@ -53,6 +53,7 @@ class TestPhysicalDevice(unittest.TestCase):
                 "inventory_mode": "disabled",
                 "inventory_sync": False,
                 "device_inventory_map": {},
+                "preferred_ip": "auto",
             },
         )
 
@@ -82,7 +83,7 @@ class TestPhysicalDevice(unittest.TestCase):
                 self.mock_nb_journal,
                 "3.0",
                 logger=self.mock_logger,
-                config={"device_cf": "zabbix_hostid"},
+                config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
             )
 
         # With the mocked search function, the name should be changed to NETBOX_ID format
@@ -106,7 +107,7 @@ class TestPhysicalDevice(unittest.TestCase):
             self.mock_nb_journal,
             "3.0",
             logger=self.mock_logger,
-            config={"device_cf": "zabbix_hostid"},
+            config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
         )
 
         # Test that templates are returned correctly
@@ -125,7 +126,7 @@ class TestPhysicalDevice(unittest.TestCase):
             self.mock_nb_journal,
             "3.0",
             logger=self.mock_logger,
-            config={"device_cf": "zabbix_hostid"},
+            config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
         )
 
         # Test that template is wrapped in a list
@@ -144,7 +145,7 @@ class TestPhysicalDevice(unittest.TestCase):
             self.mock_nb_journal,
             "3.0",
             logger=self.mock_logger,
-            config={"device_cf": "zabbix_hostid"},
+            config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
         )
 
         # Test that TemplateError is raised
@@ -163,7 +164,7 @@ class TestPhysicalDevice(unittest.TestCase):
             self.mock_nb_journal,
             "3.0",
             logger=self.mock_logger,
-            config={"device_cf": "zabbix_hostid"},
+            config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
         )
 
         # Test that TemplateError is raised
@@ -185,7 +186,7 @@ class TestPhysicalDevice(unittest.TestCase):
                 self.mock_nb_journal,
                 "3.0",
                 logger=self.mock_logger,
-                config={"device_cf": "zabbix_hostid"},
+                config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
             )
 
             # Call set_template with prefer_config_context=True
@@ -202,6 +203,7 @@ class TestPhysicalDevice(unittest.TestCase):
         # Configure with disabled inventory mode
         config_patch = {
             "device_cf": "zabbix_hostid",
+            "preferred_ip": "auto",
             "inventory_mode": "disabled",
             "inventory_sync": False,
         }
@@ -228,6 +230,7 @@ class TestPhysicalDevice(unittest.TestCase):
             "device_cf": "zabbix_hostid",
             "inventory_mode": "manual",
             "inventory_sync": False,
+            "preferred_ip": "auto",
         }
 
         device = PhysicalDevice(
@@ -251,6 +254,7 @@ class TestPhysicalDevice(unittest.TestCase):
             "device_cf": "zabbix_hostid",
             "inventory_mode": "automatic",
             "inventory_sync": False,
+            "preferred_ip": "auto",
         }
 
         device = PhysicalDevice(
@@ -275,6 +279,7 @@ class TestPhysicalDevice(unittest.TestCase):
             "inventory_mode": "manual",
             "inventory_sync": True,
             "device_inventory_map": {"name": "name", "serial": "serialno_a"},
+            "preferred_ip": "auto",
         }
 
         device = PhysicalDevice(
@@ -309,7 +314,7 @@ class TestPhysicalDevice(unittest.TestCase):
             self.mock_nb_journal,
             "3.0",
             logger=self.mock_logger,
-            config={"device_cf": "zabbix_hostid"},
+            config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
         )
 
         # Check isCluster result
@@ -327,7 +332,7 @@ class TestPhysicalDevice(unittest.TestCase):
             self.mock_nb_journal,
             "3.0",
             logger=self.mock_logger,
-            config={"device_cf": "zabbix_hostid"},
+            config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
         )
 
         # Check isCluster result

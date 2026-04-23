@@ -296,7 +296,7 @@ class Sync:
                     if rendered_context and isinstance(rendered_context, dict):
                         vm.config_context["zabbix"] = rendered_context
 
-                # Debug log of the enitre NetBox data set
+                # Debug log of the entire NetBox data set
                 logger.debug(
                     "Host %s: NetBox data:\n%s",
                     vm.name,
