@@ -22,7 +22,7 @@ class ZabbixInterface:
         if self.interface["type"] not in interface_mapping:
             return False
         # Set default port to interface
-        self.interface["port"] = str(interface_mapping[self.interface["type"]])
+        self.interface["port"] = str(interface_mapping[int(self.interface["type"])])
         return True
 
     def get_context(self):

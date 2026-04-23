@@ -70,7 +70,7 @@ class TestUsermacroSync(unittest.TestCase):
         self.assertEqual(device.usermacros, [])
         self.assertTrue(result is True or result is None)
 
-    @patch("netbox_zabbix_sync.modules.device.ZabbixUsermacros")
+    @patch("netbox_zabbix_sync.modules.host.ZabbixUsermacros")
     @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_true(self, mock_usermacro_map, mock_usermacros_class):
         mock_usermacro_map.return_value = self.usermacro_map
@@ -97,7 +97,7 @@ class TestUsermacroSync(unittest.TestCase):
         self.assertIsInstance(device.usermacros, list)
         self.assertGreater(len(device.usermacros), 0)
 
-    @patch("netbox_zabbix_sync.modules.device.ZabbixUsermacros")
+    @patch("netbox_zabbix_sync.modules.host.ZabbixUsermacros")
     @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_full(self, mock_usermacro_map, mock_usermacros_class):
         mock_usermacro_map.return_value = self.usermacro_map
