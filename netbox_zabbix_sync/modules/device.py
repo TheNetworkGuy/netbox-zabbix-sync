@@ -69,4 +69,5 @@ class PhysicalDevice(Host):
             self.name = self.nb.virtual_chassis.name
             return True
         self.logger.info("Host %s is non-primary cluster member.", self.name)
+
         return False

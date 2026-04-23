@@ -7,7 +7,9 @@ from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import TemplateError
 
 
-def _make_device(mock_nb_device, mock_zabbix, mock_nb_journal, mock_logger, config=None):
+def _make_device(
+    mock_nb_device, mock_zabbix, mock_nb_journal, mock_logger, config=None
+):
     """Helper to construct a PhysicalDevice with a minimal default config."""
     default_config = {"device_cf": "zabbix_hostid", "preferred_ip": "auto"}
     if config is not None:
@@ -48,7 +50,10 @@ class TestHostInit(unittest.TestCase):
     def test_init(self):
         """Basic attributes are set correctly from the NetBox record."""
         device = _make_device(
-            self.mock_nb_device, self.mock_zabbix, self.mock_nb_journal, self.mock_logger
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            self.mock_logger,
         )
         self.assertEqual(device.name, "test-device")
         self.assertEqual(device.id, 123)
@@ -100,7 +105,10 @@ class TestHostTemplates(unittest.TestCase):
     def _make(self, config_context):
         self.mock_nb_device.config_context = config_context
         return _make_device(
-            self.mock_nb_device, self.mock_zabbix, self.mock_nb_journal, self.mock_logger
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            self.mock_logger,
         )
 
     def test_get_templates_context(self):
@@ -128,14 +136,18 @@ class TestHostTemplates(unittest.TestCase):
     def test_set_template_with_config_context(self):
         """prefer_config_context=True uses _get_templates_context."""
         self.mock_nb_device.config_context = {"zabbix": {"templates": ["Template1"]}}
-        with patch.object(PhysicalDevice, "_get_templates_context", return_value=["Template1"]):
+        with patch.object(
+            PhysicalDevice, "_get_templates_context", return_value=["Template1"]
+        ):
             device = _make_device(
                 self.mock_nb_device,
                 self.mock_zabbix,
                 self.mock_nb_journal,
                 self.mock_logger,
             )
-            result = device.set_template(prefer_config_context=True, overrule_custom=False)
+            result = device.set_template(
+                prefer_config_context=True, overrule_custom=False
+            )
 
         self.assertTrue(result)
         self.assertEqual(device.zbx_template_names, ["Template1"])
@@ -215,4 +227,6 @@ class TestHostInventory(unittest.TestCase):
         mock_nb_data = {"name": "test-device", "serial": "ABC123"}
         self.assertTrue(device.set_inventory(mock_nb_data))
         self.assertEqual(device.inventory_mode, 0)
-        self.assertEqual(device.inventory, {"name": "test-device", "serialno_a": "ABC123"})
+        self.assertEqual(
+            device.inventory, {"name": "test-device", "serialno_a": "ABC123"}
+        )
