@@ -1,15 +1,15 @@
 """Module that hosts all functions for virtual machine processing"""
 
-from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import (
     InterfaceConfigError,
     SyncInventoryError,
     TemplateError,
 )
+from netbox_zabbix_sync.modules.host import Host
 from netbox_zabbix_sync.modules.interface import ZabbixInterface
 
 
-class VirtualMachine(PhysicalDevice):
+class VirtualMachine(Host):
     """Model for virtual machines"""
 
     def __init__(self, *args, **kwargs):
@@ -35,7 +35,7 @@ class VirtualMachine(PhysicalDevice):
         to skip a lookup of custom fields."""
         # Gather templates ONLY from the device specific context
         try:
-            self.zbx_template_names = self.get_templates_context()
+            self.zbx_template_names = self._get_templates_context()
         except TemplateError as e:
             self.logger.warning(e)
         return True

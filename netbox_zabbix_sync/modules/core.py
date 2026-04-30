@@ -12,6 +12,7 @@ from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
+from netbox_zabbix_sync.modules.host import Host
 from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
@@ -127,7 +128,7 @@ class Sync:
             netbox.dcim.devices.count()
             logger.debug("NetBox version is %s.", nb_version)
             self.netbox = netbox
-            self.nb_version = nb_version
+            self.nb_version = str(nb_version)
         except RequestsConnectionError:
             logger.error(
                 "Unable to connect to NetBox with URL %s. Please check the URL and status of NetBox.",
@@ -181,14 +182,100 @@ class Sync:
             return True
         return False
 
+    def _render_config_context(self, host, nb_obj):
+        """
+        Render config context with Jinja2 if enabled.
+        Returns False if rendering failed and the host should be skipped.
+        """
+        if not self.config["render_config_context"]:
+            return True
+        logger.debug(
+            "Host %s: *EXPERIMENTAL* Rendering config context with Jinja2.",
+            host.name,
+        )
+        try:
+            rendered_context = jinjafy_config_context(nb_obj)
+        except JinjaRenderError as e:
+            logger.exception(
+                "Host %s: Skipping due to error while rendering config context: %s",
+                host.name,
+                e,
+            )
+            logger.debug(
+                "Host %s: Source Config Context:\n%s",
+                host.name,
+                pformat(nb_obj.config_context),
+            )
+            return False
+        if rendered_context and isinstance(rendered_context, dict):
+            host.config_context["zabbix"] = rendered_context
+        else:
+            logger.error(
+                "Host %s: Skipping due to unknown issue while rendering config context.",
+                host.name,
+            )
+            return False
+        return True
+
+    def _sync_host(
+        self,
+        host: Host,
+        zabbix_groups: list[dict],
+        zabbix_templates: list[dict],
+        zabbix_proxy_list: list[dict],
+    ):
+        """
+        Handle the shared sync steps for any Host (device or VM):
+        inventory, usermacros, tags, status/cleanup, hostgroup creation,
+        and Zabbix create or consistency check.
+        """
+        host.set_inventory(host.nb)
+        host.set_usermacros()
+        host.set_tags()
+
+        if host.status in self.config["zabbix_device_removal"]:
+            if host.zabbix_id:
+                host.cleanup()
+                logger.info("Host %s: cleanup complete", host.name)
+                return
+            logger.info(
+                "Host %s: Skipping since this host is not in the active state.",
+                host.name,
+            )
+            return
+
+        if host.status in self.config["zabbix_device_disable"]:
+            host.zabbix_state = 1
+
+        if self.config["create_hostgroups"]:
+            for group in host.create_zbx_hostgroup(zabbix_groups):
+                zabbix_groups.append(group)
+
+        if host.zabbix_id:
+            host.consistency_check(
+                zabbix_groups,
+                zabbix_templates,
+                zabbix_proxy_list,
+                self.config["full_proxy_sync"],
+                self.config["create_hostgroups"],
+            )
+            return
+        host.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
+
     def start(self, device_filter=None, vm_filter=None):
         """
         Run the NetBox to Zabbix sync process.
         """
         if not self.netbox or not self.zabbix:
-            e = "Not able to start sync: No connection to NetBox or Zabbix API."
-            logger.error(e)
+            logger.error(
+                "Not able to start sync: No connection to NetBox or Zabbix API."
+            )
             return False
+
+        if not self.nb_version:
+            logger.error("NetBox version is not set. Cannot proceed with sync.")
+            return False
+
         device_cfs = []
         vm_cfs = []
         # Create API call to get all custom fields which are on the device objects
@@ -257,7 +344,6 @@ class Sync:
         # Prepare list of all proxy and proxy_groups
         zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
 
-        # Go through all NetBox devices
         for nb_vm in netbox_vms:
             try:
                 vm = VirtualMachine(
@@ -273,38 +359,10 @@ class Sync:
                 if self.config["extended_site_properties"] and nb_vm.site:
                     logger.debug("Host %s: Extending site information.", vm.name)
                     nb_vm.site.full_details()
-
-                if self.config["render_config_context"]:
-                    logger.debug(
-                        "Host %s: *EXPERIMENTAL* Rendering config context with Jinja2.",
-                        vm.name,
-                    )
-                    try:
-                        rendered_context = jinjafy_config_context(nb_vm)
-                    except JinjaRenderError as e:
-                        logger.error(
-                            "Host %s: Skipping due to error while rendering config context: %s",
-                            vm.name,
-                            e,
-                        )
-                        logger.debug(
-                            "Host %s: Source Config Context:\n%s",
-                            vm.name,
-                            pformat(nb_vm.config_context),
-                        )
-                        continue
-                    if rendered_context and isinstance(rendered_context, dict):
-                        vm.config_context["zabbix"] = rendered_context
-
-                # Debug log of the entire NetBox data set
-                logger.debug(
-                    "Host %s: NetBox data:\n%s",
-                    vm.name,
-                    pformat(dict(nb_vm)),
-                )
-
+                if not self._render_config_context(vm, nb_vm):
+                    continue
+                logger.debug("Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm)))
                 vm.set_vm_template()
-                # Check if a valid template has been found for this VM.
                 if not vm.zbx_template_names:
                     continue
                 vm.set_hostgroup(
@@ -312,57 +370,14 @@ class Sync:
                     netbox_site_groups,
                     netbox_regions,
                 )
-                # Check if a valid hostgroup has been found for this VM.
                 if not vm.hostgroups:
                     continue
-
-                vm.set_inventory(nb_vm)
-                vm.set_usermacros()
-                vm.set_tags()
-                # Checks if device is in cleanup state
-                if vm.status in self.config["zabbix_device_removal"]:
-                    if vm.zabbix_id:
-                        # Delete device from Zabbix
-                        # and remove hostID from self.netbox.
-                        vm.cleanup()
-                        logger.info("Host %s: cleanup complete", vm.name)
-                        continue
-                    # Device has been added to NetBox
-                    # but is not in Activate state
-                    logger.info(
-                        "Host %s: Skipping since this host is not in the active state.",
-                        vm.name,
-                    )
-                    continue
-                # Check if the VM is in the disabled state
-                if vm.status in self.config["zabbix_device_disable"]:
-                    vm.zabbix_state = 1
-                # Add hostgroup if config is set
-                if self.config["create_hostgroups"]:
-                    # Create new hostgroup. Potentially multiple groups if nested
-                    hostgroups = vm.create_zbx_hostgroup(zabbix_groups)
-                    # go through all newly created hostgroups
-                    for group in hostgroups:
-                        # Add new hostgroups to zabbix group list
-                        zabbix_groups.append(group)
-                # Check if VM is already in Zabbix
-                if vm.zabbix_id:
-                    vm.consistency_check(
-                        zabbix_groups,
-                        zabbix_templates,
-                        zabbix_proxy_list,
-                        self.config["full_proxy_sync"],
-                        self.config["create_hostgroups"],
-                    )
-                    continue
-                # Add VM to Zabbix
-                vm.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
+                self._sync_host(vm, zabbix_groups, zabbix_templates, zabbix_proxy_list)
             except SyncError:
                 pass
 
         for nb_device in netbox_devices:
             try:
-                # Set device instance set data such as hostgroup and template information.
                 device = PhysicalDevice(
                     nb_device,
                     self.zabbix,
@@ -387,119 +402,40 @@ class Sync:
                     if "members" in dict(nb_device.virtual_chassis):
                         for member in nb_device.virtual_chassis.members:
                             member.full_details()
-                if self.config["render_config_context"]:
-                    logger.debug(
-                        "Host %s: *EXPERIMENTAL* Rendering config context with Jinja2.",
-                        device.name,
-                    )
-                    try:
-                        rendered_context = jinjafy_config_context(nb_device)
-                    except JinjaRenderError as e:
-                        logger.exception(
-                            "Host %s: Skipping due to error while rendering config context: %s",
-                            device.name,
-                            e,
-                        )
-                        logger.debug(
-                            "Host %s: Source Config Context:\n%s",
-                            device.name,
-                            pformat(nb_device.config_context),
-                        )
-                        continue
-                    if rendered_context and isinstance(rendered_context, dict):
-                        device.config_context["zabbix"] = rendered_context
-                    else:
-                        logger.error(
-                            "Host %s: Skipping due to unknown issue while rendering config context.",
-                            device.name,
-                        )
-                        continue
-                # Debug log of the enitre NetBox data set
+                if not self._render_config_context(device, nb_device):
+                    continue
                 logger.debug(
                     "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
                 )
-
                 device.set_template(
                     self.config["templates_config_context"],
                     self.config["templates_config_context_overrule"],
                 )
-                # Check if a valid template has been found for this VM.
                 if not device.zbx_template_names:
                     continue
                 device.set_hostgroup(
                     self.config["hostgroup_format"], netbox_site_groups, netbox_regions
                 )
-
-                # Set IPMI
                 device.set_ipmi()
-
-                # Check if a valid hostgroup has been found for this VM.
                 if not device.hostgroups:
                     logger.warning(
                         "Host %s: has no valid hostgroups, Skipping this host...",
                         device.name,
                     )
                     continue
-
-                device.set_inventory(nb_device)
-                device.set_usermacros()
-                device.set_tags()
-
-                # Checks if device is part of cluster.
-                # Requires clustering variable
                 if device.is_cluster() and self.config["clustering"]:
-                    # Check if device is primary or secondary
                     if device.promote_primary_device():
                         logger.info(
                             "Host %s: is part of cluster and primary.", device.name
                         )
                     else:
-                        # Device is secondary in cluster.
-                        # Don't continue with this device.
                         logger.info(
                             "Host %s: Is part of cluster but not primary. Skipping this host...",
                             device.name,
                         )
                         continue
-                # Checks if device is in cleanup state
-                if device.status in self.config["zabbix_device_removal"]:
-                    if device.zabbix_id:
-                        # Delete device from Zabbix
-                        # and remove hostID from NetBox.
-                        device.cleanup()
-                        logger.info("Host %s: cleanup complete", device.name)
-                        continue
-                    # Device has been added to NetBox
-                    # but is not in Activate state
-                    logger.info(
-                        "Host %s: Skipping since this host is not in the active state.",
-                        device.name,
-                    )
-                    continue
-                # Check if the device is in the disabled state
-                if device.status in self.config["zabbix_device_disable"]:
-                    device.zabbix_state = 1
-                # Add hostgroup is config is set
-                if self.config["create_hostgroups"]:
-                    # Create new hostgroup. Potentially multiple groups if nested
-                    hostgroups = device.create_zbx_hostgroup(zabbix_groups)
-                    # go through all newly created hostgroups
-                    for group in hostgroups:
-                        # Add new hostgroups to zabbix group list
-                        zabbix_groups.append(group)
-                # Check if device is already in Zabbix
-                if device.zabbix_id:
-                    device.consistency_check(
-                        zabbix_groups,
-                        zabbix_templates,
-                        zabbix_proxy_list,
-                        self.config["full_proxy_sync"],
-                        self.config["create_hostgroups"],
-                    )
-                    continue
-                # Add device to Zabbix
-                device.create_in_zabbix(
-                    zabbix_groups, zabbix_templates, zabbix_proxy_list
+                self._sync_host(
+                    device, zabbix_groups, zabbix_templates, zabbix_proxy_list
                 )
             except SyncError:
                 pass
