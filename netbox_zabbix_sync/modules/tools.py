@@ -304,3 +304,17 @@ def sanatize_log_output(data):
         else:
             return sanitized_data
     return sanitized_data
+
+
+def extend_ips(nb):
+    """
+    Extends IP fields for NetBox objects
+    """
+    if "primary_ip" in dict(nb) and nb.primary_ip:
+        nb.primary_ip.full_details()
+    if "primary_ip4" in dict(nb) and nb.primary_ip4:
+        nb.primary_ip4.full_details()
+    if "primary_ip6" in dict(nb) and nb.primary_ip6:
+        nb.primary_ip6.full_details()
+    if "oob_ip" in dict(nb) and nb.oob_ip:
+        nb.oob_ip.full_details()

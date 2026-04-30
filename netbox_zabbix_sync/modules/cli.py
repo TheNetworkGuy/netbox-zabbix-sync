@@ -35,6 +35,10 @@ _BOOL_ARGS = [
         "extended_virtual_chassis",
         "Fetch additional virtual chassis info from NetBox (increases API queries).",
     ),
+    (
+        "extended_ips",
+        "Fetches additional IP information from NetBox (increases API queries).",
+    ),
     ("inventory_sync", "Sync NetBox device properties to Zabbix inventory."),
     ("oob_sync", "Sync NetBox Out-of-Band interfaces based on OOB IP."),
     ("usermacro_sync", "Sync usermacros from NetBox to Zabbix."),
