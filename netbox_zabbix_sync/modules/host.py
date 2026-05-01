@@ -452,7 +452,8 @@ class Host(ABC):
         try:
             # Initiate interface class
             interface = ZabbixInterface(
-                self.nb.config_context, int_ip, int_dns, oob=oob
+                self.nb.config_context, int_ip, int_dns, 
+                self.config['prefer_dns'], oob=oob
             )
             # Check if NetBox has device context.
             # If not fall back to old config.
@@ -816,7 +817,7 @@ class Host(ABC):
         # Get host object from Zabbix
         host = self.zabbix.host.get(
             filter={"hostid": self.zabbix_id},
-            selectInterfaces=["type", "ip", "dns", "port", "details", "interfaceid"],
+            selectInterfaces=["type", "ip", "useip", "dns", "port", "details", "interfaceid"],
             selectGroups=["groupid"],
             selectHostGroups=["groupid"],
             selectParentTemplates=["templateid"],

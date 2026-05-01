@@ -39,6 +39,7 @@ _BOOL_ARGS = [
         "extended_ips",
         "Fetches additional IP information from NetBox (increases API queries).",
     ),
+    ("prefer_dns", "Sets host interfaces to use DNS instead of IP if available. The DNS record can be supplied via config_context or by enabling extended_ips."),
     ("inventory_sync", "Sync NetBox device properties to Zabbix inventory."),
     ("oob_sync", "Sync NetBox Out-of-Band interfaces based on OOB IP."),
     ("usermacro_sync", "Sync usermacros from NetBox to Zabbix."),

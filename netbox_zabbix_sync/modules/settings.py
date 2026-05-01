@@ -38,6 +38,7 @@ DEFAULT_CONFIG = {
     "extended_site_properties": False,
     "extended_virtual_chassis": False,
     "extended_ips": False,
+    "prefer_dns": False,
     "preferred_ip": "auto",
     "device_inventory_map": {
         "asset_tag": "asset_tag",
