@@ -190,6 +190,17 @@ class Host(ABC):
             if "dns_name" in dict(self.nb.oob_ip) and self.nb.oob_ip.dns_name:
                 self.oob_dns = self.nb.oob_ip.dns_name
 
+        # Override with Config Context if set
+        if 'zabbix' in self.config_context:
+            if 'interface_ip' in self.config_context['zabbix'] and self.config_context['zabbix']['interface_ip']:
+                self.ip = self.config_context['zabbix']['interface_ip']
+            if 'interface_dns' in self.config_context['zabbix'] and self.config_context['zabbix']['interface_dns']:
+                self.dns = self.config_context['zabbix']['interface_dns']
+            if 'oob_interface_ip' in self.config_context['zabbix'] and self.config_context['zabbix']['oob_interface_ip']:
+                self.oob_ip = self.config_context['zabbix']['oob_interface_ip']
+            if 'oob_interface_dns' in self.config_context['zabbix'] and self.config_context['zabbix']['oob_interface_dns']:
+                self.oob_dns = self.config_context['zabbix']['oob_interface_dns']
+
     def set_hostgroup(
         self, hg_format: list | str, nb_site_groups: list[dict], nb_regions: list[dict]
     ):
