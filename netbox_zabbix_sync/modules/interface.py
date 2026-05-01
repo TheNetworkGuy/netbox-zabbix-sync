@@ -9,14 +9,13 @@ class ZabbixInterface:
     """Class that represents a Zabbix interface."""
 
     def __init__(self, context, ip, dns, prefer_dns, oob=False):
-        useip = 1 # Use IP by default
+        useip = 1  # Use IP by default
         self.context = context
         self.is_oob = oob
         self.ip = ip
         self.dns = dns
-        if ((self.dns and prefer_dns) or
-           (not self.ip and self.dns)):
-           useip = 0 # use DNS
+        if (self.dns and prefer_dns) or (not self.ip and self.dns):
+            useip = 0  # use DNS
         self.skelet = {"main": "1", "useip": str(useip), "dns": self.dns, "ip": self.ip}
         self.interface = self.skelet
 

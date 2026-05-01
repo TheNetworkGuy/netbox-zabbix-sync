@@ -96,9 +96,9 @@ class Host(ABC):
         self.zabbix_state = 0
         self.journal = journal
         self.nb_journals = nb_journal_class
-        self.ip = None
+        self.ip = ""
         self.dns = ""
-        self.oob_ip = None
+        self.oob_ip = ""
         self.oob_dns = ""
         self.inventory_mode = -1
         self.inventory = {}
@@ -178,10 +178,6 @@ class Host(ABC):
             self.ip = self.cidr.split("/")[0]
             if "dns_name" in dict(primary) and primary.dns_name:
                 self.dns = primary.dns_name
-        else:
-            e = f"Host {self.name}: no primary IP."
-            self.logger.warning(e)
-            raise SyncInventoryError(e)
 
         # Set OOB IP if available
         if "oob_ip" in dict(self.nb) and self.nb.oob_ip:
@@ -191,15 +187,33 @@ class Host(ABC):
                 self.oob_dns = self.nb.oob_ip.dns_name
 
         # Override with Config Context if set
-        if 'zabbix' in self.config_context:
-            if 'interface_ip' in self.config_context['zabbix'] and self.config_context['zabbix']['interface_ip']:
-                self.ip = self.config_context['zabbix']['interface_ip']
-            if 'interface_dns' in self.config_context['zabbix'] and self.config_context['zabbix']['interface_dns']:
-                self.dns = self.config_context['zabbix']['interface_dns']
-            if 'oob_interface_ip' in self.config_context['zabbix'] and self.config_context['zabbix']['oob_interface_ip']:
-                self.oob_ip = self.config_context['zabbix']['oob_interface_ip']
-            if 'oob_interface_dns' in self.config_context['zabbix'] and self.config_context['zabbix']['oob_interface_dns']:
-                self.oob_dns = self.config_context['zabbix']['oob_interface_dns']
+        if "zabbix" in self.config_context:
+            if (
+                "interface_ip" in self.config_context["zabbix"]
+                and self.config_context["zabbix"]["interface_ip"]
+            ):
+                self.ip = self.config_context["zabbix"]["interface_ip"]
+            if (
+                "interface_dns" in self.config_context["zabbix"]
+                and self.config_context["zabbix"]["interface_dns"]
+            ):
+                self.dns = self.config_context["zabbix"]["interface_dns"]
+            if (
+                "oob_interface_ip" in self.config_context["zabbix"]
+                and self.config_context["zabbix"]["oob_interface_ip"]
+            ):
+                self.oob_ip = self.config_context["zabbix"]["oob_interface_ip"]
+            if (
+                "oob_interface_dns" in self.config_context["zabbix"]
+                and self.config_context["zabbix"]["oob_interface_dns"]
+            ):
+                self.oob_dns = self.config_context["zabbix"]["oob_interface_dns"]
+
+        # Fail if no IP or DNS was set
+        if not (self.ip or self.dns):
+            e = f"Host {self.name}: No primary IP or DNS set."
+            self.logger.warning(e)
+            raise SyncInventoryError(e)
 
     def set_hostgroup(
         self, hg_format: list | str, nb_site_groups: list[dict], nb_regions: list[dict]
@@ -463,8 +477,11 @@ class Host(ABC):
         try:
             # Initiate interface class
             interface = ZabbixInterface(
-                self.nb.config_context, int_ip, int_dns, 
-                self.config['prefer_dns'], oob=oob
+                self.nb.config_context,
+                int_ip,
+                int_dns,
+                self.config["prefer_dns"],
+                oob=oob,
             )
             # Check if NetBox has device context.
             # If not fall back to old config.
@@ -828,7 +845,15 @@ class Host(ABC):
         # Get host object from Zabbix
         host = self.zabbix.host.get(
             filter={"hostid": self.zabbix_id},
-            selectInterfaces=["type", "ip", "useip", "dns", "port", "details", "interfaceid"],
+            selectInterfaces=[
+                "type",
+                "ip",
+                "useip",
+                "dns",
+                "port",
+                "details",
+                "interfaceid",
+            ],
             selectGroups=["groupid"],
             selectHostGroups=["groupid"],
             selectParentTemplates=["templateid"],
