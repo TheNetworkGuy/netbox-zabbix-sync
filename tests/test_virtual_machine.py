@@ -8,7 +8,11 @@ from netbox_zabbix_sync.modules.virtual_machine import VirtualMachine
 
 def _make_vm(mock_nb_vm, mock_zabbix, mock_nb_journal, mock_logger, config=None):
     """Helper to construct a VirtualMachine with a minimal default config."""
-    default_config = {"device_cf": "zabbix_hostid", "preferred_ip": "auto", "prefer_dns": False}
+    default_config = {
+        "device_cf": "zabbix_hostid",
+        "preferred_ip": "auto",
+        "prefer_dns": False,
+    }
     if config is not None:
         default_config.update(config)
     return VirtualMachine(

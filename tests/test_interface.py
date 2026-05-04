@@ -15,7 +15,9 @@ class TestZabbixInterface(unittest.TestCase):
         self.test_ip = "192.168.1.1"
         self.test_dns = ""
         self.empty_context = {}
-        self.default_interface = ZabbixInterface(self.empty_context, self.test_ip, self.test_dns)
+        self.default_interface = ZabbixInterface(
+            self.empty_context, self.test_ip, self.test_dns
+        )
 
         # Create some test contexts for different scenarios
         self.snmpv2_context = {
