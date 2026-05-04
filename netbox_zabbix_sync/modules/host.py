@@ -96,7 +96,10 @@ class Host(ABC):
         self.zabbix_state = 0
         self.journal = journal
         self.nb_journals = nb_journal_class
-        self.oob_ip = None
+        self.ip = ""
+        self.dns = ""
+        self.oob_ip = ""
+        self.oob_dns = ""
         self.inventory_mode = -1
         self.inventory = {}
         self.ipmi = {}
@@ -128,29 +131,6 @@ class Host(ABC):
         Set basic host attributes such as IP address, OOB IP, inventory mode, inventory, usermacros and tags based on the NetBox record and configuration settings.
         """
 
-        primary = None
-
-        # Determine which IP address to use based on config setting. Default is to use the primary IP as set in NetBox, but can be overruled to prefer IPv4 or IPv6 addresses.
-        if self.config["preferred_ip"] == "auto":
-            primary = self.nb.primary_ip
-        elif self.config["preferred_ip"] == "ipv6":
-            primary = self.nb.primary_ip6 or self.nb.primary_ip4
-        else:
-            primary = self.nb.primary_ip4 or self.nb.primary_ip6
-
-        if primary:
-            self.cidr = primary.address
-            self.ip = self.cidr.split("/")[0]
-        else:
-            e = f"Host {self.name}: no primary IP."
-            self.logger.warning(e)
-            raise SyncInventoryError(e)
-
-        # Set OOB IP if available
-        if "oob_ip" in dict(self.nb) and self.nb.oob_ip:
-            self.oob_cidr = self.nb.oob_ip.address
-            self.oob_ip = self.oob_cidr.split("/")[0]
-
         # Check if device has custom field for ZBX ID
         if self.config["device_cf"] in self.nb.custom_fields:
             self.zabbix_id = self.nb.custom_fields[self.config["device_cf"]]
@@ -177,6 +157,63 @@ class Host(ABC):
             )
         else:
             pass
+
+    def set_ips(self) -> None:
+        """
+        Set IP and DNS for the host
+        """
+
+        primary = None
+
+        # Determine which IP address to use based on config setting. Default is to use the primary IP as set in NetBox, but can be overruled to prefer IPv4 or IPv6 addresses.
+        if self.config["preferred_ip"] == "auto":
+            primary = self.nb.primary_ip
+        elif self.config["preferred_ip"] == "ipv6":
+            primary = self.nb.primary_ip6 or self.nb.primary_ip4
+        else:
+            primary = self.nb.primary_ip4 or self.nb.primary_ip6
+
+        if primary:
+            self.cidr = primary.address
+            self.ip = self.cidr.split("/")[0]
+            if "dns_name" in dict(primary) and primary.dns_name:
+                self.dns = primary.dns_name
+
+        # Set OOB IP if available
+        if "oob_ip" in dict(self.nb) and self.nb.oob_ip:
+            self.oob_cidr = self.nb.oob_ip.address
+            self.oob_ip = self.oob_cidr.split("/")[0]
+            if "dns_name" in dict(self.nb.oob_ip) and self.nb.oob_ip.dns_name:
+                self.oob_dns = self.nb.oob_ip.dns_name
+
+        # Override with Config Context if set
+        if "zabbix" in self.config_context:
+            if (
+                "interface_ip" in self.config_context["zabbix"]
+                and self.config_context["zabbix"]["interface_ip"]
+            ):
+                self.ip = self.config_context["zabbix"]["interface_ip"]
+            if (
+                "interface_dns" in self.config_context["zabbix"]
+                and self.config_context["zabbix"]["interface_dns"]
+            ):
+                self.dns = self.config_context["zabbix"]["interface_dns"]
+            if (
+                "oob_interface_ip" in self.config_context["zabbix"]
+                and self.config_context["zabbix"]["oob_interface_ip"]
+            ):
+                self.oob_ip = self.config_context["zabbix"]["oob_interface_ip"]
+            if (
+                "oob_interface_dns" in self.config_context["zabbix"]
+                and self.config_context["zabbix"]["oob_interface_dns"]
+            ):
+                self.oob_dns = self.config_context["zabbix"]["oob_interface_dns"]
+
+        # Fail if no IP or DNS was set
+        if not (self.ip or self.dns):
+            e = f"Host {self.name}: No primary IP or DNS set."
+            self.logger.warning(e)
+            raise SyncInventoryError(e)
 
     def set_hostgroup(
         self, hg_format: list | str, nb_site_groups: list[dict], nb_regions: list[dict]
@@ -276,7 +313,7 @@ class Host(ABC):
             if self.config["inventory_sync"]:
                 self.logger.error(
                     "Host %s: Unable to map NetBox inventory to Zabbix."
-                    "Inventory sync is enabled in  config but inventory mode is disabled",
+                    "Inventory sync is enabled in config but inventory mode is disabled",
                     self.name,
                 )
             return True
@@ -436,9 +473,16 @@ class Host(ABC):
         snmp_interface_type = 2
         ipmi_interface_type = 3
         int_ip = self.oob_ip if oob else self.ip
+        int_dns = self.oob_dns if oob else self.dns
         try:
             # Initiate interface class
-            interface = ZabbixInterface(self.nb.config_context, int_ip, oob=oob)
+            interface = ZabbixInterface(
+                self.nb.config_context,
+                int_ip,
+                int_dns,
+                prefer_dns=self.config["prefer_dns"],
+                oob=oob,
+            )
             # Check if NetBox has device context.
             # If not fall back to old config.
             if interface.get_context():
@@ -801,7 +845,15 @@ class Host(ABC):
         # Get host object from Zabbix
         host = self.zabbix.host.get(
             filter={"hostid": self.zabbix_id},
-            selectInterfaces=["type", "ip", "port", "details", "interfaceid"],
+            selectInterfaces=[
+                "type",
+                "ip",
+                "useip",
+                "dns",
+                "port",
+                "details",
+                "interfaceid",
+            ],
             selectGroups=["groupid"],
             selectHostGroups=["groupid"],
             selectParentTemplates=["templateid"],

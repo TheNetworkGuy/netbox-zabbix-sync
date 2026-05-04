@@ -48,7 +48,9 @@ class VirtualMachine(Host):
         zabbix_snmp_interface_type = 2
         try:
             # Initiate interface class
-            interface = ZabbixInterface(self.nb.config_context, self.ip)
+            interface = ZabbixInterface(
+                self.nb.config_context, self.ip, self.dns, self.config["prefer_dns"]
+            )
             # Check if NetBox has device context.
             # If not fall back to old config.
             if interface.get_context():

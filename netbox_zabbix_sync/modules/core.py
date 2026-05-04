@@ -17,6 +17,7 @@ from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
     convert_recordset,
+    extend_ips,
     jinjafy_config_context,
     proxy_prepper,
     verify_hg_format,
@@ -359,9 +360,13 @@ class Sync:
                 if self.config["extended_site_properties"] and nb_vm.site:
                     logger.debug("Host %s: Extending site information.", vm.name)
                     nb_vm.site.full_details()
+                if self.config["extended_ips"]:
+                    logger.debug("Host %s: Extending IP information.", vm.name)
+                    extend_ips(nb_vm)
                 if not self._render_config_context(vm, nb_vm):
                     continue
                 logger.debug("Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm)))
+                vm.set_ips()
                 vm.set_vm_template()
                 if not vm.zbx_template_names:
                     continue
@@ -402,11 +407,15 @@ class Sync:
                     if "members" in dict(nb_device.virtual_chassis):
                         for member in nb_device.virtual_chassis.members:
                             member.full_details()
+                if self.config["extended_ips"]:
+                    logger.debug("Host %s: Extending IP information.", device.name)
+                    extend_ips(nb_device)
                 if not self._render_config_context(device, nb_device):
                     continue
                 logger.debug(
                     "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
                 )
+                device.set_ips()
                 device.set_template(
                     self.config["templates_config_context"],
                     self.config["templates_config_context_overrule"],
