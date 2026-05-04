@@ -13,8 +13,9 @@ class TestZabbixInterface(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.test_ip = "192.168.1.1"
+        self.test_dns = ""
         self.empty_context = {}
-        self.default_interface = ZabbixInterface(self.empty_context, self.test_ip)
+        self.default_interface = ZabbixInterface(self.empty_context, self.test_ip, self.test_dns)
 
         # Create some test contexts for different scenarios
         self.snmpv2_context = {
@@ -47,7 +48,7 @@ class TestZabbixInterface(unittest.TestCase):
 
     def test_init(self):
         """Test initialization of ZabbixInterface."""
-        interface = ZabbixInterface(self.empty_context, self.test_ip)
+        interface = ZabbixInterface(self.empty_context, self.test_ip, self.test_dns)
 
         # Check basic properties
         self.assertEqual(interface.ip, self.test_ip)
@@ -55,18 +56,18 @@ class TestZabbixInterface(unittest.TestCase):
         self.assertEqual(interface.interface["ip"], self.test_ip)
         self.assertEqual(interface.interface["main"], "1")
         self.assertEqual(interface.interface["useip"], "1")
-        self.assertEqual(interface.interface["dns"], "")
+        self.assertEqual(interface.interface["dns"], self.test_dns)
 
     def test_get_context_empty(self):
         """Test get_context with empty context."""
-        interface = ZabbixInterface(self.empty_context, self.test_ip)
+        interface = ZabbixInterface(self.empty_context, self.test_ip, self.test_dns)
         result = interface.get_context()
         self.assertFalse(result)
 
     def test_get_context_with_interface_type(self):
         """Test get_context with interface_type but no port."""
         context = {"zabbix": {"interface_type": 2}}
-        interface = ZabbixInterface(context, self.test_ip)
+        interface = ZabbixInterface(context, self.test_ip, self.test_dns)
 
         # Should set type and default port
         result = interface.get_context()
@@ -77,7 +78,7 @@ class TestZabbixInterface(unittest.TestCase):
     def test_get_context_with_interface_type_and_port(self):
         """Test get_context with both interface_type and port."""
         context = {"zabbix": {"interface_type": 1, "interface_port": "12345"}}
-        interface = ZabbixInterface(context, self.test_ip)
+        interface = ZabbixInterface(context, self.test_ip, self.test_dns)
 
         # Should set type and specified port
         result = interface.get_context()
@@ -87,7 +88,7 @@ class TestZabbixInterface(unittest.TestCase):
 
     def test_set_default_port(self):
         """Test _set_default_port for different interface types."""
-        interface = ZabbixInterface(self.empty_context, self.test_ip)
+        interface = ZabbixInterface(self.empty_context, self.test_ip, self.test_dns)
 
         # Test for agent type (1)
         interface.interface["type"] = 1
@@ -116,7 +117,7 @@ class TestZabbixInterface(unittest.TestCase):
 
     def test_set_snmp_v2(self):
         """Test set_snmp with SNMPv2 configuration."""
-        interface = ZabbixInterface(self.snmpv2_context, self.test_ip)
+        interface = ZabbixInterface(self.snmpv2_context, self.test_ip, self.test_dns)
         interface.get_context()  # Set the interface type
 
         # Call set_snmp
@@ -130,7 +131,7 @@ class TestZabbixInterface(unittest.TestCase):
 
     def test_set_snmp_v3(self):
         """Test set_snmp with SNMPv3 configuration."""
-        interface = ZabbixInterface(self.snmpv3_context, self.test_ip)
+        interface = ZabbixInterface(self.snmpv3_context, self.test_ip, self.test_dns)
         interface.get_context()  # Set the interface type
 
         # Call set_snmp
@@ -151,7 +152,7 @@ class TestZabbixInterface(unittest.TestCase):
         """Test set_snmp with missing SNMP configuration."""
         # Create context with interface type but no SNMP config
         context = {"zabbix": {"interface_type": 2}}
-        interface = ZabbixInterface(context, self.test_ip)
+        interface = ZabbixInterface(context, self.test_ip, self.test_dns)
         interface.get_context()  # Set the interface type
 
         # Call set_snmp - should raise exception
@@ -169,7 +170,7 @@ class TestZabbixInterface(unittest.TestCase):
                 },
             }
         }
-        interface = ZabbixInterface(context, self.test_ip)
+        interface = ZabbixInterface(context, self.test_ip, self.test_dns)
         interface.get_context()  # Set the interface type
 
         # Call set_snmp - should raise exception
@@ -187,7 +188,7 @@ class TestZabbixInterface(unittest.TestCase):
                 },
             }
         }
-        interface = ZabbixInterface(context, self.test_ip)
+        interface = ZabbixInterface(context, self.test_ip, self.test_dns)
         interface.get_context()  # Set the interface type
 
         # Call set_snmp - should raise exception
@@ -196,7 +197,7 @@ class TestZabbixInterface(unittest.TestCase):
 
     def test_set_snmp_non_snmp_interface(self):
         """Test set_snmp with non-SNMP interface type."""
-        interface = ZabbixInterface(self.agent_context, self.test_ip)
+        interface = ZabbixInterface(self.agent_context, self.test_ip, self.test_dns)
         interface.get_context()  # Set the interface type
 
         # Call set_snmp - should raise exception
@@ -205,7 +206,7 @@ class TestZabbixInterface(unittest.TestCase):
 
     def test_set_default_snmp(self):
         """Test set_default_snmp method."""
-        interface = ZabbixInterface(self.empty_context, self.test_ip)
+        interface = ZabbixInterface(self.empty_context, self.test_ip, self.test_dns)
         interface.set_default_snmp()
 
         # Check interface properties
@@ -218,7 +219,7 @@ class TestZabbixInterface(unittest.TestCase):
 
     def test_set_default_agent(self):
         """Test set_default_agent method."""
-        interface = ZabbixInterface(self.empty_context, self.test_ip)
+        interface = ZabbixInterface(self.empty_context, self.test_ip, self.test_dns)
         interface.set_default_agent()
 
         # Check interface properties
@@ -229,7 +230,7 @@ class TestZabbixInterface(unittest.TestCase):
         """Test SNMPv2 with no community string specified."""
         # Create context with SNMPv2 but no community
         context = {"zabbix": {"interface_type": 2, "snmp": {"version": 2}}}
-        interface = ZabbixInterface(context, self.test_ip)
+        interface = ZabbixInterface(context, self.test_ip, self.test_dns)
         interface.get_context()  # Set the interface type
 
         # Call set_snmp

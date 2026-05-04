@@ -8,7 +8,7 @@ from netbox_zabbix_sync.modules.exceptions import InterfaceConfigError
 class ZabbixInterface:
     """Class that represents a Zabbix interface."""
 
-    def __init__(self, context, ip, dns, prefer_dns, oob=False):
+    def __init__(self, context, ip, dns, prefer_dns=False, oob=False):
         useip = 1  # Use IP by default
         self.context = context
         self.is_oob = oob

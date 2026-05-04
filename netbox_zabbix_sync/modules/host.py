@@ -480,7 +480,7 @@ class Host(ABC):
                 self.nb.config_context,
                 int_ip,
                 int_dns,
-                self.config["prefer_dns"],
+                prefer_dns=self.config["prefer_dns"],
                 oob=oob,
             )
             # Check if NetBox has device context.

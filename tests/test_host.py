@@ -11,7 +11,11 @@ def _make_device(
     mock_nb_device, mock_zabbix, mock_nb_journal, mock_logger, config=None
 ):
     """Helper to construct a PhysicalDevice with a minimal default config."""
-    default_config = {"device_cf": "zabbix_hostid", "preferred_ip": "auto"}
+    default_config = {
+        "device_cf": "zabbix_hostid",
+        "preferred_ip": "auto",
+        "prefer_dns": False,
+    }
     if config is not None:
         default_config.update(config)
     return PhysicalDevice(
@@ -55,6 +59,7 @@ class TestHostInit(unittest.TestCase):
             self.mock_nb_journal,
             self.mock_logger,
         )
+        device.set_ips()
         self.assertEqual(device.name, "test-device")
         self.assertEqual(device.id, 123)
         self.assertEqual(device.status, "Active")
