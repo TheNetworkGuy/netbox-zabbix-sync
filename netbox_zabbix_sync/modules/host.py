@@ -899,20 +899,6 @@ class Host(ABC):
                 )
                 self.update_zabbix_host(name=self.visible_name)
 
-        # Check if the templates are in-sync
-        if not self.zbx_template_comparer(host["parentTemplates"]):
-            self.logger.info("Host %s: Template(s) OUT of sync.", self.name)
-            # Prepare Templates for API parsing
-            templateids = []
-            for template in self.zbx_templates:
-                templateids.append({"templateid": template["templateid"]})
-            # Update Zabbix with NB templates and clear any old / lost templates
-            self.update_zabbix_host(
-                templates_clear=host["parentTemplates"], templates=templateids
-            )
-        else:
-            self.logger.debug("Host %s: Template(s) in-sync.", self.name)
-
         group_dictname = "hostgroups"
         # Check if Zabbix version is 6 or higher. Issue #93
         if str(self.zabbix.version).startswith(("6", "5")):
@@ -1254,6 +1240,20 @@ class Host(ABC):
             err_msg = f"Host {self.name}: Has has no interface configuration."
             self.logger.error(err_msg)
             raise SyncInventoryError(err_msg)
+
+        # Check if the templates are in-sync, needs to be donw after interfaces.
+        if not self.zbx_template_comparer(host["parentTemplates"]):
+            self.logger.info("Host %s: Template(s) OUT of sync.", self.name)
+            # Prepare Templates for API parsing
+            templateids = []
+            for template in self.zbx_templates:
+                templateids.append({"templateid": template["templateid"]})
+            # Update Zabbix with NB templates and clear any old / lost templates
+            self.update_zabbix_host(
+                templates_clear=host["parentTemplates"], templates=templateids
+            )
+        else:
+            self.logger.debug("Host %s: Template(s) in-sync.", self.name)
 
     def create_journal_entry(self, severity, message):
         """
