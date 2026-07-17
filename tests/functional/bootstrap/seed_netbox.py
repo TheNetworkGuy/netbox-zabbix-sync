@@ -39,11 +39,7 @@ def _get_or_create(endpoint, search: dict, create: dict):
 
 
 def seed_custom_fields(nb) -> None:
-    """Create the two custom fields the sync depends on.
-
-    Note NetBox >= 4.1 names this field `object_types` on write; `content_types`
-    is gone from the POST schema.
-    """
+    """Create the two custom fields the sync depends on."""
     _get_or_create(
         nb.extras.custom_fields,
         {"name": "zabbix_hostid"},
