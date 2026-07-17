@@ -282,7 +282,7 @@ class Sync:
         # Create API call to get all custom fields which are on the device objects
         device_cfs = list(
             self.netbox.extras.custom_fields.filter(
-                type=["text", "object", "select"], content_types="dcim.device"
+                type=["text", "object", "select"], object_type="dcim.device"
             )
         )
         # Check if the provided Hostgroup layout is valid
@@ -296,7 +296,7 @@ class Sync:
             vm_cfs = list(
                 self.netbox.extras.custom_fields.filter(
                     type=["text", "object", "select"],
-                    content_types="virtualization.virtualmachine",
+                    object_type="virtualization.virtualmachine",
                 )
             )
             verify_hg_format(
