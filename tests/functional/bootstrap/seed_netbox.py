@@ -29,6 +29,14 @@ ZABBIX_TEMPLATE = "Linux by SNMP"
 # above and hostgroup_format "site/manufacturer/role".
 EXPECTED_HOSTGROUP = f"{SITE_NAME}/{MANUFACTURER_NAME}/{ROLE_NAME}"
 
+# Geo data on the site. NetBox does not include these in the *nested* site it
+# returns on a device, so they are only reachable once `extended_site_properties`
+# has called full_details() -- which is exactly what the extended_site_properties
+# tests use them to prove. Stored as strings because that is how NetBox returns
+# these decimal fields, and field_mapper str()s whatever it finds.
+SITE_LATITUDE = "52.370216"
+SITE_LONGITUDE = "4.895168"
+
 
 def _get_or_create(endpoint, search: dict, create: dict):
     """Return the existing object matching `search`, else create it."""
@@ -71,8 +79,21 @@ def seed(nb) -> dict:
     site = _get_or_create(
         nb.dcim.sites,
         {"slug": SITE_SLUG},
-        {"name": SITE_NAME, "slug": SITE_SLUG, "status": "active"},
+        {
+            "name": SITE_NAME,
+            "slug": SITE_SLUG,
+            "status": "active",
+            "latitude": SITE_LATITUDE,
+            "longitude": SITE_LONGITUDE,
+        },
     )
+    # An earlier run may have created the site without geo data, so set it
+    # unconditionally rather than only on create -- same reasoning as the
+    # device type's template custom field below.
+    if str(site.latitude) != SITE_LATITUDE or str(site.longitude) != SITE_LONGITUDE:
+        site.latitude = SITE_LATITUDE
+        site.longitude = SITE_LONGITUDE
+        site.save()
     manufacturer = _get_or_create(
         nb.dcim.manufacturers,
         {"slug": MANUFACTURER_SLUG},

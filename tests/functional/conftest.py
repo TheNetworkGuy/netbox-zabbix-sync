@@ -227,10 +227,24 @@ def device_factory(nb, zapi, seeded):
 
     Cleanup covers Zabbix too: a synced device leaves a host behind, and the
     next test would otherwise see it.
+
+    The optional arguments exist for the attribute-generation features. Config
+    context arrives as `local_context_data`, the device-local layer NetBox
+    merges into the rendered `config_context` the sync reads: it needs no
+    ConfigContext object, no assignment rules, and it cannot leak into another
+    test's device the way a site- or role-scoped context would.
     """
     created = []
 
-    def make(status: str = "active", address: str = "10.0.0.1/24"):
+    def make(
+        status: str = "active",
+        address: str = "10.0.0.1/24",
+        config_context: dict | None = None,
+        tags: list[int] | None = None,
+        dns_name: str = "",
+        oob_address: str | None = None,
+        **fields,
+    ):
         name = f"fn-{uuid4().hex[:8]}"
         device = nb.dcim.devices.create(
             name=name,
@@ -238,30 +252,112 @@ def device_factory(nb, zapi, seeded):
             role=seeded["role"].id,
             site=seeded["site"].id,
             status=status,
+            local_context_data=config_context,
+            tags=tags or [],
+            **fields,
         )
+        # Deleted in list order, so anything that must go before the device it
+        # points at is appended after it.
+        dependents = [device]
         interface = nb.dcim.interfaces.create(
             device=device.id, name="eth0", type="1000base-t"
         )
         ip = nb.ipam.ip_addresses.create(
             address=address,
+            dns_name=dns_name,
             assigned_object_type="dcim.interface",
             assigned_object_id=interface.id,
         )
+        dependents += [ip, interface]
         device.primary_ip4 = ip.id
+
+        if oob_address:
+            oob_interface = nb.dcim.interfaces.create(
+                device=device.id, name="mgmt0", type="1000base-t"
+            )
+            oob_ip = nb.ipam.ip_addresses.create(
+                address=oob_address,
+                assigned_object_type="dcim.interface",
+                assigned_object_id=oob_interface.id,
+            )
+            dependents += [oob_ip, oob_interface]
+            device.oob_ip = oob_ip.id
+
         device.save()
         device = nb.dcim.devices.get(device.id)
-        created.append((device, interface, ip))
+        created.append((device, dependents))
         return device
 
     yield make
 
-    for device, interface, ip in reversed(created):
+    for device, dependents in reversed(created):
         for host in zapi.host.get(filter={"host": device.name}, output=["hostid"]):
             zapi.host.delete(host["hostid"])
-        for obj in (ip, interface, device):
+        # The device goes last: NetBox refuses to delete an IP's interface
+        # while the device still names that IP as its primary or OOB.
+        for obj in (*dependents[1:], device):
             # Already gone, or removed by a cascading delete.
             with contextlib.suppress(pynetbox.RequestError):
                 obj.delete()
+
+
+@pytest.fixture
+def tag_factory(nb):
+    """Create uniquely-named NetBox tags and remove them afterwards.
+
+    Tags are global, like custom fields, so each test gets its own rather than
+    risking a leftover tag turning up in another test's Zabbix host tags.
+    """
+    created = []
+
+    def make(name: str | None = None):
+        slug = f"tag-{uuid4().hex[:8]}"
+        tag = nb.extras.tags.create(name=name or slug.upper(), slug=slug)
+        created.append(tag)
+        return tag
+
+    yield make
+
+    for tag in reversed(created):
+        with contextlib.suppress(pynetbox.RequestError):
+            tag.delete()
+
+
+@pytest.fixture
+def virtual_chassis_factory(nb, zapi):
+    """Create a virtual chassis over existing devices, master first.
+
+    Torn down before `device_factory`'s devices: this fixture is requested
+    after it, so its finalizer runs first, and NetBox nulls the members'
+    `virtual_chassis` on delete rather than blocking on it.
+
+    Cleanup deletes the Zabbix host named after the chassis as well. With
+    `clustering` on, the master is promoted to the chassis name (device.py:57),
+    so the host it leaves behind is not named after any device and
+    `device_factory` would never find it.
+    """
+    created = []
+
+    def make(master, *members, domain: str = ""):
+        # domain is nullable in NetBox's model but not over the API, which
+        # rejects an explicit null with a 400.
+        vc = nb.dcim.virtual_chassis.create(
+            name=f"vc-{uuid4().hex[:8]}", master=master.id, domain=domain
+        )
+        for position, device in enumerate((master, *members), start=1):
+            device.virtual_chassis = vc.id
+            device.vc_position = position
+            device.save()
+        created.append(vc)
+        return vc
+
+    yield make
+
+    for vc in reversed(created):
+        for host in zapi.host.get(filter={"host": vc.name}, output=["hostid"]):
+            zapi.host.delete(host["hostid"])
+        with contextlib.suppress(pynetbox.RequestError):
+            vc.delete()
 
 
 @pytest.fixture
@@ -406,7 +502,13 @@ def custom_field_factory(nb):
 
 @pytest.fixture
 def zabbix_host(zapi):
-    """Read a Zabbix host back with everything the assertions need."""
+    """Read a Zabbix host back with everything the assertions need.
+
+    Tags, macros and inventory are selected here rather than in a second
+    fixture because Zabbix omits each of them unless asked, and a test that
+    forgot the select would read an absent key as an absent value -- passing
+    for a host whose tags were never synced.
+    """
 
     def _get(name: str):
         hosts = zapi.host.get(
@@ -415,10 +517,33 @@ def zabbix_host(zapi):
             selectHostGroups=["name"],
             selectParentTemplates=["host"],
             selectInterfaces="extend",
+            selectTags="extend",
+            selectMacros="extend",
+            selectInventory="extend",
         )
         return hosts[0] if hosts else None
 
     return _get
+
+
+def tag_pairs(host: dict) -> set[tuple[str, str]]:
+    """The host's Zabbix tags as (tag, value) pairs."""
+    return {(tag["tag"], tag["value"]) for tag in host["tags"]}
+
+
+def macro_values(host: dict) -> dict[str, str | None]:
+    """The host's Zabbix usermacros, keyed by macro name.
+
+    A secret macro's value is `None`: Zabbix withholds it by dropping the key
+    from the response entirely, rather than blanking it. Read `macro_types` to
+    assert on one.
+    """
+    return {macro["macro"]: macro.get("value") for macro in host["macros"]}
+
+
+def macro_types(host: dict) -> dict[str, str]:
+    """The host's usermacro types (0 text, 1 secret, 2 vault), by macro name."""
+    return {macro["macro"]: macro["type"] for macro in host["macros"]}
 
 
 def strip_ip_mask(address: str) -> str:

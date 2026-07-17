@@ -105,7 +105,8 @@ mocked suite would report itself.
 `seed_netbox.py` creates the shared objects: the `zabbix_hostid` and
 `zabbix_template` custom fields, plus the site, manufacturer, device type and
 role that the default `hostgroup_format` of `site/manufacturer/role` requires.
-Per-test devices come from the `device_factory` fixture.
+The site also carries latitude/longitude, which `extended_site_properties` is
+the only way to reach. Per-test devices come from the `device_factory` fixture.
 
 The seeded template is `Linux by SNMP`, and that pairing is deliberate: a device
 with no `zabbix` config context gets an **SNMP** interface (`host.py:496` calls
@@ -154,4 +155,55 @@ endpoint.
 
 Custom fields are global in NetBox, so a leftover one would quietly change what
 these tests prove; `custom_field_factory` gives each test unique names and
-deletes them afterwards.
+deletes them afterwards. `tag_factory` exists for the same reason.
+
+## Testing the generated host attributes
+
+`test_host_attributes.py` (tags, usermacros, inventory), `test_config_context.py`
+(interface/template config, Jinja2 rendering) and `test_extended_models.py` (the
+`extended_*` settings) cover the mapping features. The mocked suite already
+covers how those structures are *built*; these cover the two ends a mock cannot:
+
+- **Zabbix accepts them.** An inventory key that is not one of Zabbix's ~70
+  inventory fields is an API error, not a stored value. A mocked test asserting
+  on the dict handed to a mock passes with a typo'd field name in the map.
+- **NetBox serves what the map asks for.** A map names fields by path
+  (`site/latitude`); whether that path exists on the object NetBox actually
+  returns is not something a `DummyNB` can answer.
+
+Devices get their config context from `local_context_data`, the device-local
+layer NetBox merges into the rendered `config_context`. It needs no
+ConfigContext object or assignment rules, and it cannot leak into another
+test's device the way a site- or role-scoped context would.
+
+The rule from the filter tests has a counterpart here: **a feature switch that
+is only tested in its on state is not tested.** Asserting tags appear with
+`tag_sync=True` proves nothing unless something also proves they stay away when
+it is off — so each switch is paired with its off state.
+
+## The xfail markers
+
+Four tests are marked `xfail(strict=True)`. They are not flaky, and they are not
+aspirational: each is a bug these tests found, asserting the behaviour that
+should hold, with the reason on the marker. Strict means they fail the moment
+the behaviour is fixed, which is the signal to drop the marker.
+
+- `field_mapper` raises `KeyError` on a mapped field NetBox did not nest, rather
+  than mapping it to `""` like an empty value. It escapes `Sync.start()`, which
+  catches `SyncError` only, so one such field ends the whole run
+  (`test_unextended_mapped_field_aborts_the_run`, and at unit level
+  `tests/test_tools.py::TestFieldMapper::test_absent_field_maps_to_empty_string`).
+- `render_config_context=True` skips every host whose config context has no
+  usable `zabbix` key — which is most of an inventory — because
+  `jinjafy_config_context` returns `{}` for those and `core.py:211` reads a
+  falsy render as a failure (`test_rendering_skips_hosts_with_no_zabbix_context`,
+  three parametrised cases).
+
+One non-obvious finding is pinned as a passing test rather than an xfail:
+`extended_site_properties` is a no-op for devices. `Hostgroup` reads
+`self.nb.site.region` for every device with a site, and a nested pynetbox
+`Record` lazily fetches its full details on *attribute* access, so the site is
+fully populated either way — same data, same request count with the flag on and
+off (`test_site_costs_one_fetch_per_host_either_way`). That also explains why
+`field_mapper` misses fields that are "there": it walks with `Record[key]`,
+which is `dict(self)[key]` and does not lazy-load.
