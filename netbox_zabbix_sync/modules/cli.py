@@ -153,6 +153,7 @@ def main(arguments):
         zbx_user=zabbix_user,
         zbx_pass=zabbix_pass,
         zbx_token=zabbix_token,
+        skip_version_check=config["skip_version_check"],
     )
     if config["render_config_context"]:
         logger.warning(

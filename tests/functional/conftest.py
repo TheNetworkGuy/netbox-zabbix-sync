@@ -30,6 +30,7 @@ BASE_CONFIG = {
     "create_hostgroups": True,
     "hostgroup_format": "site/manufacturer/role",
     "create_journal": False,
+    "skip_version_check": True,  # Running tests against version matrix, allow for experimental versions
 }
 
 
@@ -285,6 +286,7 @@ def sync_runner(
             zbx_host=zabbix_url,
             zbx_user=user,
             zbx_pass=password,
+            skip_version_check=BASE_CONFIG["skip_version_check"],
         ), "Sync.connect() failed; it returns False rather than raising"
         # Everything up to here -- fixture setup, seeding, connect()'s auth
         # probe -- is noise to `netbox_requests`, whose contract is the traffic
