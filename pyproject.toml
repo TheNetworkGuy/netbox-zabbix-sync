@@ -31,6 +31,21 @@ include = ["netbox_zabbix_sync*"]
 [tool.setuptools_scm]
 version_file = "netbox_zabbix_sync/_version.py"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Functional tests need live containers, so they are deselected by default.
+# `-m` is a store option, so the CI job overrides this with `-m functional`.
+addopts = "-m 'not functional' --strict-markers"
+markers = [
+    "functional: requires live NetBox + Zabbix containers (slow)",
+]
+
+[tool.coverage.run]
+# Deselected tests are still imported at collection, so without this the
+# functional files would be measured with their bodies unexecuted and drag the
+# reported total around as tests are added.
+omit = ["tests/functional/*"]
+
 [tool.ruff.lint]
 ignore = [
     # Ignore line-length
@@ -90,6 +105,15 @@ select = [
     "S101",
     # Ignore hardcoded passwords / tokens
     "S106",
+]
+"tests/functional/*" = [
+    # Ignore use of assert
+    "S101",
+    # Ignore hardcoded passwords / tokens
+    "S105",
+    "S106",
+    # Ignore print in the readiness / bootstrap scripts
+    "T201",
 ]
 
 
