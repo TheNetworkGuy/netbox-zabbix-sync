@@ -1,0 +1,112 @@
+"""Seed a live NetBox with the objects the sync needs to do anything.
+
+Idempotent: every helper is get-or-create, so running against an
+already-seeded NetBox is a no-op and a partially-seeded one is repaired.
+
+Only the shared, session-scoped objects live here. Devices are per-test and
+come from the ``device_factory`` fixture, so each test can be isolated to its
+own device via ``Sync.start(device_filter=...)``.
+"""
+
+# The default hostgroup_format is "site/manufacturer/role", so a device needs
+# all three of these set or the sync skips it without syncing anything.
+SITE_NAME = "AMS-01"
+SITE_SLUG = "ams-01"
+MANUFACTURER_NAME = "Acme"
+MANUFACTURER_SLUG = "acme"
+DEVICE_TYPE_MODEL = "Widget-1U"
+DEVICE_TYPE_SLUG = "widget-1u"
+ROLE_NAME = "Server"
+ROLE_SLUG = "server"
+
+# Ships with the Zabbix server image's default dataset. Must be an SNMP
+# template: a device with no `zabbix` config context gets an SNMP interface
+# (host.py:496), and Zabbix refuses to link an agent template to a host that
+# has no agent interface.
+ZABBIX_TEMPLATE = "Linux by SNMP"
+
+# The hostgroup the sync should build for a seeded device, given the defaults
+# above and hostgroup_format "site/manufacturer/role".
+EXPECTED_HOSTGROUP = f"{SITE_NAME}/{MANUFACTURER_NAME}/{ROLE_NAME}"
+
+
+def _get_or_create(endpoint, search: dict, create: dict):
+    """Return the existing object matching `search`, else create it."""
+    existing = endpoint.get(**search)
+    if existing:
+        return existing
+    return endpoint.create(**create)
+
+
+def seed_custom_fields(nb) -> None:
+    """Create the two custom fields the sync depends on.
+
+    Note NetBox >= 4.1 names this field `object_types` on write; `content_types`
+    is gone from the POST schema.
+    """
+    _get_or_create(
+        nb.extras.custom_fields,
+        {"name": "zabbix_hostid"},
+        {
+            "name": "zabbix_hostid",
+            "label": "Zabbix host ID",
+            "type": "integer",
+            # The README claims VMs need a `zabbix_id` field. They do not: the
+            # code uses config["device_cf"] for devices and VMs alike.
+            "object_types": ["dcim.device", "virtualization.virtualmachine"],
+        },
+    )
+    _get_or_create(
+        nb.extras.custom_fields,
+        {"name": "zabbix_template"},
+        {
+            "name": "zabbix_template",
+            "label": "Zabbix template",
+            "type": "text",
+            "object_types": ["dcim.devicetype"],
+        },
+    )
+
+
+def seed(nb) -> dict:
+    """Seed NetBox and return the shared objects tests build devices from."""
+    seed_custom_fields(nb)
+
+    site = _get_or_create(
+        nb.dcim.sites,
+        {"slug": SITE_SLUG},
+        {"name": SITE_NAME, "slug": SITE_SLUG, "status": "active"},
+    )
+    manufacturer = _get_or_create(
+        nb.dcim.manufacturers,
+        {"slug": MANUFACTURER_SLUG},
+        {"name": MANUFACTURER_NAME, "slug": MANUFACTURER_SLUG},
+    )
+    device_type = _get_or_create(
+        nb.dcim.device_types,
+        {"slug": DEVICE_TYPE_SLUG},
+        {
+            "model": DEVICE_TYPE_MODEL,
+            "slug": DEVICE_TYPE_SLUG,
+            "manufacturer": manufacturer.id,
+            "custom_fields": {"zabbix_template": ZABBIX_TEMPLATE},
+        },
+    )
+    # The custom field may not have existed when an earlier run created the
+    # device type, so set it unconditionally rather than only on create.
+    if device_type.custom_fields.get("zabbix_template") != ZABBIX_TEMPLATE:
+        device_type.custom_fields["zabbix_template"] = ZABBIX_TEMPLATE
+        device_type.save()
+
+    role = _get_or_create(
+        nb.dcim.device_roles,
+        {"slug": ROLE_SLUG},
+        {"name": ROLE_NAME, "slug": ROLE_SLUG, "color": "00bcd4"},
+    )
+
+    return {
+        "site": site,
+        "manufacturer": manufacturer,
+        "device_type": device_type,
+        "role": role,
+    }
