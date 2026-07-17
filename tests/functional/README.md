@@ -111,3 +111,47 @@ The seeded template is `Linux by SNMP`, and that pairing is deliberate: a device
 with no `zabbix` config context gets an **SNMP** interface (`host.py:496` calls
 `set_default_snmp()`; only VMs default to agent), and Zabbix refuses to link an
 agent template to a host with no agent interface.
+
+## Testing the NetBox filters
+
+`test_netbox_filters.py` covers the filters the sync sends and exists because of
+a bug that mocks are structurally unable to catch: the sync asked for device
+custom fields with `content_types="dcim.device"`, and **NetBox silently ignored
+the parameter** and returned every custom field — behaving exactly as it does
+for a made-up `bogus_filter=xyz`. The param that filters is `object_type`
+(singular); `object_types` is ignored too. Note the asymmetry with writes, where
+the field really is `object_types` — `seed_netbox.py` uses that to *create* a
+custom field, while the sync uses `object_type` to *filter* one.
+
+The rule that follows, and the reason these tests are shaped the way they are:
+
+> **A filter in the query string is not evidence that it filtered.** A mocked
+> `custom_fields.filter()` asserts the kwarg you passed, which is precisely the
+> thing that was wrong. Only a real NetBox can say whether it did anything.
+
+So every filter test seeds a **decoy** the filter must exclude — a VM-only
+custom field, a second device — and asserts on what came back. Two fixtures
+support this:
+
+- **`sync_runner`** — `run_sync` with full control over `device_filter`,
+  `vm_filter` and config overrides. Its logout is in a `finally`, so it also
+  suits syncs expected to raise (`verify_hg_format` raises `HostgroupError`
+  straight out of `start()`).
+- **`netbox_requests`** — every NetBox request of the most recent
+  `Sync.start()`, with its response, recorded at `requests.Session.send`.
+  That hook point is not a preference: `Sync` builds its own
+  `nbapi(..., threading=True)` internally and never exposes the session.
+  `sync_runner` clears the recording just before `start()`, so fixture setup,
+  seeding and `connect()`'s auth probe stay out of the assertions and results
+  do not depend on which test happened to trigger the session-scoped seed.
+
+Use the recorded **response** (`.results`) to prove a filter worked, and the
+recorded **request** (`.params`) only to pin down *how* — server-side rather
+than in Python, once per run rather than once per host. Asserting a request
+count is how the N+1 tests work: custom field definitions are fetched once no
+matter how many devices sync, and `sync_vms=False` must touch neither VM
+endpoint.
+
+Custom fields are global in NetBox, so a leftover one would quietly change what
+these tests prove; `custom_field_factory` gives each test unique names and
+deletes them afterwards.

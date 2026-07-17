@@ -9,10 +9,12 @@ import contextlib
 import os
 from ipaddress import ip_interface
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 import pynetbox
 import pytest
+import requests
 from zabbix_utils import ZabbixAPI
 
 from netbox_zabbix_sync import Sync
@@ -263,11 +265,19 @@ def device_factory(nb, zapi, seeded):
 
 
 @pytest.fixture
-def run_sync(netbox_url, netbox_token, zabbix_url, zabbix_credentials):
-    """Run the real Sync, scoped to one device."""
+def sync_runner(
+    netbox_url, netbox_token, zabbix_url, zabbix_credentials, _netbox_recording
+):
+    """Run the real Sync with full control over both filters and the config.
+
+    `run_sync` is the common case built on this one. Use this fixture directly
+    when the filters themselves are what's under test, or when `start()` is
+    expected to raise -- the logout here is in a `finally`, so a raising sync
+    still hands its Zabbix session back.
+    """
     user, password = zabbix_credentials
 
-    def _run(device_name: str, **overrides):
+    def _run(device_filter=None, vm_filter=None, **overrides):
         syncer = Sync(config={**BASE_CONFIG, **overrides})
         assert syncer.connect(
             nb_host=netbox_url,
@@ -276,12 +286,122 @@ def run_sync(netbox_url, netbox_token, zabbix_url, zabbix_credentials):
             zbx_user=user,
             zbx_pass=password,
         ), "Sync.connect() failed; it returns False rather than raising"
-        # Sync.start() catches SyncError per host and still returns truthy, so
-        # its return value proves nothing. Assert on end state instead.
-        syncer.start(device_filter={"name": device_name})
-        syncer.logout()
+        # Everything up to here -- fixture setup, seeding, connect()'s auth
+        # probe -- is noise to `netbox_requests`, whose contract is the traffic
+        # of the sync itself.
+        _netbox_recording.clear()
+        try:
+            # Sync.start() catches SyncError per host and still returns truthy,
+            # so its return value proves nothing. Assert on end state instead.
+            syncer.start(device_filter=device_filter, vm_filter=vm_filter)
+        finally:
+            syncer.logout()
 
     return _run
+
+
+@pytest.fixture
+def run_sync(sync_runner):
+    """Run the real Sync, scoped to one device."""
+
+    def _run(device_name: str, **overrides):
+        sync_runner(device_filter={"name": device_name}, **overrides)
+
+    return _run
+
+
+class Exchange:
+    """One NetBox request the sync made, and what came back."""
+
+    def __init__(self, method: str, url: str, response):
+        self.method = method
+        self.url = url
+        self._response = response
+
+    @property
+    def params(self) -> dict[str, list[str]]:
+        """The query string, as pynetbox sent it."""
+        return parse_qs(urlparse(self.url).query)
+
+    @property
+    def results(self) -> list[dict]:
+        """The `results` of a NetBox list response, else an empty list."""
+        try:
+            body = self._response.json()
+        except ValueError:
+            return []
+        return body.get("results", []) if isinstance(body, dict) else []
+
+
+@pytest.fixture
+def _netbox_recording(monkeypatch):
+    """Record NetBox traffic at `requests.Session.send`.
+
+    That is the one chokepoint every pynetbox call passes through, including
+    the threaded ones -- Sync builds its own `nbapi(..., threading=True)`
+    internally and never exposes the session, so there is nothing narrower to
+    hook. Zabbix traffic goes through zabbix_utils rather than requests, so
+    none of it lands here.
+
+    Recording the *request* alone would be a trap: NetBox silently ignores
+    filter params it does not know, so a param in a query string is no evidence
+    it did anything. The response is kept so a test can assert on what the
+    filter actually excluded. Reading `.json()` off it is safe -- these
+    responses are not streamed, so the body is already in memory and stays
+    readable by pynetbox afterwards.
+    """
+    recorded = []
+    original = requests.Session.send
+
+    def spy(self, request, **kwargs):
+        response = original(self, request, **kwargs)
+        recorded.append(Exchange(request.method, request.url, response))
+        return response
+
+    monkeypatch.setattr(requests.Session, "send", spy)
+    return recorded
+
+
+@pytest.fixture
+def netbox_requests(_netbox_recording):
+    """The NetBox requests made by the most recent `Sync.start()`.
+
+    Only that: `sync_runner` empties the recording just before it calls
+    `start()`, so fixture setup, the seeding, and `connect()`'s own auth probe
+    (a `.count()` on the device endpoint) are all discarded rather than left
+    for each test to filter back out. Without that the assertions here would
+    depend on which test first triggered the session-scoped seed.
+    """
+    return _netbox_recording
+
+
+@pytest.fixture
+def custom_field_factory(nb):
+    """Create uniquely-named custom fields and remove them afterwards.
+
+    Names are unique per test because a custom field is global: a leftover one
+    from a previous run would be picked up by `verify_hg_format` and quietly
+    change what these tests prove.
+    """
+    created = []
+
+    def make(object_types: list[str], cf_type: str = "text") -> str:
+        name = f"cf_{uuid4().hex[:8]}"
+        created.append(
+            nb.extras.custom_fields.create(
+                name=name,
+                label=name,
+                type=cf_type,
+                object_types=object_types,
+            )
+        )
+        return name
+
+    yield make
+
+    for cf in reversed(created):
+        with contextlib.suppress(pynetbox.RequestError):
+            cf.delete()
 
 
 @pytest.fixture
@@ -303,3 +423,12 @@ def zabbix_host(zapi):
 
 def strip_ip_mask(address: str) -> str:
     return str(ip_interface(address).ip)
+
+
+def requests_to(exchanges: list[Exchange], path: str) -> list[Exchange]:
+    """The recorded exchanges whose URL path is exactly `path`.
+
+    Matched on the parsed path rather than a substring so that
+    `/api/dcim/devices/` does not also collect `/api/dcim/device-types/`.
+    """
+    return [ex for ex in exchanges if urlparse(ex.url).path == path]
