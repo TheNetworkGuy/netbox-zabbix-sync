@@ -90,6 +90,7 @@ DEFAULT_CONFIG = {
     "description_dt_format": "%Y-%m-%d %H:%M:%S",
     "description": "static",
     "render_config_context": False,
+    "skip_version_check": False,
 }
 
 

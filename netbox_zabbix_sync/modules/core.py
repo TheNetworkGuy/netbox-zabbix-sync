@@ -106,18 +106,25 @@ class Sync:
         return True
 
     def connect(
-        self, nb_host, nb_token, zbx_host, zbx_user=None, zbx_pass=None, zbx_token=None
+        self,
+        nb_host,
+        nb_token,
+        zbx_host,
+        zbx_user=None,
+        zbx_pass=None,
+        zbx_token=None,
+        skip_version_check=False,
     ):
         """
-        Docstring for connect
+        Connect to NetBox and Zabbix APIs using provided credentials and settings.
 
-        :param self: Description
-        :param nb_host: Description
-        :param nb_token: Description
-        :param zbx_host: Description
-        :param zbx_user: Description
-        :param zbx_pass: Description
-        :param zbx_token: Description
+        :param nb_host: NetBox host URL
+        :param nb_token: NetBox API token
+        :param zbx_host: Zabbix host URL
+        :param zbx_user: Zabbix username
+        :param zbx_pass: Zabbix password
+        :param zbx_token: Zabbix API token
+        :param skip_version_check: Whether to skip version checking
         """
         # Initialize Netbox API connection
         netbox = nbapi(nb_host, token=nb_token, threading=True)
@@ -160,11 +167,20 @@ class Sync:
             if not zbx_token:
                 logger.debug("Using user/password authentication for Zabbix API.")
                 self.zabbix = ZabbixAPI(
-                    zbx_host, user=zbx_user, password=zbx_pass, ssl_context=ssl_ctx
+                    zbx_host,
+                    user=zbx_user,
+                    password=zbx_pass,
+                    ssl_context=ssl_ctx,
+                    skip_version_check=skip_version_check,
                 )
             else:
                 logger.debug("Using token authentication for Zabbix API.")
-                self.zabbix = ZabbixAPI(zbx_host, token=zbx_token, ssl_context=ssl_ctx)
+                self.zabbix = ZabbixAPI(
+                    zbx_host,
+                    token=zbx_token,
+                    ssl_context=ssl_ctx,
+                    skip_version_check=skip_version_check,
+                )
             self.zabbix.check_auth()
             logger.debug("Zabbix version is %s.", self.zabbix.version)
         except (APIRequestError, ProcessingError) as zbx_error:
