@@ -212,7 +212,7 @@ def nb(netbox_url, netbox_token):
 @pytest.fixture(scope="session")
 def zapi(zabbix_url, zabbix_credentials):
     user, password = zabbix_credentials
-    api = ZabbixAPI(zabbix_url, user=user, password=password)
+    api = ZabbixAPI(zabbix_url, user=user, password=password, skip_version_check=True)
     yield api
     api.logout()
 
