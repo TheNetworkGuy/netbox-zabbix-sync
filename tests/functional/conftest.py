@@ -32,6 +32,11 @@ BASE_CONFIG = {
     "create_journal": False,
 }
 
+# Distinguishes "the caller said None" from "the caller said nothing", where
+# None is a meaningful value rather than an absence -- vm_factory's config
+# context being the case that needs it.
+UNSET = object()
+
 
 FUNCTIONAL_DIR = Path(__file__).parent
 
@@ -243,6 +248,7 @@ def device_factory(nb, zapi, seeded):
         tags: list[int] | None = None,
         dns_name: str = "",
         oob_address: str | None = None,
+        site: int | None = None,
         **fields,
     ):
         name = f"fn-{uuid4().hex[:8]}"
@@ -250,7 +256,11 @@ def device_factory(nb, zapi, seeded):
             name=name,
             device_type=seeded["device_type"].id,
             role=seeded["role"].id,
-            site=seeded["site"].id,
+            # Named rather than left to **fields: the seeded site is the default
+            # and would collide with a site= passed through as a plain field.
+            # Overridden by the hostgroup tests, which need a site carrying a
+            # region or a site group.
+            site=site or seeded["site"].id,
             status=status,
             local_context_data=config_context,
             tags=tags or [],
@@ -297,6 +307,82 @@ def device_factory(nb, zapi, seeded):
         # while the device still names that IP as its primary or OOB.
         for obj in (*dependents[1:], device):
             # Already gone, or removed by a cascading delete.
+            with contextlib.suppress(pynetbox.RequestError):
+                obj.delete()
+
+
+def vm_context(**zabbix_keys) -> dict:
+    """A VM config context carrying the agent template, plus whatever is added.
+
+    Every VM that is expected to sync needs one. A VM takes its templates from
+    the config context alone -- `set_vm_template` deliberately skips the custom
+    field lookup devices use (virtual_machine.py:35) -- and core.py:371 drops a
+    VM with no templates before it ever reaches Zabbix. So a VM test that sets a
+    config context for some other purpose has to carry the template along, or it
+    silently stops testing what it meant to.
+    """
+    return {"zabbix": {"templates": [seed_netbox.ZABBIX_VM_TEMPLATE], **zabbix_keys}}
+
+
+@pytest.fixture
+def vm_factory(nb, zapi, seeded):
+    """Create uniquely-named NetBox VMs and clean up after the test.
+
+    The device_factory's counterpart. Two differences are worth knowing:
+    `config_context` defaults to `vm_context()` rather than nothing, because a
+    VM without one never reaches Zabbix at all (see `vm_context`); and the VM
+    gets `site` as well as `cluster`, since the default vm_tag_map maps
+    `site/name` and a site is optional for VMs.
+    """
+    created = []
+
+    def make(
+        status: str = "active",
+        address: str = "10.1.0.1/24",
+        config_context=UNSET,
+        tags: list[int] | None = None,
+        dns_name: str = "",
+        **fields,
+    ):
+        name = f"fn-vm-{uuid4().hex[:8]}"
+        vm = nb.virtualization.virtual_machines.create(
+            name=name,
+            cluster=seeded["cluster"].id,
+            role=seeded["role"].id,
+            site=seeded["site"].id,
+            status=status,
+            local_context_data=vm_context()
+            if config_context is UNSET
+            else config_context,
+            tags=tags or [],
+            **fields,
+        )
+        dependents = [vm]
+        interface = nb.virtualization.interfaces.create(
+            virtual_machine=vm.id, name="eth0"
+        )
+        ip = nb.ipam.ip_addresses.create(
+            address=address,
+            dns_name=dns_name,
+            assigned_object_type="virtualization.vminterface",
+            assigned_object_id=interface.id,
+        )
+        dependents += [ip, interface]
+        vm.primary_ip4 = ip.id
+        vm.save()
+        vm = nb.virtualization.virtual_machines.get(vm.id)
+        created.append((vm, dependents))
+        return vm
+
+    yield make
+
+    for vm, dependents in reversed(created):
+        for host in zapi.host.get(filter={"host": vm.name}, output=["hostid"]):
+            zapi.host.delete(host["hostid"])
+        # The VM goes last, for the same reason the device does: NetBox refuses
+        # to delete the interface an IP hangs off while the VM still names that
+        # IP as its primary.
+        for obj in (*dependents[1:], vm):
             with contextlib.suppress(pynetbox.RequestError):
                 obj.delete()
 
@@ -402,6 +488,31 @@ def run_sync(sync_runner):
 
     def _run(device_name: str, **overrides):
         sync_runner(device_filter={"name": device_name}, **overrides)
+
+    return _run
+
+
+# A device name no device has, used to scope a VM sync down to its VM. The
+# devices half of start() runs regardless of sync_vms, so without this a VM test
+# also syncs whatever devices another test left in NetBox.
+NO_DEVICES = {"name": "fn-no-such-device"}
+
+
+@pytest.fixture
+def run_vm_sync(sync_runner):
+    """Run the real Sync, scoped to one VM, with sync_vms on.
+
+    `sync_vms` defaults to False, so a VM test that forgets it passes an empty
+    NetBox for the VM half and asserts nothing. It is set here rather than left
+    to each test, and can still be overridden to test the off state.
+    """
+
+    def _run(vm_name: str, **overrides):
+        sync_runner(
+            device_filter=NO_DEVICES,
+            vm_filter={"name": vm_name},
+            **{"sync_vms": True, **overrides},
+        )
 
     return _run
 

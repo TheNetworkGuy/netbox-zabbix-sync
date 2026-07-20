@@ -443,3 +443,158 @@ def test_empty_netbox_field_becomes_empty_inventory_value(
     host = zabbix_host(device.name)
     assert host is not None, "a device with an empty serial failed to sync"
     assert host["inventory"]["serialno_a"] == ""
+
+
+# --- what a bad map does ----------------------------------------------------
+
+
+def test_unknown_inventory_field_costs_only_its_own_host(
+    device_factory, vm_factory, sync_runner, zabbix_host
+):
+    """A map naming a field Zabbix does not have fails that host, not the run.
+
+    This is the same user error as the one in
+    test_extended_models.py::test_unextended_mapped_field_aborts_the_run -- a
+    typo in a map -- but on the Zabbix side of it, and the blast radius is
+    completely different. Zabbix rejects `host.create`, the sync catches it, logs
+    it and moves on; a NetBox path that does not resolve raises KeyError out of
+    `Sync.start()` and takes every remaining host with it.
+
+    The VM proves the run really continued rather than merely not raising: VMs
+    are synced before devices (core.py:348), so a broken VM that ended the run
+    would leave the device unsynced. Only the VM's map is broken, since a map is
+    config and applies to every host of its type -- which is the point.
+    """
+    vm = vm_factory()
+    device = device_factory(address="10.0.0.76/24")
+
+    sync_runner(
+        device_filter={"name": device.name},
+        vm_filter={"name": vm.name},
+        sync_vms=True,
+        inventory_sync=True,
+        inventory_mode="manual",
+        vm_inventory_map={"name": "not_a_zabbix_inventory_field"},
+        device_inventory_map={"name": "name"},
+    )
+
+    assert zabbix_host(vm.name) is None, "Zabbix accepted an invented inventory field"
+    device_host = zabbix_host(device.name)
+    assert device_host is not None, (
+        "the device never synced: one host's rejected inventory ended the run"
+    )
+    assert device_host["inventory"]["name"] == device.name
+
+
+def test_oversized_macro_value_is_dropped_not_sent(
+    device_factory, run_sync, zabbix_host
+):
+    """A value past Zabbix's 2048-byte macro limit is dropped before the call.
+
+    NetBox puts no such limit on the fields a map can name -- `comments` is a
+    free-text field -- so this is reachable with nothing but a verbose comment
+    and the shipped `comments` mapping. Zabbix would reject the whole host, so
+    the check in usermacros.py:104 has to drop the macro rather than log and
+    send: the assertion is that the host exists and kept its other macro.
+    """
+    device = device_factory(
+        address="10.0.0.77/24", comments="x" * 3000, serial="SN-SURVIVES"
+    )
+
+    run_sync(
+        device.name,
+        usermacro_sync=True,
+        device_usermacro_map={"comments": "{$TOO_BIG}", "serial": "{$OK}"},
+    )
+
+    host = zabbix_host(device.name)
+    assert host is not None, "an oversized macro value took the whole host down"
+    assert macro_values(host) == {"{$OK}": "SN-SURVIVES"}
+
+
+def test_macro_description_reaches_zabbix(device_factory, run_sync, zabbix_host):
+    """The dict form's `description` is stored, not just accepted.
+
+    Covered here rather than in test_usermacros_from_config_context because it
+    needs the description read back off the Zabbix host: the mocked suite can
+    only show it was put in the payload.
+    """
+    device = device_factory(
+        address="10.0.0.78/24",
+        config_context={
+            "zabbix": {
+                "usermacros": {
+                    "{$DOCUMENTED}": {"value": "1", "description": "why this exists"}
+                }
+            }
+        },
+    )
+
+    run_sync(device.name, usermacro_sync=True, device_usermacro_map={})
+
+    host = zabbix_host(device.name)
+    descriptions = {m["macro"]: m["description"] for m in host["macros"]}
+    assert descriptions["{$DOCUMENTED}"] == "why this exists"
+
+
+def test_macro_dict_without_a_value_is_skipped(device_factory, run_sync, zabbix_host):
+    """A dict form missing `value` is dropped rather than sent empty.
+
+    The distinction that makes this worth a test: a macro whose value is empty
+    would be created in Zabbix as a blank, silently overwriting whatever a
+    template set. usermacros.py:63 declines to guess.
+    """
+    device = device_factory(
+        address="10.0.0.79/24",
+        config_context={
+            "zabbix": {
+                "usermacros": {
+                    "{$NO_VALUE}": {"type": "text", "description": "no value here"},
+                    "{$FINE}": "yes",
+                }
+            }
+        },
+    )
+
+    run_sync(device.name, usermacro_sync=True, device_usermacro_map={})
+
+    host = zabbix_host(device.name)
+    assert host is not None
+    assert macro_values(host) == {"{$FINE}": "yes"}
+
+
+def test_oversized_tag_value_is_dropped_not_sent(device_factory, run_sync, zabbix_host):
+    """Zabbix caps a tag value at 256 characters; the map has no such cap.
+
+    Same shape as the macro limit, and reachable the same way -- through
+    `comments`. The dropped tag must not cost the host its valid ones.
+    """
+    device = device_factory(address="10.0.0.80/24", comments="y" * 300)
+
+    run_sync(
+        device.name,
+        tag_sync=True,
+        tag_name=None,
+        device_tag_map={"comments": "toolong", "site/name": "site"},
+    )
+
+    host = zabbix_host(device.name)
+    assert host is not None, "an oversized tag value took the whole host down"
+    assert tag_pairs(host) == {("site", SITE_NAME.lower())}
+
+
+def test_unknown_tag_value_setting_falls_back_to_name(
+    device_factory, tag_factory, run_sync, zabbix_host
+):
+    """`tag_value` only accepts display/name/slug; anything else means name.
+
+    A quiet fallback (tags.py:129), so a typo'd `tag_value` produces a host that
+    looks synced and carries the wrong values. Pinned so the fallback is a
+    decision rather than an accident.
+    """
+    tag = tag_factory(name="Production")
+    device = device_factory(address="10.0.0.81/24", tags=[tag.id])
+
+    run_sync(device.name, tag_sync=True, tag_value="nonsense", device_tag_map={})
+
+    assert tag_pairs(zabbix_host(device.name)) == {("netbox", "production")}

@@ -4,6 +4,7 @@ import pytest
 
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError
 from netbox_zabbix_sync.modules.tools import (
+    build_path,
     field_mapper,
     jinjafy_config_context,
     sanatize_log_output,
@@ -238,3 +239,68 @@ class TestJinjafyConfigContext:
         """
         nb = DummyNB(config_context=config_context)
         assert jinjafy_config_context(nb) == {}
+
+
+def region(name: str, depth: int, parent: str | None):
+    """One entry of the flat recordset build_path walks.
+
+    Mirrors what convert_recordset produces from a pynetbox region: a dict with
+    the record's own `name`, its `_depth` in the tree, and `parent` -- which is
+    a Record whose str() is the parent's name, so a plain string stands in.
+    """
+    return {"name": name, "_depth": depth, "parent": parent}
+
+
+class TestBuildPath:
+    """build_path reconstructs a region/site-group ancestry for a hostgroup."""
+
+    def test_top_level_object_is_its_own_path(self):
+        records = [region("EU", 0, None)]
+        assert build_path("EU", records) == ["EU"]
+
+    def test_walks_up_through_every_parent(self):
+        records = [
+            region("EU", 0, None),
+            region("NL", 1, "EU"),
+            region("AMS", 2, "NL"),
+        ]
+        assert build_path("AMS", records) == ["EU", "NL", "AMS"]
+
+    def test_returns_only_the_ancestry_of_the_requested_leaf(self):
+        """A sibling branch in the same recordset must not bleed into the path."""
+        records = [
+            region("EU", 0, None),
+            region("NL", 1, "EU"),
+            region("US", 0, None),
+        ]
+        assert build_path("NL", records) == ["EU", "NL"]
+
+    def test_unknown_endpoint_returns_empty(self):
+        assert build_path("nope", [region("EU", 0, None)]) == []
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "build_path finds ancestors by name (tools.py:37). NetBox only "
+            "enforces unique region names at the top level, so a name reused "
+            "under two parents yields two matches; build_path cannot choose and "
+            "returns [] (tools.py:32,35), dropping the whole path. The device "
+            "then lands in the wrong hostgroup with no error -- see the "
+            "functional test test_ambiguous_region_name_still_traverses. Remove "
+            "this marker once build_path disambiguates by parent or id."
+        ),
+    )
+    def test_reused_ancestor_name_still_resolves(self):
+        """`North` under both EU and US should still resolve EU's leaf's path.
+
+        The leaf is unambiguous -- it has one parent -- but its parent's name is
+        not unique across the tree, which is all build_path keys on.
+        """
+        records = [
+            region("EU", 0, None),
+            region("US", 0, None),
+            region("North", 1, "EU"),
+            region("North", 1, "US"),
+            region("Leaf", 2, "North"),
+        ]
+        assert build_path("Leaf", records) == ["EU", "North", "Leaf"]
