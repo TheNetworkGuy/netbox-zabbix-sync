@@ -39,24 +39,28 @@ def proxy_factory(zapi):
     proxies = []
     groups = []
 
-    def proxy(name: str | None = None) -> str:
-        name = name or f"fn-proxy-{uuid4().hex[:8]}"
-        # operating_mode 0 is an active proxy, which needs no address or port:
-        # nothing ever connects to it, and the sync only reads its name.
-        proxies.append(zapi.proxy.create(name=name, operating_mode=0)["proxyids"][0])
-        return name
+    class ProxyFactory:
+        """Called for a proxy, `.group()` for a proxy group."""
 
-    def group(name: str | None = None) -> str:
-        name = name or f"fn-pgroup-{uuid4().hex[:8]}"
-        groups.append(
-            zapi.proxygroup.create(name=name, failover_delay="10s", min_online="1")[
-                "proxy_groupids"
-            ][0]
-        )
-        return name
+        def __call__(self, name: str | None = None) -> str:
+            name = name or f"fn-proxy-{uuid4().hex[:8]}"
+            # operating_mode 0 is an active proxy, which needs no address or
+            # port: nothing ever connects to it, and the sync only reads its name.
+            proxies.append(
+                zapi.proxy.create(name=name, operating_mode=0)["proxyids"][0]
+            )
+            return name
 
-    proxy.group = group
-    yield proxy
+        def group(self, name: str | None = None) -> str:
+            name = name or f"fn-pgroup-{uuid4().hex[:8]}"
+            groups.append(
+                zapi.proxygroup.create(name=name, failover_delay="10s", min_online="1")[
+                    "proxy_groupids"
+                ][0]
+            )
+            return name
+
+    yield ProxyFactory()
 
     for proxyid in proxies:
         zapi.proxy.delete(proxyid)

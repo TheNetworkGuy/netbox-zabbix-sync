@@ -28,6 +28,18 @@ from tests.functional.conftest import macro_values, tag_pairs
 
 pytestmark = pytest.mark.functional
 
+
+def default_map(name: str) -> dict[str, str]:
+    """A map out of DEFAULT_CONFIG, narrowed to the dict it is.
+
+    DEFAULT_CONFIG holds every setting, so its value type is the union of all of
+    them; the maps have to be narrowed before they can be walked.
+    """
+    value = DEFAULT_CONFIG[name]
+    assert isinstance(value, dict)
+    return value
+
+
 INVENTORY_MANUAL_CONFIG = {"inventory_sync": True, "inventory_mode": "manual"}
 
 # Set on the fully-populated device below, and asserted through the default map.
@@ -101,7 +113,7 @@ def test_default_device_inventory_map_reaches_zabbix(
 
     inventory = zabbix_host(populated_device.name)["inventory"]
     assert {
-        key: inventory[key] for key in DEFAULT_CONFIG["device_inventory_map"].values()
+        key: inventory[key] for key in default_map("device_inventory_map").values()
     } == {
         "asset_tag": populated_device.asset_tag,
         # No virtual chassis on this device: an absent *parent* is the one
@@ -175,6 +187,7 @@ def test_default_nb_url_macro_is_the_api_url_not_the_web_ui(
     run_sync(populated_device.name, usermacro_sync=True)
 
     nb_url = macro_values(zabbix_host(populated_device.name))["{$NB_URL}"]
+    assert nb_url is not None
     assert "/api/dcim/devices/" in nb_url
     assert nb_url == populated_device.url
 
@@ -204,7 +217,7 @@ def test_default_vm_inventory_map_reaches_zabbix(vm_factory, run_vm_sync, zabbix
 
     inventory = zabbix_host(vm.name)["inventory"]
     assert {
-        key: inventory[key] for key in DEFAULT_CONFIG["vm_inventory_map"].values()
+        key: inventory[key] for key in default_map("vm_inventory_map").values()
     } == {
         "deployment_status": "Active",
         "notes": COMMENTS,
