@@ -48,7 +48,7 @@ class TestDeviceDeletion(unittest.TestCase):
             "3.0",
             journal=True,
             logger=self.mock_logger,
-            config={"device_cf": "zabbix_hostid"},
+            config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
         )
 
     def test_cleanup_successful_deletion(self):
@@ -154,7 +154,7 @@ class TestDeviceDeletion(unittest.TestCase):
             "3.0",
             journal=False,  # Disable journaling
             logger=self.mock_logger,
-            config={"device_cf": "zabbix_hostid"},
+            config={"device_cf": "zabbix_hostid", "preferred_ip": "auto"},
         )
 
         # Execute

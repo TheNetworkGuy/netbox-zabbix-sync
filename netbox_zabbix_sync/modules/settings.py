@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = getLogger(__name__)
 
-# PLEASE NOTE: This is a sample config file. Please do NOT make any edits in this file!
+# PLEASE NOTE: This is a defaults config file. Please do NOT make any edits in this file!
 # You should create your own config.py and it will overwrite the default config.
 
 DEFAULT_CONFIG = {
@@ -20,6 +20,7 @@ DEFAULT_CONFIG = {
     "proxy_cf": False,
     "proxy_group_cf": False,
     "clustering": False,
+    "oob_sync": False,
     "create_hostgroups": True,
     "create_journal": False,
     "sync_vms": False,
@@ -36,6 +37,9 @@ DEFAULT_CONFIG = {
     "inventory_sync": False,
     "extended_site_properties": False,
     "extended_virtual_chassis": False,
+    "extended_ips": False,
+    "prefer_dns": False,
+    "preferred_ip": "auto",
     "device_inventory_map": {
         "asset_tag": "asset_tag",
         "virtual_chassis/name": "chassis",
@@ -85,6 +89,7 @@ DEFAULT_CONFIG = {
     },
     "description_dt_format": "%Y-%m-%d %H:%M:%S",
     "description": "static",
+    "render_config_context": False,
 }
 
 
