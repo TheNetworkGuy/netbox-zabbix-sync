@@ -284,3 +284,47 @@ def test_vm_filter_reaches_netbox_when_vm_sync_enabled(sync_runner, netbox_reque
     ]
     assert ["dcim.device"] in object_types
     assert ["virtualization.virtualmachine"] in object_types
+
+
+def test_vm_config_filter_scopes_the_sync(vm_factory, sync_runner, zabbix_host, seeded):
+    """`nb_vm_filter` alone, with no method filter, decides which VMs sync.
+
+    The test above proves the filter reaches the wire; this one proves it
+    *filtered*, which is the distinction this whole file exists for. A decoy VM
+    is seeded that the filter must exclude -- without it, a sync that ignored
+    the filter entirely would look identical.
+    """
+    target = vm_factory()
+    decoy = vm_factory()
+
+    sync_runner(
+        device_filter={"name": NO_DEVICE},
+        sync_vms=True,
+        nb_vm_filter={"name": target.name},
+    )
+
+    assert zabbix_host(target.name) is not None, "the filtered VM did not sync"
+    assert zabbix_host(decoy.name) is None, "nb_vm_filter did not exclude the decoy"
+
+
+def test_method_vm_filter_overrides_the_config_vm_filter(
+    vm_factory, sync_runner, zabbix_host
+):
+    """On an overlapping key the method filter wins, as it does for devices.
+
+    The VM half of `_combine_filters` is a separate call site from the device
+    half, so the precedence has to be checked on both -- the same reason the
+    VM maps get their own tests rather than being assumed to match.
+    """
+    target = vm_factory()
+    other = vm_factory()
+
+    sync_runner(
+        device_filter={"name": NO_DEVICE},
+        vm_filter={"name": target.name},
+        sync_vms=True,
+        nb_vm_filter={"name": other.name},
+    )
+
+    assert zabbix_host(target.name) is not None, "method VM filter did not win"
+    assert zabbix_host(other.name) is None, "config VM filter was not overridden"
