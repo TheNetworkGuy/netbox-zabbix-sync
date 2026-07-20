@@ -110,6 +110,13 @@ The site also carries latitude/longitude, which `extended_site_properties` is
 the only way to reach. Per-test devices come from the `device_factory` fixture
 and per-test VMs from `vm_factory`.
 
+Both factories allocate a unique IP by default, out of `10.128/9`, which is kept
+clear of every hard-coded address in the suite. Pass `address=` only when the
+test asserts on the value; NetBox rejects a duplicate address globally, so a
+shared default would make any two-device test fail for a reason unrelated to what
+it is testing. Both factories also register their object for cleanup *before*
+creating its interface and IP, so a failure part-way through still tears down.
+
 The seeded template is `Linux by SNMP`, and that pairing is deliberate: a device
 with no `zabbix` config context gets an **SNMP** interface (`host.py:496` calls
 `set_default_snmp()`; only VMs default to agent), and Zabbix refuses to link an
@@ -224,12 +231,68 @@ templates come **only** from its config context (there is no custom-field
 fallback), so a VM with no `zabbix` context is dropped before Zabbix sees it —
 which is why `vm_factory` gives every VM one by default.
 
+## Testing the settings one by one
+
+Four files exist to cover the settings in `DEFAULT_CONFIG` that nothing else
+reaches. They share a rule, which is the one worth internalising before adding
+to them:
+
+> **A setting is only tested if changing it changes the assertion.** A test that
+> sets `zabbix_device_disable` to a status the default list already contains
+> passes whether or not the setting was ever read. So each test either drives a
+> value the defaults put somewhere else, or is paired with an off-state test
+> using identical NetBox data.
+
+- **`test_status_and_journal.py`** — `zabbix_device_removal` and
+  `zabbix_device_disable` (both driven with statuses the defaults classify
+  differently), `create_hostgroups`, and `create_journal`, the one setting whose
+  effect lands in NetBox rather than Zabbix. Note the config lists are written in
+  status **labels** (`"Offline"`), not slugs — `Host.status` is `nb.status.label`.
+- **`test_interfaces.py`** — `preferred_ip` and `oob_sync`. Every `preferred_ip`
+  test uses a dual-stack device, because that is the only thing that tells the
+  three values apart; `"auto"` defers to NetBox, which resolves `primary_ip` to
+  v6 when both exist. `oob_sync` has a sharp edge worth knowing: both interfaces
+  fall back to SNMP, `_verify_interfaces` rejects duplicate types, so enabling
+  the flag without an `oob_interface_type` in config context drops every device
+  that has an OOB IP.
+- **`test_proxies.py`** — `proxy_cf`, `proxy_group_cf` and `full_proxy_sync`,
+  against proxies that really exist in Zabbix, since the whole feature is a
+  name lookup. Covers the three-level precedence (device custom field, then the
+  same field on the site, then config context) with each level set to a
+  *different* proxy so the order is observable. `full_proxy_sync` is the only
+  setting in the suite that deletes Zabbix configuration, so both its states are
+  pinned.
+- **`test_templates.py`** — `template_cf`. Every test uses a custom field whose
+  name the default would never find, because the seed data uses the default name
+  and a sync ignoring the setting would otherwise pass.
+
+Two teardown-ordering traps show up here and are worth copying rather than
+rediscovering. Zabbix refuses to delete a hostgroup that still holds a host, or a
+proxy a host still points at — so `zabbix_hostgroups` and `proxy_factory` are
+requested **before** `device_factory` in a test signature. Finalizers run in
+reverse setup order, so first in the signature means last at teardown. And any
+test that writes a custom field onto a session-seeded object (the site, the
+device type) refetches it first: the shared `Record` keeps whatever
+`custom_fields` it last saved, including ones a fixture has since deleted, and
+sending those back is a 400.
+
+Two bugs found here are filed as ISSUES.md 5 and 6 and pinned as xfails (see
+below). A third finding is pinned as a **passing** test instead: **turning
+`oob_sync` off does not remove the interface** from a host that already synced,
+because Zabbix refuses to delete an interface with template items bound to it.
+The sync logs the rejection and carries on, so the setting is effectively
+one-way. That is pinned as-is rather than xfailed deliberately — forcing the
+removal would mean unlinking Zabbix items the sync did not create, so an xfail
+would encode a fix nobody should make (ISSUES.md issue 7).
+
 ## The xfail markers
 
-Five tests are marked `xfail(strict=True)`. They are not flaky, and they are not
+Seven tests are marked `xfail(strict=True)`. They are not flaky, and they are not
 aspirational: each is a bug these tests found, asserting the behaviour that
 should hold, with the reason on the marker. Strict means they fail the moment
-the behaviour is fixed, which is the signal to drop the marker.
+the behaviour is fixed, which is the signal to drop the marker. Each corresponds
+to a numbered entry in `ISSUES.md`, where the trade-offs a fix has to weigh are
+written up.
 
 - `field_mapper` raises `KeyError` on a mapped field NetBox did not nest, rather
   than mapping it to `""` like an empty value. It escapes `Sync.start()`, which
@@ -249,6 +312,16 @@ the behaviour is fixed, which is the signal to drop the marker.
   a hostgroup with the whole region path missing
   (`test_ambiguous_region_name_still_traverses`, and at unit level
   `tests/test_tools.py::TestBuildPath::test_reused_ancestor_name_still_resolves`).
+- The **host description is never reconciled**. `Description.generate()` is
+  called only from `create_in_zabbix`, so `description` and
+  `description_dt_format` silently do nothing on any host Zabbix already has
+  (`test_a_changed_description_reaches_an_existing_host`). The test uses a
+  macro-free description on purpose, so it does not prejudge how a fix should
+  handle `{datetime}` — see ISSUES.md issue 5.
+- A **meaningless `description_dt_format` reaches Zabbix verbatim**. `strftime`
+  passes unknown directives like `%Q` through rather than raising, so the
+  `except ValueError` guard is unreachable and only a non-string format falls
+  back (`test_a_meaningless_dt_format_falls_back_to_the_default`).
 
 One non-obvious finding is pinned as a passing test rather than an xfail:
 `extended_site_properties` is a no-op for devices. `Hostgroup` reads

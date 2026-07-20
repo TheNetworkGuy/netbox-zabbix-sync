@@ -8,6 +8,7 @@ nothing may connect to anything at import time.
 import contextlib
 import os
 from ipaddress import ip_interface
+from itertools import count
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
@@ -36,6 +37,18 @@ BASE_CONFIG = {
 # None is a meaningful value rather than an absence -- vm_factory's config
 # context being the case that needs it.
 UNSET = object()
+
+# NetBox rejects a duplicate address in the global table, so every device and VM
+# needs its own even when the test does not care what it is. 10.128/9 is left
+# free by the tests that do hard-code an address (all of them in 10.0, 10.1,
+# 10.20 or 192.168), so a generated address can never collide with a named one.
+_address_counter = count()
+
+
+def next_address() -> str:
+    """An address no other host in the run is using."""
+    n = next(_address_counter)
+    return f"10.128.{n // 254}.{n % 254 + 1}/24"
 
 
 FUNCTIONAL_DIR = Path(__file__).parent
@@ -243,11 +256,12 @@ def device_factory(nb, zapi, seeded):
 
     def make(
         status: str = "active",
-        address: str = "10.0.0.1/24",
+        address: str | None = None,
         config_context: dict | None = None,
         tags: list[int] | None = None,
         dns_name: str = "",
         oob_address: str | None = None,
+        address6: str | None = None,
         site: int | None = None,
         **fields,
     ):
@@ -269,6 +283,11 @@ def device_factory(nb, zapi, seeded):
         # Deleted in list order, so anything that must go before the device it
         # points at is appended after it.
         dependents = [device]
+        # Registered before the dependents exist so a failure below still tears
+        # the device down. `dependents` is mutated in place from here on, so the
+        # tuple already in `created` keeps seeing the additions.
+        created.append((device, dependents))
+        address = address or next_address()
         interface = nb.dcim.interfaces.create(
             device=device.id, name="eth0", type="1000base-t"
         )
@@ -280,6 +299,18 @@ def device_factory(nb, zapi, seeded):
         )
         dependents += [ip, interface]
         device.primary_ip4 = ip.id
+
+        if address6:
+            # Hung off the same interface as the v4 address, which is how a
+            # dual-stack host is normally modelled and keeps `preferred_ip`
+            # the only thing choosing between the two.
+            ip6 = nb.ipam.ip_addresses.create(
+                address=address6,
+                assigned_object_type="dcim.interface",
+                assigned_object_id=interface.id,
+            )
+            dependents.insert(1, ip6)
+            device.primary_ip6 = ip6.id
 
         if oob_address:
             oob_interface = nb.dcim.interfaces.create(
@@ -294,9 +325,10 @@ def device_factory(nb, zapi, seeded):
             device.oob_ip = oob_ip.id
 
         device.save()
-        device = nb.dcim.devices.get(device.id)
-        created.append((device, dependents))
-        return device
+        # Refetched so the caller sees the primary IP it just assigned. The
+        # copy registered for cleanup above stays as it is -- teardown only
+        # needs the id and the name, and both are already on it.
+        return nb.dcim.devices.get(device.id)
 
     yield make
 
@@ -338,7 +370,7 @@ def vm_factory(nb, zapi, seeded):
 
     def make(
         status: str = "active",
-        address: str = "10.1.0.1/24",
+        address: str | None = None,
         config_context=UNSET,
         tags: list[int] | None = None,
         dns_name: str = "",
@@ -358,11 +390,14 @@ def vm_factory(nb, zapi, seeded):
             **fields,
         )
         dependents = [vm]
+        # Registered before its dependents, so a failure below still cleans up.
+        # See the same note in device_factory.
+        created.append((vm, dependents))
         interface = nb.virtualization.interfaces.create(
             virtual_machine=vm.id, name="eth0"
         )
         ip = nb.ipam.ip_addresses.create(
-            address=address,
+            address=address or next_address(),
             dns_name=dns_name,
             assigned_object_type="virtualization.vminterface",
             assigned_object_id=interface.id,
@@ -370,9 +405,7 @@ def vm_factory(nb, zapi, seeded):
         dependents += [ip, interface]
         vm.primary_ip4 = ip.id
         vm.save()
-        vm = nb.virtualization.virtual_machines.get(vm.id)
-        created.append((vm, dependents))
-        return vm
+        return nb.virtualization.virtual_machines.get(vm.id)
 
     yield make
 
