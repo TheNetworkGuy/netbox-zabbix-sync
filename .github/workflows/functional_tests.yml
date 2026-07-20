@@ -35,6 +35,8 @@ jobs:
         include:
           - netbox: "v4.6.5"
             zabbix: "alpine-7.0-latest"
+          - netbox: "v4.6.5"
+            zabbix: "alpine-trunk"
     env:
       NETBOX_TAG: ${{ matrix.netbox }}
       ZABBIX_TAG: ${{ matrix.zabbix }}

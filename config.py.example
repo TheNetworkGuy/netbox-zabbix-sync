@@ -198,3 +198,8 @@ vm_tag_map = {"site/name": "site",
 # This will allow you to perform advanced NetBox lookups and transform data before passing it to Zabbix.
 # See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features#config-context-rendering
 render_config_context = False
+
+## Skip version Check
+# Disabled zabbix_utils version check, allows for runs against unsupported Zabbix versions (ex: development and release candidates)
+# DOES NOT GUARANTEE CORRECT FUNCTION OF THE SYNC SCRIPT! This feature is only to be used for development and testing!
+skip_version_check = False
