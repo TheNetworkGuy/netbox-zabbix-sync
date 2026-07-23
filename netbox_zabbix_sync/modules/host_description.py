@@ -6,6 +6,10 @@ from datetime import datetime
 from logging import getLogger
 from re import findall as re_findall
 
+# strftime directives documented by Python. strftime passes unknown directives
+# through literally instead of raising, so they are checked up front.
+SUPPORTED_DT_DIRECTIVES = set("aAbBcdfGHIjmMpSuUVwWxXyYzZ%")
+
 
 class Description:
     """
@@ -37,6 +41,13 @@ class Description:
         dt_format = self.configuration.get("description_dt_format", "%Y-%m-%d %H:%M:%S")
         # Set the datetime macro
         try:
+            unknown = [
+                "%" + directive
+                for directive in re_findall(r"%[-_0^#]?(.)", dt_format)
+                if directive not in SUPPORTED_DT_DIRECTIVES
+            ]
+            if unknown:
+                raise ValueError(f"unknown directive(s) {', '.join(unknown)}")
             datetime_value = datetime.now().strftime(dt_format)
         except (ValueError, TypeError) as e:
             self.logger.warning(

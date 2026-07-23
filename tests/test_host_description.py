@@ -152,6 +152,26 @@ class TestDescription(unittest.TestCase):
         result = desc.generate()
         self.assertEqual(result, "")
 
+    # Test 9: Unknown datetime directives fall back to the default format
+    @patch("netbox_zabbix_sync.modules.host_description.datetime")
+    def test_9_meaningless_dt_format_falls_back_to_the_default(self, mock_datetime):
+        """Test 9: A dt_format with unknown directives should not reach Zabbix literally."""
+        mock_now = MagicMock()
+        mock_now.strftime.return_value = "2026-02-25 10:30:00"
+        mock_datetime.now.return_value = mock_now
+
+        config = {
+            "description": "Updated on {datetime}",
+            "description_dt_format": "%Q-not-a-format",
+        }
+        desc = Description(self.mock_nb_object, config, "4.5", logger=self.mock_logger)
+
+        result = desc.generate()
+        self.assertEqual(result, "Updated on 2026-02-25 10:30:00")
+        # strftime should only ever be called with the default format
+        mock_now.strftime.assert_called_once_with("%Y-%m-%d %H:%M:%S")
+        self.mock_logger.warning.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
