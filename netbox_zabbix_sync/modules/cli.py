@@ -52,6 +52,11 @@ _BOOL_ARGS = [
         "render_config_context",
         "Enables *EXPERIMENTAL* support for Jinja2 config context rendering.",
     ),
+    (
+        "log_rotation",
+        "Rotate the log file (5 MB, 3 backups) instead of appending forever.",
+    ),
+    ("log_console", "Log to the console."),
 ]
 
 # String settings that can be set via --option VALUE
@@ -113,7 +118,12 @@ def main(arguments):
     config = _apply_cli_overrides(config, arguments)
 
     # Set logging
-    setup_logger(log_file=config["log_file"])
+    setup_logger(
+        log_file=config["log_file"],
+        log_rotation=config["log_rotation"],
+        log_console=config["log_console"],
+        log_handlers=config["log_handlers"],
+    )
     logger = get_logger()
     # Set log levels based on verbosity flags
     if arguments.verbose:
@@ -233,6 +243,13 @@ def parse_cli():
             metavar=metavar,
             default=None,
         )
+    str_group.add_argument(
+        "--no-log-file",
+        dest="log_file",
+        help="Disable logging to a file.",
+        action="store_const",
+        const=False,
+    )
 
     args = parser.parse_args()
     main(args)
