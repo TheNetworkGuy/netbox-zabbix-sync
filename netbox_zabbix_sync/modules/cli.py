@@ -35,10 +35,23 @@ _BOOL_ARGS = [
         "extended_virtual_chassis",
         "Fetch additional virtual chassis info from NetBox (increases API queries).",
     ),
+    (
+        "extended_ips",
+        "Fetches additional IP information from NetBox (increases API queries).",
+    ),
+    (
+        "prefer_dns",
+        "Sets host interfaces to use DNS instead of IP if available. The DNS record can be supplied via config_context or by enabling extended_ips.",
+    ),
     ("inventory_sync", "Sync NetBox device properties to Zabbix inventory."),
+    ("oob_sync", "Sync NetBox Out-of-Band interfaces based on OOB IP."),
     ("usermacro_sync", "Sync usermacros from NetBox to Zabbix."),
     ("tag_sync", "Sync host tags to Zabbix."),
     ("tag_lower", "Lowercase tag names and values before syncing."),
+    (
+        "render_config_context",
+        "Enables *EXPERIMENTAL* support for Jinja2 config context rendering.",
+    ),
 ]
 
 # String settings that can be set via --option VALUE
@@ -65,6 +78,11 @@ _STR_ARGS = [
         "tag_value",
         "NetBox tag property to use as the Zabbix tag value (name, slug, or display).",
         "PROPERTY",
+    ),
+    (
+        "preferred_ip",
+        "Preferred IP version for inventory sync (ipv4 (default) or ipv6).",
+        "IP_VERSION",
     ),
 ]
 
@@ -136,6 +154,10 @@ def main(arguments):
         zbx_pass=zabbix_pass,
         zbx_token=zabbix_token,
     )
+    if config["render_config_context"]:
+        logger.warning(
+            "*EXPERIMENTAL* Features have been enabled, see https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features for more information."
+        )
     syncer.start()
     syncer.logout()
 
