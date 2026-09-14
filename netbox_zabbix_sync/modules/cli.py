@@ -84,6 +84,11 @@ _STR_ARGS = [
         "Preferred IP version for inventory sync (ipv4 (default) or ipv6).",
         "IP_VERSION",
     ),
+    (
+        "log_file",
+        "Path to the log file (default: sync.log in the current working directory).",
+        "PATH",
+    ),
 ]
 
 
@@ -102,8 +107,13 @@ def _apply_cli_overrides(config: dict, arguments: argparse.Namespace) -> dict:
 
 def main(arguments):
     """Run the sync process."""
+    # Load config (defaults → config.py → env vars), then apply CLI overrides.
+    # This happens before logging is set up so the log file path can be configured.
+    config = load_config(config_file=arguments.config)
+    config = _apply_cli_overrides(config, arguments)
+
     # Set logging
-    setup_logger()
+    setup_logger(log_file=config["log_file"])
     logger = get_logger()
     # Set log levels based on verbosity flags
     if arguments.verbose:
@@ -139,10 +149,6 @@ def main(arguments):
     zabbix_host = environ.get("ZABBIX_HOST")
     netbox_host = environ.get("NETBOX_HOST")
     netbox_token = environ.get("NETBOX_TOKEN")
-
-    # Load config (defaults → config.py → env vars), then apply CLI overrides
-    config = load_config(config_file=arguments.config)
-    config = _apply_cli_overrides(config, arguments)
 
     # Run main sync process
     syncer = Sync(config=config)

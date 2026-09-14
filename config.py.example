@@ -1,3 +1,10 @@
+## Logging
+# Path to the log file. The log file is rotated when it reaches 5 MB, keeping 3 backups.
+# When set to None, sync.log in the current working directory is used.
+# When pointing to a directory, sync.log is created inside that directory.
+# Can also be set with the NBZX_LOG_FILE environment variable or the --log-file flag.
+log_file = None
+
 ## Template logic.
 # Set to true to enable the template source information
 # coming from config context instead of a custom field.
