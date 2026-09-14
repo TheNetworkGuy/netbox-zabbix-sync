@@ -1,13 +1,20 @@
 """A collection of tools used by several classes"""
 
 from collections.abc import Callable
+from copy import copy
+from inspect import getmembers, isfunction
+from json import JSONDecodeError, dumps, loads
 from typing import Any, cast, overload
 
-from netbox_zabbix_sync.modules.exceptions import HostgroupError
+from j2ipaddr import filters as j2ipfilters  # adds IP filtering to jinja2
+from jinja2 import Environment, TemplateError
+
+from netbox_zabbix_sync.modules import jinja_filters
+from netbox_zabbix_sync.modules.exceptions import HostgroupError, JinjaRenderError
 
 
 def convert_recordset(recordset):
-    """Converts netbox RedcordSet to list of dicts."""
+    """Converts netbox RecordSet to list of dicts."""
     recordlist = []
     for record in recordset:
         recordlist.append(record.__dict__)
@@ -55,6 +62,41 @@ def proxy_prepper(proxy_list, proxy_group_list):
         group["monitored_by"] = 2
         output.append(group)
     return output
+
+
+def jinjafy_config_context(nb, context=None):
+    """
+    Renders Config Context through the Jinja2 templating engine
+    """
+    # Set our context to the Zabbix key within the config context
+    if (
+        not context
+        and "config_context" in dict(nb)
+        and "zabbix" in dict(nb)["config_context"]
+    ):
+        context = nb.config_context["zabbix"]
+    elif not context:
+        context = {}
+    # Copy nb and delete the config context to prevent issues
+    data = dict(copy(nb))
+    if "config_context" in data:
+        data.pop("config_context")
+    if context and isinstance(context, dict):
+        # create Jinja2 environment
+        j2env = Environment(autoescape=False)  # noqa: S701
+        # Load additional Jinja2 filters
+        j2env.filters.update(j2ipfilters.load_all())  # j2ipaddr filters
+        j2env.filters.update(getmembers(jinja_filters, isfunction))  # custom filters
+        try:
+            # Use our Zabbix config context as the Jinja2 template
+            # and render it using the objects data dictionary
+            template = j2env.from_string(str(dumps(context)))
+            rendered_context = loads(template.render(data=data))
+        except (JSONDecodeError, TemplateError, TypeError) as e:
+            raise JinjaRenderError(e) from e
+        else:
+            return rendered_context
+    return context
 
 
 def cf_to_string(cf, key="name", logger=None):
@@ -236,22 +278,39 @@ def sanatize_log_output(data):
             if not (macro["type"] == str(1) or macro["type"] == 1):
                 continue
             macro["value"] = "********"
+    if "ipmi_password" in sanitized_data:
+        ipmi_password = sanitized_data["ipmi_password"]
+        if not (ipmi_password.startswith("{$") and ipmi_password.endswith("}")):
+            sanitized_data["ipmi_password"] = "********"  # noqa: S105
     # Check for interface data
     if "interfaceid" in data:
-        # Interface ID is a value which is most likely not helpful
-        # in logging output or for troubleshooting.
-        del sanitized_data["interfaceid"]
-        # InterfaceID also hints that this is a interface update.
+        # InterfaceID hints that this is a interface update.
         # A check is required if there are no macro's used for SNMP security parameters.
-        if "details" not in data:
+        if data.get("details"):
+            for key, detail in sanitized_data["details"].items():
+                # If the detail is a secret, we don't want to log it.
+                if key in (
+                    "authpassphrase",
+                    "privpassphrase",
+                    "securityname",
+                    "community",
+                ):
+                    # Check if a macro is used.
+                    # If so then logging the output is not a security issue.
+                    if detail.startswith("{$") and detail.endswith("}"):
+                        continue
+                    # A macro is not used, so we sanitize the value.
+                    sanitized_data["details"][key] = "********"
+        else:
             return sanitized_data
-        for key, detail in sanitized_data["details"].items():
-            # If the detail is a secret, we don't want to log it.
-            if key in ("authpassphrase", "privpassphrase", "securityname", "community"):
-                # Check if a macro is used.
-                # If so then logging the output is not a security issue.
-                if detail.startswith("{$") and detail.endswith("}"):
-                    continue
-                # A macro is not used, so we sanitize the value.
-                sanitized_data["details"][key] = "********"
     return sanitized_data
+
+
+def extend_ips(nb):
+    """
+    Extends IP fields for NetBox objects
+    """
+    fields = ["primary_ip", "primary_ip4", "primary_ip6", "oob_ip"]
+    for field in fields:
+        if attr := getattr(nb, field, None):
+            attr.full_details()

@@ -632,6 +632,44 @@ python3 netbox_zabbix_sync.py
 | -v   | verbose   | Log with info on.                     |
 | -vv  | debug     | Log with debugging on.                |
 | -vvv | debug-all | Log with debugging on for all modules |
+| -q   | quiet     | Only log errors.                      |
+
+### Logging
+
+By default the script logs to the console and to `sync.log` in the current
+working directory. The log file is rotated when it reaches 5 MB, keeping 3
+backups (`sync.log.1` to `sync.log.3`).
+
+| Setting        | Default | Description                                                                 |
+| -------------- | ------- | --------------------------------------------------------------------------- |
+| `log_file`     | `None`  | Path to the log file. `None` uses `sync.log` in the current working directory. `False` disables file logging. |
+| `log_rotation` | `True`  | Rotate the log file. `False` keeps appending to a single file.              |
+| `log_console`  | `True`  | Log to the console. `False` disables console logging.                       |
+| `log_handlers` | `None`  | Extra `logging.Handler` objects to send logs to other destinations.         |
+
+Like other settings, these can be set in `config.py`, with `NBZX_` environment
+variables (for example `NBZX_LOG_FILE=/var/log/netbox-zabbix-sync/sync.log`) or
+with CLI flags, listed from lowest to highest priority:
+
+| Flag                                   | Description                    |
+| -------------------------------------- | ------------------------------ |
+| `--log-file PATH`                      | Log to the given file.         |
+| `--no-log-file`                        | Disable logging to a file.     |
+| `--log-rotation` / `--no-log-rotation` | Enable or disable log rotation. |
+| `--log-console` / `--no-log-console`   | Enable or disable console logging. |
+
+Missing parent directories of the log file are created. If the path points to a
+directory, `sync.log` is created inside it. A `~` is expanded to the user's home
+directory. Disabling both the file and console logging, without custom handlers,
+turns logging off completely.
+
+#### Custom handlers
+
+Custom handlers can be provided with `log_handlers` in `config.py`, as a single
+`logging.Handler` or a list of handlers. Since they are Python objects, they can
+only be set in `config.py`. They are used in addition to the console and file
+handlers. Handlers without a formatter use the default log format, and the
+`-v` / `-q` flags apply to them as well.
 
 ## Config context
 

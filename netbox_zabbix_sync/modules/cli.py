@@ -35,10 +35,28 @@ _BOOL_ARGS = [
         "extended_virtual_chassis",
         "Fetch additional virtual chassis info from NetBox (increases API queries).",
     ),
+    (
+        "extended_ips",
+        "Fetches additional IP information from NetBox (increases API queries).",
+    ),
+    (
+        "prefer_dns",
+        "Sets host interfaces to use DNS instead of IP if available. The DNS record can be supplied via config_context or by enabling extended_ips.",
+    ),
     ("inventory_sync", "Sync NetBox device properties to Zabbix inventory."),
+    ("oob_sync", "Sync NetBox Out-of-Band interfaces based on OOB IP."),
     ("usermacro_sync", "Sync usermacros from NetBox to Zabbix."),
     ("tag_sync", "Sync host tags to Zabbix."),
     ("tag_lower", "Lowercase tag names and values before syncing."),
+    (
+        "render_config_context",
+        "Enables *EXPERIMENTAL* support for Jinja2 config context rendering.",
+    ),
+    (
+        "log_rotation",
+        "Rotate the log file (5 MB, 3 backups) instead of appending forever.",
+    ),
+    ("log_console", "Log to the console."),
 ]
 
 # String settings that can be set via --option VALUE
@@ -66,6 +84,16 @@ _STR_ARGS = [
         "NetBox tag property to use as the Zabbix tag value (name, slug, or display).",
         "PROPERTY",
     ),
+    (
+        "preferred_ip",
+        "Preferred IP version for inventory sync (ipv4 (default) or ipv6).",
+        "IP_VERSION",
+    ),
+    (
+        "log_file",
+        "Path to the log file (default: sync.log in the current working directory).",
+        "PATH",
+    ),
 ]
 
 
@@ -84,8 +112,18 @@ def _apply_cli_overrides(config: dict, arguments: argparse.Namespace) -> dict:
 
 def main(arguments):
     """Run the sync process."""
+    # Load config (defaults → config.py → env vars), then apply CLI overrides.
+    # This happens before logging is set up so the log file path can be configured.
+    config = load_config(config_file=arguments.config)
+    config = _apply_cli_overrides(config, arguments)
+
     # Set logging
-    setup_logger()
+    setup_logger(
+        log_file=config["log_file"],
+        log_rotation=config["log_rotation"],
+        log_console=config["log_console"],
+        log_handlers=config["log_handlers"],
+    )
     logger = get_logger()
     # Set log levels based on verbosity flags
     if arguments.verbose:
@@ -122,10 +160,6 @@ def main(arguments):
     netbox_host = environ.get("NETBOX_HOST")
     netbox_token = environ.get("NETBOX_TOKEN")
 
-    # Load config (defaults → config.py → env vars), then apply CLI overrides
-    config = load_config(config_file=arguments.config)
-    config = _apply_cli_overrides(config, arguments)
-
     # Run main sync process
     syncer = Sync(config=config)
     syncer.connect(
@@ -136,6 +170,10 @@ def main(arguments):
         zbx_pass=zabbix_pass,
         zbx_token=zabbix_token,
     )
+    if config["render_config_context"]:
+        logger.warning(
+            "*EXPERIMENTAL* Features have been enabled, see https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features for more information."
+        )
     syncer.start()
     syncer.logout()
 
@@ -205,6 +243,13 @@ def parse_cli():
             metavar=metavar,
             default=None,
         )
+    str_group.add_argument(
+        "--no-log-file",
+        dest="log_file",
+        help="Disable logging to a file.",
+        action="store_const",
+        const=False,
+    )
 
     args = parser.parse_args()
     main(args)
