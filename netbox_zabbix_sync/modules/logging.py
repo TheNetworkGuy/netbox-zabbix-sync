@@ -2,10 +2,11 @@
 Logging module for Netbox-Zabbix-sync
 """
 
-import logging
+from logging import WARNING, StreamHandler, basicConfig, getLogger
+from logging.handlers import RotatingFileHandler
 from os import path
 
-logger = logging.getLogger("NetBox-Zabbix-sync")
+logger = getLogger("NetBox-Zabbix-sync")
 
 
 def get_logger():
@@ -20,16 +21,16 @@ def setup_logger():
     Prepare a logger with stream and file handlers
     """
     # Set logging
-    lgout = logging.StreamHandler()
+    lgout = StreamHandler()
 
     # Create log file in current working directory
     working_dir = path.realpath(path.curdir)
     logfile_path = path.join(working_dir, "sync.log")
-    lgfile = logging.FileHandler(logfile_path)
+    lgfile = RotatingFileHandler(logfile_path, mode="a", maxBytes=5 * 1024 * 1024, backupCount=3)
 
-    logging.basicConfig(
+    basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=logging.WARNING,
+        level=WARNING,
         handlers=[lgout, lgfile],
     )
 
@@ -38,5 +39,5 @@ def set_log_levels(root_level, own_level):
     """
     Configure log levels for root and Netbox-Zabbix-sync logger
     """
-    logging.getLogger().setLevel(root_level)
+    getLogger().setLevel(root_level)
     logger.setLevel(own_level)
