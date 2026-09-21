@@ -1,0 +1,113 @@
+---
+name: nbzx-func
+
+# Stack for the functional test suite: a real NetBox and a real Zabbix.
+# Image tags come from NETBOX_TAG / ZABBIX_TAG so the CI matrix can pin any
+# published tag of either project. See .env.example.
+
+services:
+  netbox-postgres:
+    image: docker.io/postgres:17-alpine
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: netbox
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netbox -d netbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  netbox-redis:
+    image: docker.io/valkey/valkey:8-alpine
+    command: ["valkey-server", "--requirepass", "netbox", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a netbox ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  netbox:
+    image: docker.io/netboxcommunity/netbox:${NETBOX_TAG:-v4.6.5}
+    depends_on:
+      netbox-postgres:
+        condition: service_healthy
+      netbox-redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: netbox-postgres
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: netbox
+      REDIS_HOST: netbox-redis
+      REDIS_PASSWORD: netbox
+      REDIS_DATABASE: "0"
+      REDIS_CACHE_HOST: netbox-redis
+      REDIS_CACHE_PASSWORD: netbox
+      REDIS_CACHE_DATABASE: "1"
+      SECRET_KEY: "functional-tests-only-not-a-secret-0123456789abcdef"
+      # NetBox >= 4.5 mints v2 API tokens and refuses to provision one at all
+      # unless a pepper is configured.
+      API_TOKEN_PEPPER_1: "functional-tests-only-not-a-secret-pepper-0123456789"
+      ALLOWED_HOSTS: "*"
+      SKIP_SUPERUSER: "false"
+      SUPERUSER_NAME: admin
+      SUPERUSER_EMAIL: admin@example.com
+      SUPERUSER_PASSWORD: admin
+      SKIP_STARTUP_SCRIPTS: "true"
+    ports:
+      - "8000:8080"
+    healthcheck:
+      # NetBox runs its migrations on first boot; start_period must cover that
+      # or `compose up --wait` gives up before it has ever served a request.
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login/"]
+      start_period: 150s
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  zabbix-postgres:
+    # Zabbix 7.0 only gained PG17 support in later patch releases; 16 is
+    # accepted across every tag we are likely to put in the matrix.
+    image: docker.io/postgres:16-alpine
+    environment:
+      POSTGRES_DB: zabbix
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: zabbix
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zabbix -d zabbix"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  zabbix-server:
+    image: docker.io/zabbix/zabbix-server-pgsql:${ZABBIX_TAG:-alpine-7.0-latest}
+    depends_on:
+      zabbix-postgres:
+        condition: service_healthy
+    environment:
+      DB_SERVER_HOST: zabbix-postgres
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: zabbix
+      POSTGRES_DB: zabbix
+      # The supported PG range differs per Zabbix release; without this a
+      # single pinned postgres image cannot serve the whole matrix.
+      ZBX_ALLOW_UNSUPPORTED_DB_VERSIONS: "1"
+
+  zabbix-web:
+    image: docker.io/zabbix/zabbix-web-nginx-pgsql:${ZABBIX_TAG:-alpine-7.0-latest}
+    depends_on:
+      zabbix-postgres:
+        condition: service_healthy
+      zabbix-server:
+        condition: service_started
+    environment:
+      ZBX_SERVER_HOST: zabbix-server
+      DB_SERVER_HOST: zabbix-postgres
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: zabbix
+      POSTGRES_DB: zabbix
+      PHP_TZ: UTC
+      ZBX_ALLOW_UNSUPPORTED_DB_VERSIONS: "1"
+    ports:
+      - "8081:8080"

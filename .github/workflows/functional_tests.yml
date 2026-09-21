@@ -1,0 +1,78 @@
+---
+name: Functional Tests
+
+# Runs the real sync against real NetBox and Zabbix containers. Slow (~5-8
+# minutes), so it is gated on the mocked suite passing first.
+
+on:
+  pull_request:
+
+concurrency:
+  group: functional-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The gate: if the fast mocked tests fail, don't spend runners on containers.
+  unit:
+    uses: ./.github/workflows/run_tests.yml
+
+  functional:
+    needs: [unit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: ${{ matrix.experimental || false }}
+    strategy:
+      # One version failing must not cancel the others; the point is to see the
+      # whole version picture from a single run.
+      fail-fast: false
+      matrix:
+        # Literal Docker tags, not version numbers. Add a version by adding a
+        # line. Mark pre-releases `experimental: true` to keep them
+        # non-blocking.
+        include:
+          - netbox: "v4.6.5"
+            zabbix: "alpine-7.0-latest"
+    env:
+      NETBOX_TAG: ${{ matrix.netbox }}
+      ZABBIX_TAG: ${{ matrix.zabbix }}
+      COMPOSE_FILE: tests/functional/docker/compose.yaml
+      FUNC_NETBOX_URL: http://localhost:8000
+      FUNC_ZABBIX_URL: http://localhost:8081
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Start NetBox ${{ matrix.netbox }} and Zabbix ${{ matrix.zabbix }}
+        run: docker compose up -d --wait
+
+      - name: Wait for APIs
+        # Healthchecks alone are not enough: Zabbix answers its API before the
+        # default templates have finished importing.
+        run: uv run python -m tests.functional.docker.wait_for_stack
+
+      - name: Run functional tests
+        # The suite writes its own report to $GITHUB_STEP_SUMMARY as it runs,
+        # so a failing run still reports -- no separate reporting step, and no
+        # report file on disk.
+        run: uv run pytest tests/functional -m functional -v
+
+      - name: Dump container logs
+        if: failure()
+        run: docker compose logs --no-color --tail=500
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

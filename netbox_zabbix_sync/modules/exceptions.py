@@ -35,6 +35,14 @@ class ProxyConfigError(SyncError):
     """Class ProxyConfigError"""
 
 
+class JinjaRenderError(SyncError):
+    """Class JinjaRenderError"""
+
+
+class JinjaFilterError(SyncError):
+    """Class JinjaFilterError"""
+
+
 class HostgroupError(SyncError):
     """Class HostgroupError"""
 

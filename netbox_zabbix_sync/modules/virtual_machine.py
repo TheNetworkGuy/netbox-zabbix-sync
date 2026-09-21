@@ -1,15 +1,15 @@
 """Module that hosts all functions for virtual machine processing"""
 
-from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import (
     InterfaceConfigError,
     SyncInventoryError,
     TemplateError,
 )
+from netbox_zabbix_sync.modules.host import Host
 from netbox_zabbix_sync.modules.interface import ZabbixInterface
 
 
-class VirtualMachine(PhysicalDevice):
+class VirtualMachine(Host):
     """Model for virtual machines"""
 
     def __init__(self, *args, **kwargs):
@@ -35,12 +35,12 @@ class VirtualMachine(PhysicalDevice):
         to skip a lookup of custom fields."""
         # Gather templates ONLY from the device specific context
         try:
-            self.zbx_template_names = self.get_templates_context()
+            self.zbx_template_names = self._get_templates_context()
         except TemplateError as e:
             self.logger.warning(e)
         return True
 
-    def set_interface_details(self):
+    def set_interface_details(self, oob=False):
         """
         Overwrites device function to select an agent interface type by default
         Agent type interfaces are more likely to be used with VMs then SNMP
@@ -48,7 +48,9 @@ class VirtualMachine(PhysicalDevice):
         zabbix_snmp_interface_type = 2
         try:
             # Initiate interface class
-            interface = ZabbixInterface(self.nb.config_context, self.ip)
+            interface = ZabbixInterface(
+                self.nb.config_context, self.ip, self.dns, self.config["prefer_dns"]
+            )
             # Check if NetBox has device context.
             # If not fall back to old config.
             if interface.get_context():
@@ -57,7 +59,7 @@ class VirtualMachine(PhysicalDevice):
                     interface.set_snmp()
             else:
                 interface.set_default_agent()
-            return [interface.interface]
+            return interface.interface
         except InterfaceConfigError as e:
             message = f"{self.name}: {e}"
             self.logger.warning(message)
