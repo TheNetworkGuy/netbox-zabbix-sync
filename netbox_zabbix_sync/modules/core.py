@@ -135,10 +135,11 @@ class Sync:
             self.logger.debug("NetBox version is %s.", nb_version)
             self.netbox = netbox
             self.nb_version = str(nb_version)
-        except RequestsConnectionError:
+        except RequestsConnectionError as e:
             self.logger.error(
-                "Unable to connect to NetBox with URL %s. Please check the URL and status of NetBox.",
+                "Unable to connect to NetBox with URL %s. Please check the URL and status of NetBox. %s",
                 nb_host,
+                e,
             )
             return False
         except NetBoxRequestError as nb_error:
