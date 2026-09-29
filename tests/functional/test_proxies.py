@@ -16,78 +16,16 @@ Every test resolves against a proxy that really exists in Zabbix. Asserting
 that the sync sent a name would prove nothing: the whole feature is the lookup.
 """
 
-from uuid import uuid4
-
 import pytest
 
+from tests.functional.conftest import (
+    MONITORED_BY_PROXY,
+    MONITORED_BY_PROXY_GROUP,
+    MONITORED_BY_SERVER,
+    proxy_assignment,
+)
+
 pytestmark = pytest.mark.functional
-
-# host.monitored_by: 0 = server, 1 = proxy, 2 = proxy group.
-MONITORED_BY_SERVER = "0"
-MONITORED_BY_PROXY = "1"
-MONITORED_BY_PROXY_GROUP = "2"
-
-
-@pytest.fixture
-def proxy_factory(zapi):
-    """Create Zabbix proxies and proxy groups, and remove them afterwards.
-
-    Request this fixture *before* `device_factory` in a test signature. Zabbix
-    refuses to delete a proxy while a host still points at it, and finalizers
-    run in reverse setup order, so first here means the proxies go last.
-    """
-    proxies = []
-    groups = []
-
-    class ProxyFactory:
-        """Called for a proxy, `.group()` for a proxy group."""
-
-        def __call__(self, name: str | None = None) -> str:
-            name = name or f"fn-proxy-{uuid4().hex[:8]}"
-            # operating_mode 0 is an active proxy, which needs no address or
-            # port: nothing ever connects to it, and the sync only reads its name.
-            proxies.append(
-                zapi.proxy.create(name=name, operating_mode=0)["proxyids"][0]
-            )
-            return name
-
-        def group(self, name: str | None = None) -> str:
-            name = name or f"fn-pgroup-{uuid4().hex[:8]}"
-            groups.append(
-                zapi.proxygroup.create(name=name, failover_delay="10s", min_online="1")[
-                    "proxy_groupids"
-                ][0]
-            )
-            return name
-
-    yield ProxyFactory()
-
-    for proxyid in proxies:
-        zapi.proxy.delete(proxyid)
-    for groupid in groups:
-        zapi.proxygroup.delete(groupid)
-
-
-@pytest.fixture
-def proxy_id(zapi):
-    """Resolve a proxy name to its Zabbix id, for comparing against a host."""
-
-    def _get(name: str) -> str:
-        found = zapi.proxy.get(filter={"name": name}, output=["proxyid"])
-        assert found, f"no Zabbix proxy named {name}"
-        return found[0]["proxyid"]
-
-    return _get
-
-
-def proxy_assignment(host: dict) -> tuple[str, str]:
-    """The two fields that together say what is monitoring a host.
-
-    Returned as a pair because neither means anything alone: `proxyid` is "0"
-    both when no proxy is set and when a proxy *group* is, so a test asserting
-    only on it cannot tell those apart.
-    """
-    return host["monitored_by"], host.get("proxyid", "0")
 
 
 def test_proxy_from_config_context(
