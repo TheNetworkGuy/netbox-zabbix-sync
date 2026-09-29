@@ -1,14 +1,18 @@
 from logging import getLogger
+from unittest.mock import MagicMock
 
 import pytest
 
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError
 from netbox_zabbix_sync.modules.tools import (
     build_path,
+    cf_to_string,
+    choice_value,
     field_mapper,
     jinjafy_config_context,
     sanatize_log_output,
 )
+from tests.netbox_payloads import EXPECTED, NETBOX_VERSIONS, cf_cases, cf_value
 
 
 def test_sanatize_log_output_secrets():
@@ -161,6 +165,105 @@ class TestFieldMapper:
         assert field_mapper("host", {"site/latitude": "location_lat"}, nb, logger) == {
             "location_lat": ""
         }
+
+    @pytest.mark.parametrize("version", NETBOX_VERSIONS)
+    def test_select_custom_field_maps_to_its_value(self, logger, version):
+        """`custom_fields/<select>` sends the value, not the 4.7 dict's repr."""
+        nb = DummyNB(custom_fields={"env": cf_value(version, "select")})
+
+        assert field_mapper("host", {"custom_fields/env": "alias"}, nb, logger) == {
+            "alias": "staging"
+        }
+
+    @pytest.mark.parametrize("version", NETBOX_VERSIONS)
+    def test_multiselect_custom_field_is_the_same_on_every_version(
+        self, logger, version
+    ):
+        """A multiselect is stringified as a list of values on 4.6 and 4.7 alike."""
+        nb = DummyNB(custom_fields={"fw": cf_value(version, "multiselect")})
+
+        assert field_mapper("host", {"custom_fields/fw": "alias"}, nb, logger) == {
+            "alias": "['iso27001', 'soc2']"
+        }
+
+    @pytest.mark.parametrize("version", NETBOX_VERSIONS)
+    def test_object_custom_field_can_be_walked_into(self, logger, version):
+        """An object custom field is a nested dict, so its name is a path away."""
+        nb = DummyNB(custom_fields={"owner": cf_value(version, "object")})
+
+        assert field_mapper(
+            "host", {"custom_fields/owner/name": "alias"}, nb, logger
+        ) == {"alias": "Internal IT"}
+
+    def test_label_path_into_a_47_select_keeps_working(self, logger):
+        """A map written for 4.7 can still reach the label by walking into it.
+
+        Only the value at the end of the path is resolved, so the dict stays
+        walkable -- `custom_fields/<select>/label` is how to get the label.
+        """
+        nb = DummyNB(custom_fields={"env": cf_value("4.7", "select")})
+
+        assert field_mapper(
+            "host", {"custom_fields/env/label": "alias"}, nb, logger
+        ) == {"alias": "Staging"}
+
+    def test_choice_fields_outside_custom_fields_are_untouched(self, logger):
+        """Only custom fields changed shape, so `status` keeps its dict.
+
+        The shipped maps reach it as `status/label`, which has to keep
+        resolving to the label rather than stopping at the value.
+        """
+        nb = DummyNB(status={"value": "active", "label": "Active"})
+
+        assert field_mapper(
+            "host", {"status/label": "deployment_status"}, nb, logger
+        ) == {"deployment_status": "Active"}
+
+
+class TestChoiceValue:
+    """choice_value undoes NetBox 4.7's `{"value", "label"}` choice wrapping."""
+
+    @pytest.mark.parametrize("version", NETBOX_VERSIONS)
+    def test_select_resolves_to_its_value(self, version):
+        assert choice_value(cf_value(version, "select")) == "staging"
+
+    @pytest.mark.parametrize("version", NETBOX_VERSIONS)
+    def test_multiselect_resolves_to_a_list_of_values(self, version):
+        assert choice_value(cf_value(version, "multiselect")) == ["iso27001", "soc2"]
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            *(p.values[0] for p in cf_cases("object", "multiobject")),
+            "hello",
+            7,
+            True,
+            None,
+            # A NetBox 2.7 choice carries an id as well. It is not the 4.7
+            # custom field shape, so it is left for the caller to handle.
+            {"id": 1, "value": "active", "label": "Active"},
+        ],
+    )
+    def test_anything_else_is_returned_unchanged(self, value):
+        assert choice_value(value) == value
+
+
+class TestCfToString:
+    """cf_to_string turns a custom field value into the name it stands for."""
+
+    @pytest.mark.parametrize(("value", "cf_type"), cf_cases("text", "select", "object"))
+    def test_resolves_to_the_same_name_on_every_version(self, value, cf_type):
+        assert cf_to_string(value) == EXPECTED[cf_type]
+
+    def test_empty_value_stays_empty(self):
+        assert cf_to_string(None) is None
+
+    def test_dict_without_the_key_logs_and_returns_none(self):
+        """An object whose nested form lacks `key` is reported, not guessed at."""
+        logger = MagicMock()
+
+        assert cf_to_string({"id": 1, "display": "x"}, logger=logger) is None
+        logger.error.assert_called_once()
 
 
 class TestJinjafyConfigContext:
