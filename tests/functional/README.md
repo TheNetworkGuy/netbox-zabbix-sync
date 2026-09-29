@@ -14,8 +14,8 @@ changes its API, these tests are where it shows up, and the CI matrix runs them
 against each supported version combination.
 
 They are **deselected by default**. `pytest` and `pytest tests` skip them via
-`addopts = "-m 'not functional'"` in `pyproject.toml`, so the normal suite
-needs no containers.
+`addopts = "-m 'not functional'"` in `pyproject.toml`, so the normal suite needs
+no containers.
 
 ## Running locally
 
@@ -27,8 +27,8 @@ uv run python -m tests.functional.docker.wait_for_stack
 uv run pytest tests/functional -m functional -v
 ```
 
-First boot takes a couple of minutes while NetBox runs its migrations and
-Zabbix imports its default templates. `wait_for_stack` waits for both.
+First boot takes a couple of minutes while NetBox runs its migrations and Zabbix
+imports its default templates. `wait_for_stack` waits for both.
 
 Tear the stack down afterwards (`-v` also drops the databases, so the next run
 starts clean):
@@ -44,13 +44,13 @@ need, so no manual setup is required.
 
 To run against NetBox and Zabbix instances you already have, set:
 
-| Variable | Default |
-| --- | --- |
-| `FUNC_NETBOX_URL` | `http://localhost:8000` |
+| Variable            | Default                   |
+| ------------------- | ------------------------- |
+| `FUNC_NETBOX_URL`   | `http://localhost:8000`   |
 | `FUNC_NETBOX_TOKEN` | provisioned automatically |
-| `FUNC_ZABBIX_URL` | `http://localhost:8081` |
-| `FUNC_ZABBIX_USER` | `Admin` |
-| `FUNC_ZABBIX_PASS` | `zabbix` |
+| `FUNC_ZABBIX_URL`   | `http://localhost:8081`   |
+| `FUNC_ZABBIX_USER`  | `Admin`                   |
+| `FUNC_ZABBIX_PASS`  | `zabbix`                  |
 
 With `FUNC_NETBOX_URL` set to an empty value the tests are skipped rather than
 failed.
@@ -100,6 +100,6 @@ GITHUB_STEP_SUMMARY=/tmp/summary.md uv run pytest tests/functional -m functional
   doesn't test the setting.
 
 Tests marked `xfail(strict=True)` document known bugs: each asserts the
-behaviour that *should* hold, with the reason on the marker. Once the bug is
+behaviour that _should_ hold, with the reason on the marker. Once the bug is
 fixed the test starts passing, and the strict marker then fails the run as a
 reminder to remove it.
