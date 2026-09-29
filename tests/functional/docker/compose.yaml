@@ -20,7 +20,16 @@ services:
 
   netbox-redis:
     image: docker.io/valkey/valkey:8-alpine
-    command: ["valkey-server", "--requirepass", "netbox", "--appendonly", "no", "--save", ""]
+    command:
+      [
+        "valkey-server",
+        "--requirepass",
+        "netbox",
+        "--appendonly",
+        "no",
+        "--save",
+        "",
+      ]
     healthcheck:
       test: ["CMD-SHELL", "valkey-cli -a netbox ping | grep -q PONG"]
       interval: 5s
@@ -28,7 +37,7 @@ services:
       retries: 20
 
   netbox:
-    image: docker.io/netboxcommunity/netbox:${NETBOX_TAG:-v4.6.5}
+    image: docker.io/netboxcommunity/netbox:${NETBOX_TAG:-v4.6.10}
     depends_on:
       netbox-postgres:
         condition: service_healthy
