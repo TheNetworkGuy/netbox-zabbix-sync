@@ -278,7 +278,7 @@ class Host(ABC):
         # Check if the ZBX Template CF is present
         if self.config["template_cf"] in device_type_cfs:
             # Set value to template
-            return [device_type_cfs[self.config["template_cf"]]]
+            return [cf_to_string(device_type_cfs[self.config["template_cf"]])]
         # Custom field not found, return error
         e = (
             f"Custom field {self.config['template_cf']} not "
