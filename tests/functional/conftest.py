@@ -622,26 +622,47 @@ def custom_field_factory(nb):
     Names are unique per test because a custom field is global: a leftover one
     from a previous run would be picked up by `verify_hg_format` and quietly
     change what these tests prove.
+
+    `choices` gives a select or multiselect field its own choice set, as
+    `(value, label)` pairs; the label is deliberately free to differ from the
+    value, since NetBox 4.7 serialises both and the tests need to tell which
+    one the sync used. Anything else the field needs, such as an object
+    field's `related_object_type`, passes through as a keyword.
     """
     created = []
+    choice_sets = []
 
-    def make(object_types: list[str], cf_type: str = "text") -> str:
+    def make(
+        object_types: list[str],
+        cf_type: str = "text",
+        choices: list[tuple[str, str]] | None = None,
+        **extra,
+    ) -> str:
         name = f"cf_{uuid4().hex[:8]}"
+        if choices:
+            choice_set = nb.extras.custom_field_choice_sets.create(
+                name=f"cs_{name}",
+                extra_choices=[list(choice) for choice in choices],
+            )
+            choice_sets.append(choice_set)
+            extra["choice_set"] = choice_set.id
         created.append(
             nb.extras.custom_fields.create(
                 name=name,
                 label=name,
                 type=cf_type,
                 object_types=object_types,
+                **extra,
             )
         )
         return name
 
     yield make
 
-    for cf in reversed(created):
+    # Fields first: NetBox refuses to delete a choice set still in use.
+    for obj in (*reversed(created), *choice_sets):
         with contextlib.suppress(pynetbox.RequestError):
-            cf.delete()
+            obj.delete()
 
 
 @pytest.fixture
@@ -668,6 +689,74 @@ def zabbix_host(zapi):
         return hosts[0] if hosts else None
 
     return _get
+
+
+# host.monitored_by: 0 = server, 1 = proxy, 2 = proxy group.
+MONITORED_BY_SERVER = "0"
+MONITORED_BY_PROXY = "1"
+MONITORED_BY_PROXY_GROUP = "2"
+
+
+@pytest.fixture
+def proxy_factory(zapi):
+    """Create Zabbix proxies and proxy groups, and remove them afterwards.
+
+    Request this fixture *before* `device_factory` in a test signature. Zabbix
+    refuses to delete a proxy while a host still points at it, and finalizers
+    run in reverse setup order, so first here means the proxies go last.
+    """
+    proxies = []
+    groups = []
+
+    class ProxyFactory:
+        """Called for a proxy, `.group()` for a proxy group."""
+
+        def __call__(self, name: str | None = None) -> str:
+            name = name or f"fn-proxy-{uuid4().hex[:8]}"
+            # operating_mode 0 is an active proxy, which needs no address or
+            # port: nothing ever connects to it, and the sync only reads its name.
+            proxies.append(
+                zapi.proxy.create(name=name, operating_mode=0)["proxyids"][0]
+            )
+            return name
+
+        def group(self, name: str | None = None) -> str:
+            name = name or f"fn-pgroup-{uuid4().hex[:8]}"
+            groups.append(
+                zapi.proxygroup.create(name=name, failover_delay="10s", min_online="1")[
+                    "proxy_groupids"
+                ][0]
+            )
+            return name
+
+    yield ProxyFactory()
+
+    for proxyid in proxies:
+        zapi.proxy.delete(proxyid)
+    for groupid in groups:
+        zapi.proxygroup.delete(groupid)
+
+
+@pytest.fixture
+def proxy_id(zapi):
+    """Resolve a proxy name to its Zabbix id, for comparing against a host."""
+
+    def _get(name: str) -> str:
+        found = zapi.proxy.get(filter={"name": name}, output=["proxyid"])
+        assert found, f"no Zabbix proxy named {name}"
+        return found[0]["proxyid"]
+
+    return _get
+
+
+def proxy_assignment(host: dict) -> tuple[str, str]:
+    """The two fields that together say what is monitoring a host.
+
+    Returned as a pair because neither means anything alone: `proxyid` is "0"
+    both when no proxy is set and when a proxy *group* is, so a test asserting
+    only on it cannot tell those apart.
+    """
+    return host["monitored_by"], host.get("proxyid", "0")
 
 
 def tag_pairs(host: dict) -> set[tuple[str, str]]:
