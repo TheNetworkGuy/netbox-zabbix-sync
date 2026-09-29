@@ -10,13 +10,8 @@ is the furniture every NetBox in production has and a bare test fixture does
 not -- a region tree above the site, a site group, a tenant, a platform, and
 the handful of custom fields an instance grows once people actually use it.
 
-That second layer is not decoration. Before it syncs anything the sync fetches
-*every* text, object and select custom field defined on a device (core.py:283)
-and validates the hostgroup format against the names it finds, so an instance
-whose only custom fields are the two the sync owns is a case no real user is
-in. Seeding a select, a multiselect and an object custom field also puts all
-three shapes NetBox serialises a custom field value as -- a bare string, a list
-of strings, and a nested object -- on every device the suite syncs.
+That second layer simulates an production NetBox instance to catch comparability
+issues with more advanced data structures.
 
 Only the shared, session-scoped objects live here. Devices are per-test and
 come from the ``device_factory`` fixture, so each test can be isolated to its
