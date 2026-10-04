@@ -65,6 +65,19 @@ class TestVirtualMachineInit(_VMSetUp):
         )
         self.assertIsNone(vm.zbx_template_names)
 
+    def test_journal_entry_targets_virtual_machine(self):
+        """Journal entries are assigned to the VM, not to a device with the same ID."""
+        vm = _make_vm(
+            self.mock_nb_vm, self.mock_zabbix, self.mock_nb_journal, self.mock_logger
+        )
+        vm.journal = True
+        vm.create_journal_entry("info", "test")
+        journal = self.mock_nb_journal.create.call_args.args[0]
+        self.assertEqual(
+            journal["assigned_object_type"], "virtualization.virtualmachine"
+        )
+        self.assertEqual(journal["assigned_object_id"], 42)
+
 
 class TestVirtualMachineMaps(_VMSetUp):
     """Test that abstract map methods return the VM-specific config keys."""
