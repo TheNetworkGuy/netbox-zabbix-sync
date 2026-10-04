@@ -1269,6 +1269,69 @@ class TestDeviceStatusHandling(unittest.TestCase):
         mock_zabbix.host.delete.assert_called_once_with(42)
 
     # ------------------------------------------------------------------
+    # Regression (#155): removal must not depend on a primary IP
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_decommissioning_device_without_primary_ip_is_deleted(
+        self, mock_api, mock_zabbix_api
+    ):
+        """A device in a removal state is deleted even when its primary IP was moved away."""
+        device = MockNetboxDevice(
+            name="test-device",
+            status_label="Decommissioning",
+            zabbix_hostid=42,
+            primary_ip=False,
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix.host.get.return_value = [{"hostid": "42"}]
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.delete.assert_called_once_with(42)
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_active_device_without_primary_ip_is_still_skipped(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Paired off-state: without a removal status the missing IP still skips the host."""
+        device = MockNetboxDevice(
+            name="test-device",
+            status_label="Active",
+            zabbix_hostid=42,
+            primary_ip=False,
+        )
+        self._setup_netbox_mock(mock_api, devices=[device])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix.host.get.return_value = self._make_zabbix_host()
+
+        syncer = Sync()
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.delete.assert_not_called()
+        mock_zabbix.host.create.assert_not_called()
+        mock_zabbix.host.update.assert_not_called()
+
+    # ------------------------------------------------------------------
     # Scenario 7: Active device, Zabbix host is disabled → re-enable via consistency check
     # ------------------------------------------------------------------
     @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
@@ -1562,6 +1625,69 @@ class TestVMStatusHandling(unittest.TestCase):
         syncer.start()
 
         mock_zabbix.host.delete.assert_called_once_with(42)
+
+    # ------------------------------------------------------------------
+    # Regression (#155): removal must not depend on a primary IP
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_decommissioning_vm_without_primary_ip_is_deleted(
+        self, mock_api, mock_zabbix_api
+    ):
+        """A VM in a removal state is deleted even when its primary IP was moved away."""
+        vm = MockNetboxVM(
+            name="test-vm",
+            status_label="Decommissioning",
+            zabbix_hostid=42,
+            primary_ip=False,
+        )
+        self._setup_netbox_mock(mock_api, vms=[vm])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix.host.get.return_value = [{"hostid": "42"}]
+
+        syncer = Sync(self._SYNC_CFG)
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.delete.assert_called_once_with(42)
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_active_vm_without_primary_ip_is_still_skipped(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Paired off-state: without a removal status the missing IP still skips the host."""
+        vm = MockNetboxVM(
+            name="test-vm",
+            status_label="Active",
+            zabbix_hostid=42,
+            primary_ip=False,
+        )
+        self._setup_netbox_mock(mock_api, vms=[vm])
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix.host.get.return_value = self._make_zabbix_host()
+
+        syncer = Sync(self._SYNC_CFG)
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.delete.assert_not_called()
+        mock_zabbix.host.create.assert_not_called()
+        mock_zabbix.host.update.assert_not_called()
 
     # ------------------------------------------------------------------
     # Scenario 7: Active VM, Zabbix host is disabled → re-enable via consistency check

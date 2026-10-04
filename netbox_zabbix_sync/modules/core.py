@@ -218,6 +218,28 @@ class Sync:
             return False
         return True
 
+    def _remove_host(self, host: Host) -> bool:
+        """
+        Remove a host from Zabbix when its NetBox status is in zabbix_device_removal.
+
+        Removal only needs the Zabbix ID and the status, so this runs before any
+        check that is a prerequisite for creating or updating a host (IP,
+        template, hostgroup, clustering). A host that can no longer be created
+        must still be removable. Returns True if the host is in a removal state
+        and needs no further processing.
+        """
+        if host.status not in self.config["zabbix_device_removal"]:
+            return False
+        if host.zabbix_id:
+            host.cleanup()
+            logger.info("Host %s: cleanup complete", host.name)
+        else:
+            logger.info(
+                "Host %s: Skipping since this host is not in the active state.",
+                host.name,
+            )
+        return True
+
     def _sync_host(
         self,
         host: Host,
@@ -227,23 +249,14 @@ class Sync:
     ):
         """
         Handle the shared sync steps for any Host (device or VM):
-        inventory, usermacros, tags, status/cleanup, hostgroup creation,
+        inventory, usermacros, tags, disabled state, hostgroup creation,
         and Zabbix create or consistency check.
+
+        Hosts in a removal state are handled earlier by _remove_host().
         """
         host.set_inventory(host.nb)
         host.set_usermacros()
         host.set_tags()
-
-        if host.status in self.config["zabbix_device_removal"]:
-            if host.zabbix_id:
-                host.cleanup()
-                logger.info("Host %s: cleanup complete", host.name)
-                return
-            logger.info(
-                "Host %s: Skipping since this host is not in the active state.",
-                host.name,
-            )
-            return
 
         if host.status in self.config["zabbix_device_disable"]:
             host.zabbix_state = 1
@@ -357,6 +370,8 @@ class Sync:
                     config=self.config,
                 )
                 logger.debug("Host %s: Started operations on VM.", vm.name)
+                if self._remove_host(vm):
+                    continue
                 if self.config["extended_site_properties"] and nb_vm.site:
                     logger.debug("Host %s: Extending site information.", vm.name)
                     nb_vm.site.full_details()
@@ -393,6 +408,8 @@ class Sync:
                     config=self.config,
                 )
                 logger.debug("Host %s: Started operations on device.", device.name)
+                if self._remove_host(device):
+                    continue
                 if self.config["extended_site_properties"] and nb_device.site:
                     logger.debug("Host %s: Extending site information.", device.name)
                     nb_device.site.full_details()
