@@ -923,6 +923,78 @@ class TestDeviceHandeling(unittest.TestCase):
 
     @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
     @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_removal_state_secondary_cluster_member_is_not_deleted(
+        self, mock_api, mock_zabbix_api
+    ):
+        """A secondary member's Zabbix ID can belong to the cluster host, so it is kept."""
+        vc_master = MagicMock()
+        vc_master.id = 2
+        virtual_chassis = MagicMock()
+        virtual_chassis.master = vc_master
+        virtual_chassis.name = "SW01"
+        device = MockNetboxDevice(
+            device_id=1,
+            name="SW01N0",
+            status_label="Decommissioning",
+            zabbix_hostid=42,
+            virtual_chassis=virtual_chassis,
+        )
+        mock_netbox = self._setup_netbox_mock(mock_api)
+        mock_netbox.dcim.devices.filter.return_value = [device]
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix.host.get.return_value = [{"hostid": "42"}]
+
+        syncer = Sync({"clustering": True})
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.delete.assert_not_called()
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_removal_state_primary_cluster_member_is_deleted(
+        self, mock_api, mock_zabbix_api
+    ):
+        """The primary member in a removal state is still deleted."""
+        vc_master = MagicMock()
+        vc_master.id = 1
+        virtual_chassis = MagicMock()
+        virtual_chassis.master = vc_master
+        virtual_chassis.name = "SW01"
+        device = MockNetboxDevice(
+            device_id=1,
+            name="SW01N0",
+            status_label="Decommissioning",
+            zabbix_hostid=42,
+            virtual_chassis=virtual_chassis,
+        )
+        mock_netbox = self._setup_netbox_mock(mock_api)
+        mock_netbox.dcim.devices.filter.return_value = [device]
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix.host.get.return_value = [{"hostid": "42"}]
+
+        syncer = Sync({"clustering": True})
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        syncer.start()
+
+        mock_zabbix.host.delete.assert_called_once_with(42)
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_templates_from_config_context(self, mock_api, mock_zabbix_api):
         """Test that templates_config_context=True uses the config context template."""
         device = MockNetboxDevice(

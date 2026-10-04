@@ -218,6 +218,17 @@ class Sync:
             return False
         return True
 
+    def _is_cluster_secondary(self, device: PhysicalDevice) -> bool:
+        """
+        A secondary member's Zabbix ID can still point to the cluster host
+        (e.g. after a failover), so it must never trigger a removal.
+        """
+        return bool(
+            self.config["clustering"]
+            and device.is_cluster()
+            and device.get_cluster_master() != device.id
+        )
+
     def _remove_host(self, host: Host) -> bool:
         """
         Delete the host from Zabbix if its status is in zabbix_device_removal.
@@ -225,6 +236,8 @@ class Sync:
         Returns True if the host was in a removal state.
         """
         if host.status not in self.config["zabbix_device_removal"]:
+            return False
+        if isinstance(host, PhysicalDevice) and self._is_cluster_secondary(host):
             return False
         if host.zabbix_id:
             host.cleanup()
