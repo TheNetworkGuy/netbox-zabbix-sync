@@ -437,6 +437,12 @@ class Sync:
                         logger.info(
                             "Host %s: is part of cluster and primary.", device.name
                         )
+                        if not device.zabbix_id:
+                            device.adopt_cluster_host(
+                                self.netbox.dcim.devices.filter(
+                                    virtual_chassis_id=nb_device.virtual_chassis.id
+                                )
+                            )
                     else:
                         logger.info(
                             "Host %s: Is part of cluster but not primary. Skipping this host...",

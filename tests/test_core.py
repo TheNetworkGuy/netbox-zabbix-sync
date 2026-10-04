@@ -882,6 +882,55 @@ class TestDeviceHandeling(unittest.TestCase):
 
     @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
     @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_sync_cluster_failover_keeps_existing_host(self, mock_api, mock_zabbix_api):
+        """After a failover the new primary takes over the Zabbix host of the former primary."""
+        vc_master = MagicMock()
+        vc_master.id = 2
+        virtual_chassis = MagicMock()
+        virtual_chassis.id = 10
+        virtual_chassis.master = vc_master
+        virtual_chassis.name = "SW01"
+
+        new_primary = MockNetboxDevice(
+            device_id=2,
+            name="SW01N1",
+            zabbix_hostid=None,
+            virtual_chassis=virtual_chassis,
+        )
+        former_primary = MockNetboxDevice(
+            device_id=1,
+            name="SW01N0",
+            zabbix_hostid=42,
+            virtual_chassis=virtual_chassis,
+        )
+
+        mock_netbox = self._setup_netbox_mock(mock_api)
+        mock_netbox.dcim.devices.filter.side_effect = lambda **kwargs: (
+            [new_primary, former_primary]
+            if "virtual_chassis_id" in kwargs
+            else [new_primary]
+        )
+        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync({"clustering": True})
+        syncer.connect(
+            "http://netbox.local",
+            "nb_token",
+            "http://zabbix.local",
+            "user",
+            "pass",
+            None,
+        )
+        with patch.object(MockNetboxDevice, "save") as mock_save:
+            syncer.start()
+
+        mock_zabbix.host.create.assert_not_called()
+        self.assertEqual(new_primary.custom_fields["zabbix_hostid"], 42)
+        self.assertIsNone(former_primary.custom_fields["zabbix_hostid"])
+        self.assertEqual(mock_save.call_count, 2)
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_sync_cluster_where_device_is_not_primary(self, mock_api, mock_zabbix_api):
         """Test that a non-primary cluster member is skipped and not created in Zabbix."""
         # vc_master.id (2) differs from device.id (1) → device is secondary

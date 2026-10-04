@@ -163,3 +163,39 @@ class TestPhysicalDevice(unittest.TestCase):
 
         self.assertFalse(device.promote_primary_device())
         self.assertEqual(device.name, "test-device")
+
+    # ------------------------------------------------------------------
+    # adopt_cluster_host
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _member(member_id, name, zabbix_id):
+        member = MagicMock()
+        member.id = member_id
+        member.name = name
+        member.custom_fields = {"zabbix_hostid": zabbix_id}
+        return member
+
+    def test_adopt_cluster_host_moves_id_from_former_primary(self):
+        """The Zabbix ID moves from the former primary to this device."""
+        former = self._member(1, "SW01N0", 42)
+        self.assertTrue(self.device.adopt_cluster_host([self.mock_nb_device, former]))
+        self.assertEqual(self.device.zabbix_id, 42)
+        self.assertEqual(self.mock_nb_device.custom_fields["zabbix_hostid"], 42)
+        self.assertIsNone(former.custom_fields["zabbix_hostid"])
+        self.mock_nb_device.save.assert_called_once()
+        former.save.assert_called_once()
+
+    def test_adopt_cluster_host_without_holder_does_nothing(self):
+        """No other member has an ID: nothing to transfer."""
+        other = self._member(1, "SW01N0", None)
+        self.assertFalse(self.device.adopt_cluster_host([other]))
+        self.assertIsNone(self.device.zabbix_id)
+        self.mock_nb_device.save.assert_not_called()
+
+    def test_adopt_cluster_host_with_multiple_holders_does_nothing(self):
+        """Ambiguous: more than one member has an ID, so nothing is moved."""
+        members = [self._member(1, "SW01N0", 42), self._member(3, "SW01N2", 43)]
+        self.assertFalse(self.device.adopt_cluster_host(members))
+        self.assertIsNone(self.device.zabbix_id)
+        members[0].save.assert_not_called()
