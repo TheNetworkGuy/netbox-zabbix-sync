@@ -1268,15 +1268,12 @@ class TestDeviceStatusHandling(unittest.TestCase):
 
         mock_zabbix.host.delete.assert_called_once_with(42)
 
-    # ------------------------------------------------------------------
-    # Regression (#155): removal must not depend on a primary IP
-    # ------------------------------------------------------------------
     @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
     @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_decommissioning_device_without_primary_ip_is_deleted(
         self, mock_api, mock_zabbix_api
     ):
-        """A device in a removal state is deleted even when its primary IP was moved away."""
+        """Removal does not require a primary IP (#155)."""
         device = MockNetboxDevice(
             name="test-device",
             status_label="Decommissioning",
@@ -1305,7 +1302,7 @@ class TestDeviceStatusHandling(unittest.TestCase):
     def test_active_device_without_primary_ip_is_still_skipped(
         self, mock_api, mock_zabbix_api
     ):
-        """Paired off-state: without a removal status the missing IP still skips the host."""
+        """Without a removal status a missing IP still skips the host."""
         device = MockNetboxDevice(
             name="test-device",
             status_label="Active",
@@ -1626,15 +1623,12 @@ class TestVMStatusHandling(unittest.TestCase):
 
         mock_zabbix.host.delete.assert_called_once_with(42)
 
-    # ------------------------------------------------------------------
-    # Regression (#155): removal must not depend on a primary IP
-    # ------------------------------------------------------------------
     @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
     @patch("netbox_zabbix_sync.modules.core.nbapi")
     def test_decommissioning_vm_without_primary_ip_is_deleted(
         self, mock_api, mock_zabbix_api
     ):
-        """A VM in a removal state is deleted even when its primary IP was moved away."""
+        """Removal does not require a primary IP (#155)."""
         vm = MockNetboxVM(
             name="test-vm",
             status_label="Decommissioning",
@@ -1663,7 +1657,7 @@ class TestVMStatusHandling(unittest.TestCase):
     def test_active_vm_without_primary_ip_is_still_skipped(
         self, mock_api, mock_zabbix_api
     ):
-        """Paired off-state: without a removal status the missing IP still skips the host."""
+        """Without a removal status a missing IP still skips the host."""
         vm = MockNetboxVM(
             name="test-vm",
             status_label="Active",

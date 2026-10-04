@@ -101,8 +101,8 @@ def test_removal_status_on_a_host_zabbix_never_had_is_a_no_op(
 ):
     """A device that is removable on its first sync is skipped, not an error.
 
-    `_remove_host` returns early with no Zabbix ID rather than calling cleanup
-    (core.py). The run has to continue: an inventory full of
+    `_remove_host` returns early with no Zabbix ID rather than calling cleanup.
+    The run has to continue: an inventory full of
     decommissioned devices is ordinary, and each one raising would end it.
     """
     removable = device_factory(status=DECOMMISSIONING[0])

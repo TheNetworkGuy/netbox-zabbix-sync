@@ -220,13 +220,9 @@ class Sync:
 
     def _remove_host(self, host: Host) -> bool:
         """
-        Remove a host from Zabbix when its NetBox status is in zabbix_device_removal.
-
-        Removal only needs the Zabbix ID and the status, so this runs before any
-        check that is a prerequisite for creating or updating a host (IP,
-        template, hostgroup, clustering). A host that can no longer be created
-        must still be removable. Returns True if the host is in a removal state
-        and needs no further processing.
+        Delete the host from Zabbix if its status is in zabbix_device_removal.
+        Runs before the IP/template/hostgroup checks, which removal doesn't need.
+        Returns True if the host was in a removal state.
         """
         if host.status not in self.config["zabbix_device_removal"]:
             return False
@@ -251,8 +247,6 @@ class Sync:
         Handle the shared sync steps for any Host (device or VM):
         inventory, usermacros, tags, disabled state, hostgroup creation,
         and Zabbix create or consistency check.
-
-        Hosts in a removal state are handled earlier by _remove_host().
         """
         host.set_inventory(host.nb)
         host.set_usermacros()
