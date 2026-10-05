@@ -2,7 +2,10 @@
 Device specific handeling for NetBox to Zabbix
 """
 
+from pynetbox import RequestError as NetboxRequestError
+
 from netbox_zabbix_sync.modules.exceptions import (
+    SyncExternalError,
     SyncInventoryError,
 )
 from netbox_zabbix_sync.modules.host import Host
@@ -71,3 +74,44 @@ class PhysicalDevice(Host):
         self.logger.info("Host %s is non-primary cluster member.", self.name)
 
         return False
+
+    def adopt_cluster_host(self, members) -> bool:
+        """
+        After a failover the new primary has no Zabbix ID, while the former
+        primary still holds the ID of the cluster host. Move the ID to this
+        device so the existing host and its history are kept.
+        Returns True if an ID was transferred.
+        """
+        cf = self.config["device_cf"]
+        holders = [m for m in members if m.id != self.id and m.custom_fields.get(cf)]
+        if not holders:
+            return False
+        if len(holders) > 1:
+            self.logger.warning(
+                "Host %s: multiple cluster members have a Zabbix ID. "
+                "Not transferring the cluster host.",
+                self.name,
+            )
+            return False
+        former = holders[0]
+        zabbix_id = former.custom_fields[cf]
+        try:
+            self.nb.custom_fields[cf] = zabbix_id
+            self.nb.save()
+            former.custom_fields[cf] = None
+            former.save()
+        except NetboxRequestError as e:
+            message = f"Host {self.name}: unable to transfer Zabbix ID: {e}."
+            self.logger.error(message)
+            raise SyncExternalError(message) from e
+        self.zabbix_id = zabbix_id
+        self.logger.info(
+            "Host %s: took over Zabbix host %s from former primary %s.",
+            self.name,
+            zabbix_id,
+            former.name,
+        )
+        self.create_journal_entry(
+            "info", f"Took over Zabbix host {zabbix_id} from {former.name}"
+        )
+        return True
