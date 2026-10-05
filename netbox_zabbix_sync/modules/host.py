@@ -49,6 +49,7 @@ class Host(ABC):
     zabbix_state: int
     journal: bool
     nb_journals: Endpoint
+    nb_object_type: str
     oob_ip: str | None
     inventory_mode: int
     inventory: dict
@@ -1268,7 +1269,7 @@ class Host(ABC):
                 )
                 return False
             journal = {
-                "assigned_object_type": "dcim.device",
+                "assigned_object_type": self.nb_object_type,
                 "assigned_object_id": self.id,
                 "kind": severity,
                 "comments": message,

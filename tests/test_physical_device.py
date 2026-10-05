@@ -42,6 +42,14 @@ class TestPhysicalDevice(unittest.TestCase):
         """PhysicalDevice sets hostgroup_type to 'dev'."""
         self.assertEqual(self.device.hostgroup_type, "dev")
 
+    def test_journal_entry_targets_device(self):
+        """Journal entries are assigned to a dcim.device."""
+        self.device.journal = True
+        self.device.create_journal_entry("info", "test")
+        journal = self.mock_nb_journal.create.call_args.args[0]
+        self.assertEqual(journal["assigned_object_type"], "dcim.device")
+        self.assertEqual(journal["assigned_object_id"], 123)
+
     # ------------------------------------------------------------------
     # Map methods
     # ------------------------------------------------------------------

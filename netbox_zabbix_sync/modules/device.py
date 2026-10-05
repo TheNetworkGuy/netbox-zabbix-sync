@@ -17,6 +17,8 @@ class PhysicalDevice(Host):
     INPUT: (NetBox device class, ZabbixAPI class, journal flag, NB journal class)
     """
 
+    nb_object_type = "dcim.device"
+
     def _inventory_map(self):
         """Use device inventory maps"""
         return self.config["device_inventory_map"]
