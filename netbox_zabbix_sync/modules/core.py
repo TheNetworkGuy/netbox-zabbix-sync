@@ -224,6 +224,37 @@ class Sync:
             return False
         return True
 
+    def _is_cluster_secondary(self, device: PhysicalDevice) -> bool:
+        """
+        A secondary member's Zabbix ID can still point to the cluster host
+        (e.g. after a failover), so it must never trigger a removal.
+        """
+        return bool(
+            self.config["clustering"]
+            and device.is_cluster()
+            and device.get_cluster_master() != device.id
+        )
+
+    def _remove_host(self, host: Host) -> bool:
+        """
+        Delete the host from Zabbix if its status is in zabbix_device_removal.
+        Runs before the IP/template/hostgroup checks, which removal doesn't need.
+        Returns True if the host was in a removal state.
+        """
+        if host.status not in self.config["zabbix_device_removal"]:
+            return False
+        if isinstance(host, PhysicalDevice) and self._is_cluster_secondary(host):
+            return False
+        if host.zabbix_id:
+            host.cleanup()
+            self.logger.info("Host %s: cleanup complete", host.name)
+        else:
+            self.logger.info(
+                "Host %s: Skipping since this host is not in the active state.",
+                host.name,
+            )
+        return True
+
     def _sync_host(
         self,
         host: Host,
@@ -233,23 +264,12 @@ class Sync:
     ):
         """
         Handle the shared sync steps for any Host (device or VM):
-        inventory, usermacros, tags, status/cleanup, hostgroup creation,
+        inventory, usermacros, tags, disabled state, hostgroup creation,
         and Zabbix create or consistency check.
         """
         host.set_inventory(host.nb)
         host.set_usermacros()
         host.set_tags()
-
-        if host.status in self.config["zabbix_device_removal"]:
-            if host.zabbix_id:
-                host.cleanup()
-                self.logger.info("Host %s: cleanup complete", host.name)
-                return
-            self.logger.info(
-                "Host %s: Skipping since this host is not in the active state.",
-                host.name,
-            )
-            return
 
         if host.status in self.config["zabbix_device_disable"]:
             host.zabbix_state = 1
@@ -363,6 +383,8 @@ class Sync:
                     config=self.config,
                 )
                 self.logger.debug("Host %s: Started operations on VM.", vm.name)
+                if self._remove_host(vm):
+                    continue
                 if self.config["extended_site_properties"] and nb_vm.site:
                     self.logger.debug("Host %s: Extending site information.", vm.name)
                     nb_vm.site.full_details()
@@ -401,6 +423,8 @@ class Sync:
                     config=self.config,
                 )
                 self.logger.debug("Host %s: Started operations on device.", device.name)
+                if self._remove_host(device):
+                    continue
                 if self.config["extended_site_properties"] and nb_device.site:
                     self.logger.debug(
                         "Host %s: Extending site information.", device.name
