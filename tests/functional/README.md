@@ -110,6 +110,32 @@ The site also carries latitude/longitude, which `extended_site_properties` is
 the only way to reach. Per-test devices come from the `device_factory` fixture
 and per-test VMs from `vm_factory`.
 
+It then seeds a second layer that nothing strictly requires: a nested region
+(`Europe` → `Netherlands`) above the site, a site group, a tenant and its
+group, a platform, and the custom fields a NetBox instance grows on its own —
+`environment` (select), `compliance_frameworks` (multiselect),
+`monitoring_enabled`, `maintenance_window`, `service_owner` (an object field
+pointing at a tenant), `support_expiry` and `documentation_url`. The point is
+shape, not decoration:
+
+- The sync fetches **every** text, object and select custom field on a device
+  before syncing anything (`core.py:283`) and validates the hostgroup format
+  against the names it finds. An instance whose only custom fields are the two
+  the sync owns is a case no real user is in.
+- The three ways NetBox serialises a custom field value — a bare string, a
+  *list* of them for a multiselect, and a nested object — are then all present
+  on every device the suite syncs, which is what `cf_to_string` (`tools.py:102`)
+  exists to flatten.
+- `region`, `site_group`, `tenant` and `tenant_group` are all valid hostgroup
+  format segments, and `traverse_regions` / `traverse_site_groups` walk the
+  ancestry of the first two. A site hanging off nothing leaves that unreachable
+  from the seeded device.
+
+`environment` and `monitoring_enabled` carry NetBox defaults, so every device
+and VM the factories create comes out with them populated. Nothing is marked
+required — a required custom field would make every device creation in the
+suite fail.
+
 Both factories allocate a unique IP by default, out of `10.128/9`, which is kept
 clear of every hard-coded address in the suite. Pass `address=` only when the
 test asserts on the value; NetBox rejects a duplicate address globally, so a

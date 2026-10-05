@@ -90,6 +90,10 @@ DEFAULT_CONFIG = {
     "description_dt_format": "%Y-%m-%d %H:%M:%S",
     "description": "static",
     "render_config_context": False,
+    "log_file": None,
+    "log_rotation": True,
+    "log_console": True,
+    "log_handlers": None,
 }
 
 
