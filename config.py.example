@@ -68,7 +68,7 @@ create_journal = False
 # When set to True, the script will create an additional Zabbix interface for the OOB IP set configured on the device in NetBox.
 # This will need to be a different interface typ than the interface type used for the primary interface.
 # This can be configured through config contxt, see documentation for futher info:
-# https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#set-interface-parameters-within-netbox
+# https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#out-of-band-interfaces
 oob_sync = False
 
 ## Virtual machine sync
@@ -77,7 +77,7 @@ oob_sync = False
 # hostgroup atributes of VM's such as cluster_type and cluster
 sync_vms = False
 
-# Check the README documentation for values to use in the VM hostgroup format.
+# See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#layout for values to use in the VM hostgroup format.
 vm_hostgroup_format = "cluster_type/cluster/role"
 
 ## Proxy Sync
@@ -91,7 +91,7 @@ zabbix_device_removal = ["Decommissioning", "Inventory"]
 zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
 
 ## Hostgroup mapping
-# See the README documentation for available options
+# See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#layout for available options
 # You can also use CF (custom field) names under the device. The CF content will be used for the hostgroup generation.
 #
 # When using region in the group name, the default behaviour is to use name of the directly assigned region.
@@ -165,7 +165,7 @@ vm_inventory_map = { "status/label": "deployment_status",
 # this will enable both field mapping and config context usermacros.
 #
 # If set to "full", it will force the update of secret usermacros every run.
-# Please see the README.md for more information.
+# See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#usermacros for more information.
 usermacro_sync = False
 
 # device usermacro_map to map NetBox fields to usermacros.
