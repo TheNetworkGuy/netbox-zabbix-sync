@@ -430,7 +430,7 @@ class TestHostgroups(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_vm_without_cluster(self):
-        """Test that cluster/cluster_type are absent from format_options when VM has no cluster."""
+        """Test that cluster/cluster_type are left out of the hostgroup when VM has no cluster."""
         clusterless_vm = MagicMock()
         clusterless_vm.name = "clusterless-vm"
         clusterless_vm.site = self.mock_vm.site
@@ -442,13 +442,12 @@ class TestHostgroups(unittest.TestCase):
 
         hostgroup = Hostgroup("vm", clusterless_vm, "4.0", self.mock_logger)
 
-        # cluster and cluster_type must not appear in format_options
-        self.assertNotIn("cluster", hostgroup.format_options)
-        self.assertNotIn("cluster_type", hostgroup.format_options)
+        # cluster and cluster_type have no value
+        self.assertIsNone(hostgroup.format_options["cluster"])
+        self.assertIsNone(hostgroup.format_options["cluster_type"])
 
-        # Requesting cluster in a format must raise HostgroupError
-        with self.assertRaises(HostgroupError):
-            hostgroup.generate("cluster/role")
+        # Empty cluster levels are skipped, like other empty fields
+        self.assertEqual(hostgroup.generate("cluster_type/cluster/role"), "TestRole")
 
     def test_empty_custom_field_skipped_in_format(self):
         """Test that an empty (None) custom field is silently omitted from the hostgroup name."""

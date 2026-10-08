@@ -86,9 +86,13 @@ class Hostgroup:
             )
             format_options["rack"] = self.nb.rack.name if self.nb.rack else None
         # Variables only applicable for VM's such as clusters
-        if self.type == "vm" and self.nb.cluster:
-            format_options["cluster"] = self.nb.cluster.name
-            format_options["cluster_type"] = self.nb.cluster.type.name
+        if self.type == "vm":
+            format_options["cluster"] = (
+                self.nb.cluster.name if self.nb.cluster else None
+            )
+            format_options["cluster_type"] = (
+                self.nb.cluster.type.name if self.nb.cluster else None
+            )
         self.format_options = format_options
         self.logger.debug(
             "Host %s: Resolved properties for use in hostgroups: %s",
