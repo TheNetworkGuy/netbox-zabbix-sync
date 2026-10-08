@@ -628,7 +628,8 @@ class Host(ABC):
                         self.nb.custom_fields[self.config[field_config]]
                     )
                 elif (
-                    self.config[field_config] in self.nb.site.custom_fields
+                    self.nb.site
+                    and self.config[field_config] in self.nb.site.custom_fields
                     and self.nb.site.custom_fields[self.config[field_config]]
                 ):
                     proxy_name = cf_to_string(

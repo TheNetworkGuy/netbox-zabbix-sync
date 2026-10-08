@@ -167,3 +167,24 @@ class TestVirtualMachineInterface(_VMSetUp):
         interface = vm.set_interface_details()
         self.assertEqual(interface["type"], 2)
         self.assertEqual(interface["port"], "161")
+
+
+class TestVirtualMachineProxy(_VMSetUp):
+    """Test proxy selection for VMs."""
+
+    def test_proxy_cf_without_site(self):
+        """A VM without a site falls back to config context for its proxy."""
+        self.mock_nb_vm.site = None
+        self.mock_nb_vm.custom_fields = {"zabbix_hostid": None, "zabbix_proxy": None}
+        self.mock_nb_vm.config_context = {"zabbix": {"proxy": "proxy1"}}
+        self.mock_zabbix.version = 7.0
+        vm = _make_vm(
+            self.mock_nb_vm,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            self.mock_logger,
+            config={"proxy_cf": "zabbix_proxy", "proxy_group_cf": False},
+        )
+        proxy = {"name": "proxy1", "type": "proxy", "id": "1"}
+        self.assertTrue(vm._set_proxy([proxy]))
+        self.assertEqual(vm.zbxproxy, proxy)
