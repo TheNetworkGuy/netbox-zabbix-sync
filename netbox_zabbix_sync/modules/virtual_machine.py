@@ -12,6 +12,8 @@ from netbox_zabbix_sync.modules.interface import ZabbixInterface
 class VirtualMachine(Host):
     """Model for virtual machines"""
 
+    nb_object_type = "virtualization.virtualmachine"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hostgroup = None

@@ -8,6 +8,7 @@ nothing may connect to anything at import time.
 import contextlib
 import os
 from ipaddress import ip_interface
+from itertools import count
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
@@ -32,6 +33,23 @@ BASE_CONFIG = {
     "create_journal": False,
     "skip_version_check": True,  # Running tests against version matrix, allow for experimental versions
 }
+
+# Distinguishes "the caller said None" from "the caller said nothing", where
+# None is a meaningful value rather than an absence -- vm_factory's config
+# context being the case that needs it.
+UNSET = object()
+
+# NetBox rejects a duplicate address in the global table, so every device and VM
+# needs its own even when the test does not care what it is. 10.128/9 is left
+# free by the tests that do hard-code an address (all of them in 10.0, 10.1,
+# 10.20 or 192.168), so a generated address can never collide with a named one.
+_address_counter = count()
+
+
+def next_address() -> str:
+    """An address no other host in the run is using."""
+    n = next(_address_counter)
+    return f"10.128.{n // 254}.{n % 254 + 1}/24"
 
 
 FUNCTIONAL_DIR = Path(__file__).parent
@@ -228,41 +246,238 @@ def device_factory(nb, zapi, seeded):
 
     Cleanup covers Zabbix too: a synced device leaves a host behind, and the
     next test would otherwise see it.
+
+    The optional arguments exist for the attribute-generation features. Config
+    context arrives as `local_context_data`, the device-local layer NetBox
+    merges into the rendered `config_context` the sync reads: it needs no
+    ConfigContext object, no assignment rules, and it cannot leak into another
+    test's device the way a site- or role-scoped context would.
     """
     created = []
 
-    def make(status: str = "active", address: str = "10.0.0.1/24"):
+    def make(
+        status: str = "active",
+        address: str | None = None,
+        config_context: dict | None = None,
+        tags: list[int] | None = None,
+        dns_name: str = "",
+        oob_address: str | None = None,
+        address6: str | None = None,
+        site: int | None = None,
+        **fields,
+    ):
         name = f"fn-{uuid4().hex[:8]}"
         device = nb.dcim.devices.create(
             name=name,
             device_type=seeded["device_type"].id,
             role=seeded["role"].id,
-            site=seeded["site"].id,
+            # Named rather than left to **fields: the seeded site is the default
+            # and would collide with a site= passed through as a plain field.
+            # Overridden by the hostgroup tests, which need a site carrying a
+            # region or a site group.
+            site=site or seeded["site"].id,
             status=status,
+            local_context_data=config_context,
+            tags=tags or [],
+            **fields,
         )
+        # Deleted in list order, so anything that must go before the device it
+        # points at is appended after it.
+        dependents = [device]
+        # Registered before the dependents exist so a failure below still tears
+        # the device down. `dependents` is mutated in place from here on, so the
+        # tuple already in `created` keeps seeing the additions.
+        created.append((device, dependents))
+        address = address or next_address()
         interface = nb.dcim.interfaces.create(
             device=device.id, name="eth0", type="1000base-t"
         )
         ip = nb.ipam.ip_addresses.create(
             address=address,
+            dns_name=dns_name,
             assigned_object_type="dcim.interface",
             assigned_object_id=interface.id,
         )
+        dependents += [ip, interface]
         device.primary_ip4 = ip.id
+
+        if address6:
+            # Hung off the same interface as the v4 address, which is how a
+            # dual-stack host is normally modelled and keeps `preferred_ip`
+            # the only thing choosing between the two.
+            ip6 = nb.ipam.ip_addresses.create(
+                address=address6,
+                assigned_object_type="dcim.interface",
+                assigned_object_id=interface.id,
+            )
+            dependents.insert(1, ip6)
+            device.primary_ip6 = ip6.id
+
+        if oob_address:
+            oob_interface = nb.dcim.interfaces.create(
+                device=device.id, name="mgmt0", type="1000base-t"
+            )
+            oob_ip = nb.ipam.ip_addresses.create(
+                address=oob_address,
+                assigned_object_type="dcim.interface",
+                assigned_object_id=oob_interface.id,
+            )
+            dependents += [oob_ip, oob_interface]
+            device.oob_ip = oob_ip.id
+
         device.save()
-        device = nb.dcim.devices.get(device.id)
-        created.append((device, interface, ip))
-        return device
+        # Refetched so the caller sees the primary IP it just assigned. The
+        # copy registered for cleanup above stays as it is -- teardown only
+        # needs the id and the name, and both are already on it.
+        return nb.dcim.devices.get(device.id)
 
     yield make
 
-    for device, interface, ip in reversed(created):
+    for device, dependents in reversed(created):
         for host in zapi.host.get(filter={"host": device.name}, output=["hostid"]):
             zapi.host.delete(host["hostid"])
-        for obj in (ip, interface, device):
+        # The device goes last: NetBox refuses to delete an IP's interface
+        # while the device still names that IP as its primary or OOB.
+        for obj in (*dependents[1:], device):
             # Already gone, or removed by a cascading delete.
             with contextlib.suppress(pynetbox.RequestError):
                 obj.delete()
+
+
+def vm_context(**zabbix_keys) -> dict:
+    """A VM config context carrying the agent template, plus whatever is added.
+
+    Every VM that is expected to sync needs one. A VM takes its templates from
+    the config context alone -- `set_vm_template` deliberately skips the custom
+    field lookup devices use (virtual_machine.py:35) -- and core.py:371 drops a
+    VM with no templates before it ever reaches Zabbix. So a VM test that sets a
+    config context for some other purpose has to carry the template along, or it
+    silently stops testing what it meant to.
+    """
+    return {"zabbix": {"templates": [seed_netbox.ZABBIX_VM_TEMPLATE], **zabbix_keys}}
+
+
+@pytest.fixture
+def vm_factory(nb, zapi, seeded):
+    """Create uniquely-named NetBox VMs and clean up after the test.
+
+    The device_factory's counterpart. Two differences are worth knowing:
+    `config_context` defaults to `vm_context()` rather than nothing, because a
+    VM without one never reaches Zabbix at all (see `vm_context`); and the VM
+    gets `site` as well as `cluster`, since the default vm_tag_map maps
+    `site/name` and a site is optional for VMs.
+    """
+    created = []
+
+    def make(
+        status: str = "active",
+        address: str | None = None,
+        config_context=UNSET,
+        tags: list[int] | None = None,
+        dns_name: str = "",
+        **fields,
+    ):
+        name = f"fn-vm-{uuid4().hex[:8]}"
+        vm = nb.virtualization.virtual_machines.create(
+            name=name,
+            cluster=seeded["cluster"].id,
+            role=seeded["role"].id,
+            site=seeded["site"].id,
+            status=status,
+            local_context_data=vm_context()
+            if config_context is UNSET
+            else config_context,
+            tags=tags or [],
+            **fields,
+        )
+        dependents = [vm]
+        # Registered before its dependents, so a failure below still cleans up.
+        # See the same note in device_factory.
+        created.append((vm, dependents))
+        interface = nb.virtualization.interfaces.create(
+            virtual_machine=vm.id, name="eth0"
+        )
+        ip = nb.ipam.ip_addresses.create(
+            address=address or next_address(),
+            dns_name=dns_name,
+            assigned_object_type="virtualization.vminterface",
+            assigned_object_id=interface.id,
+        )
+        dependents += [ip, interface]
+        vm.primary_ip4 = ip.id
+        vm.save()
+        return nb.virtualization.virtual_machines.get(vm.id)
+
+    yield make
+
+    for vm, dependents in reversed(created):
+        for host in zapi.host.get(filter={"host": vm.name}, output=["hostid"]):
+            zapi.host.delete(host["hostid"])
+        # The VM goes last, for the same reason the device does: NetBox refuses
+        # to delete the interface an IP hangs off while the VM still names that
+        # IP as its primary.
+        for obj in (*dependents[1:], vm):
+            with contextlib.suppress(pynetbox.RequestError):
+                obj.delete()
+
+
+@pytest.fixture
+def tag_factory(nb):
+    """Create uniquely-named NetBox tags and remove them afterwards.
+
+    Tags are global, like custom fields, so each test gets its own rather than
+    risking a leftover tag turning up in another test's Zabbix host tags.
+    """
+    created = []
+
+    def make(name: str | None = None):
+        slug = f"tag-{uuid4().hex[:8]}"
+        tag = nb.extras.tags.create(name=name or slug.upper(), slug=slug)
+        created.append(tag)
+        return tag
+
+    yield make
+
+    for tag in reversed(created):
+        with contextlib.suppress(pynetbox.RequestError):
+            tag.delete()
+
+
+@pytest.fixture
+def virtual_chassis_factory(nb, zapi):
+    """Create a virtual chassis over existing devices, master first.
+
+    Torn down before `device_factory`'s devices: this fixture is requested
+    after it, so its finalizer runs first, and NetBox nulls the members'
+    `virtual_chassis` on delete rather than blocking on it.
+
+    Cleanup deletes the Zabbix host named after the chassis as well. With
+    `clustering` on, the master is promoted to the chassis name (device.py:57),
+    so the host it leaves behind is not named after any device and
+    `device_factory` would never find it.
+    """
+    created = []
+
+    def make(master, *members, domain: str = ""):
+        # domain is nullable in NetBox's model but not over the API, which
+        # rejects an explicit null with a 400.
+        vc = nb.dcim.virtual_chassis.create(
+            name=f"vc-{uuid4().hex[:8]}", master=master.id, domain=domain
+        )
+        for position, device in enumerate((master, *members), start=1):
+            device.virtual_chassis = vc.id
+            device.vc_position = position
+            device.save()
+        created.append(vc)
+        return vc
+
+    yield make
+
+    for vc in reversed(created):
+        for host in zapi.host.get(filter={"host": vc.name}, output=["hostid"]):
+            zapi.host.delete(host["hostid"])
+        with contextlib.suppress(pynetbox.RequestError):
+            vc.delete()
 
 
 @pytest.fixture
@@ -308,6 +523,31 @@ def run_sync(sync_runner):
 
     def _run(device_name: str, **overrides):
         sync_runner(device_filter={"name": device_name}, **overrides)
+
+    return _run
+
+
+# A device name no device has, used to scope a VM sync down to its VM. The
+# devices half of start() runs regardless of sync_vms, so without this a VM test
+# also syncs whatever devices another test left in NetBox.
+NO_DEVICES = {"name": "fn-no-such-device"}
+
+
+@pytest.fixture
+def run_vm_sync(sync_runner):
+    """Run the real Sync, scoped to one VM, with sync_vms on.
+
+    `sync_vms` defaults to False, so a VM test that forgets it passes an empty
+    NetBox for the VM half and asserts nothing. It is set here rather than left
+    to each test, and can still be overridden to test the off state.
+    """
+
+    def _run(vm_name: str, **overrides):
+        sync_runner(
+            device_filter=NO_DEVICES,
+            vm_filter={"name": vm_name},
+            **{"sync_vms": True, **overrides},
+        )
 
     return _run
 
@@ -408,7 +648,13 @@ def custom_field_factory(nb):
 
 @pytest.fixture
 def zabbix_host(zapi):
-    """Read a Zabbix host back with everything the assertions need."""
+    """Read a Zabbix host back with everything the assertions need.
+
+    Tags, macros and inventory are selected here rather than in a second
+    fixture because Zabbix omits each of them unless asked, and a test that
+    forgot the select would read an absent key as an absent value -- passing
+    for a host whose tags were never synced.
+    """
 
     def _get(name: str):
         hosts = zapi.host.get(
@@ -417,10 +663,33 @@ def zabbix_host(zapi):
             selectHostGroups=["name"],
             selectParentTemplates=["host"],
             selectInterfaces="extend",
+            selectTags="extend",
+            selectMacros="extend",
+            selectInventory="extend",
         )
         return hosts[0] if hosts else None
 
     return _get
+
+
+def tag_pairs(host: dict) -> set[tuple[str, str]]:
+    """The host's Zabbix tags as (tag, value) pairs."""
+    return {(tag["tag"], tag["value"]) for tag in host["tags"]}
+
+
+def macro_values(host: dict) -> dict[str, str | None]:
+    """The host's Zabbix usermacros, keyed by macro name.
+
+    A secret macro's value is `None`: Zabbix withholds it by dropping the key
+    from the response entirely, rather than blanking it. Read `macro_types` to
+    assert on one.
+    """
+    return {macro["macro"]: macro.get("value") for macro in host["macros"]}
+
+
+def macro_types(host: dict) -> dict[str, str]:
+    """The host's usermacro types (0 text, 1 secret, 2 vault), by macro name."""
+    return {macro["macro"]: macro["type"] for macro in host["macros"]}
 
 
 def strip_ip_mask(address: str) -> str:

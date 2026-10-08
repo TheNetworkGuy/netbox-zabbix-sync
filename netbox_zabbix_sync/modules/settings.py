@@ -91,6 +91,10 @@ DEFAULT_CONFIG = {
     "description": "static",
     "render_config_context": False,
     "skip_version_check": False,
+    "log_file": None,
+    "log_rotation": True,
+    "log_console": True,
+    "log_handlers": None,
 }
 
 
