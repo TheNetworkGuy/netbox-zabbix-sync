@@ -109,8 +109,23 @@ def load_config(config_file=None):
     for key in conf:
         value_setting = load_env_variable(key)
         if value_setting is not None:
-            conf[key] = value_setting
+            conf[key] = parse_env_value(key, value_setting)
     return conf
+
+
+def parse_env_value(key, value):
+    """
+    Converts the text of an environment variable for boolean settings.
+    Other values, such as "full" for usermacro_sync or a custom field
+    name for proxy_cf, are returned unchanged.
+    """
+    if not isinstance(value, str) or not isinstance(DEFAULT_CONFIG.get(key), bool):
+        return value
+    if value.strip().lower() in ("true", "1", "yes", "on"):
+        return True
+    if value.strip().lower() in ("false", "0", "no", "off"):
+        return False
+    return value
 
 
 def load_env_variable(config_environvar):
