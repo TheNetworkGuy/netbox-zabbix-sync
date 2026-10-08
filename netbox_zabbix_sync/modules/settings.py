@@ -64,13 +64,13 @@ DEFAULT_CONFIG = {
     "device_usermacro_map": {
         "serial": "{$HW_SERIAL}",
         "role/name": "{$DEV_ROLE}",
-        "url": "{$NB_URL}",
+        "display_url": "{$NB_URL}",
         "id": "{$NB_ID}",
     },
     "vm_usermacro_map": {
         "memory": "{$TOTAL_MEMORY}",
         "role/name": "{$DEV_ROLE}",
-        "url": "{$NB_URL}",
+        "display_url": "{$NB_URL}",
         "id": "{$NB_ID}",
     },
     "tag_sync": False,
