@@ -511,7 +511,7 @@ class Host(ABC):
             "md2": 1,
             "md5": 2,
             "straight": 4,
-            "OEM": 5,
+            "oem": 5,
             "rmcp+": 6,
         }
 
@@ -520,7 +520,7 @@ class Host(ABC):
             "user": 2,
             "operator": 3,
             "admin": 4,
-            "OEM": 5,
+            "oem": 5,
         }
         # See if IPMI is defined in Config Context
         if (
