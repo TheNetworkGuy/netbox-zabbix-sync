@@ -153,6 +153,17 @@ class TestZabbixUsermacros(unittest.TestCase):
         self.assertEqual(macro["type"], "1")
         self.assertEqual(macro["description"], "desc")
 
+    def test_render_macro_dict_type_any_case(self):
+        macros = ZabbixUsermacros(self.nb, {}, False, logger=self.logger)
+        for macro_type, expected in (("Secret", "1"), ("VAULT", "2"), ("Text", "0")):
+            macro = macros.render_macro("{$FOO}", {"value": "bar", "type": macro_type})
+            self.assertEqual(macro["type"], expected)
+
+    def test_render_macro_dict_invalid_type(self):
+        macros = ZabbixUsermacros(self.nb, {}, False, logger=self.logger)
+        macro = macros.render_macro("{$FOO}", {"value": "bar", "type": 1})
+        self.assertEqual(macro["type"], "0")
+
     def test_render_macro_dict_missing_value(self):
         macros = ZabbixUsermacros(self.nb, {}, False, logger=self.logger)
         result = macros.render_macro("{$FOO}", {"type": "text"})
