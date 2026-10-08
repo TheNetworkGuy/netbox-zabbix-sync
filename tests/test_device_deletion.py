@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from zabbix_utils import APIRequestError
+from zabbix_utils import APIRequestError, APIVersion
 
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import SyncExternalError
@@ -29,7 +29,7 @@ class TestDeviceDeletion(unittest.TestCase):
 
         # Create mock Zabbix API
         self.mock_zabbix = MagicMock()
-        self.mock_zabbix.version = "6.0"
+        self.mock_zabbix.version = APIVersion("6.0.0")
 
         # Set up mock host.get response
         self.mock_zabbix.host.get.return_value = [{"hostid": "456"}]

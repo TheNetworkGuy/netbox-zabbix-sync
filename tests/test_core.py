@@ -5,7 +5,7 @@ from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 from requests.exceptions import ConnectionError as RequestsConnectionError
-from zabbix_utils import APIRequestError
+from zabbix_utils import APIRequestError, APIVersion
 
 from netbox_zabbix_sync.modules.core import Sync
 
@@ -436,11 +436,11 @@ class TestSyncZabbixAuthentication(unittest.TestCase):
         mock_netbox.dcim.regions.all.return_value = []
         return mock_netbox
 
-    def _setup_zabbix_mock(self, mock_zabbix_api, version="7.0"):
+    def _setup_zabbix_mock(self, mock_zabbix_api, version="7.0.0"):
         """Helper to setup a working Zabbix mock."""
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = version
+        mock_zabbix.version = APIVersion(version)
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
         mock_zabbix.proxy.get.return_value = []
@@ -508,11 +508,11 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         mock_netbox.extras.journal_entries = MagicMock()
         return mock_netbox
 
-    def _setup_zabbix_mock(self, mock_zabbix_api, version="6.0"):
+    def _setup_zabbix_mock(self, mock_zabbix_api, version="6.0.0"):
         """Helper to setup a working Zabbix mock."""
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = version
+        mock_zabbix.version = APIVersion(version)
         mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
         mock_zabbix.template.get.return_value = [
             {"templateid": "1", "name": "TestTemplate"}
@@ -636,7 +636,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
 
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = "6.0"
+        mock_zabbix.version = APIVersion("6.0.0")
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
         mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "host": "proxy1"}]
@@ -663,7 +663,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
 
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = "7.0"
+        mock_zabbix.version = APIVersion("7.0.0")
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
         mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "name": "proxy1"}]
@@ -691,7 +691,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
 
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = "7.0"
+        mock_zabbix.version = APIVersion("7.0.0")
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
         mock_zabbix.proxy.get.return_value = []
@@ -719,7 +719,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
 
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = "6.0"
+        mock_zabbix.version = APIVersion("6.0.0")
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
         mock_zabbix.proxy.get.return_value = []
@@ -765,7 +765,7 @@ class TestSyncProxyNameSanitization(unittest.TestCase):
 
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = "6.0"
+        mock_zabbix.version = APIVersion("6.0.0")
         mock_zabbix.hostgroup.get.return_value = []
         mock_zabbix.template.get.return_value = []
         # Zabbix 6 returns 'host' field
@@ -813,11 +813,11 @@ class TestDeviceHandeling(unittest.TestCase):
         mock_netbox.dcim.regions.all.return_value = []
         return mock_netbox
 
-    def _setup_zabbix_mock(self, mock_zabbix_api, version=7.0):
+    def _setup_zabbix_mock(self, mock_zabbix_api, version="7.0.0"):
         """Helper to setup a working Zabbix mock."""
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = version
+        mock_zabbix.version = APIVersion(version)
         mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
         mock_zabbix.template.get.return_value = [
             {"templateid": "1", "name": "TestTemplate"}
@@ -1169,11 +1169,11 @@ class TestDeviceStatusHandling(unittest.TestCase):
         mock_netbox.extras.journal_entries = MagicMock()
         return mock_netbox
 
-    def _setup_zabbix_mock(self, mock_zabbix_api, version=7.0):
+    def _setup_zabbix_mock(self, mock_zabbix_api, version="7.0.0"):
         """Helper to setup a working Zabbix mock."""
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = version
+        mock_zabbix.version = APIVersion(version)
         mock_zabbix.hostgroup.get.return_value = [
             {"groupid": "1", "name": self.EXPECTED_HOSTGROUP}
         ]
@@ -1534,11 +1534,11 @@ class TestVMStatusHandling(unittest.TestCase):
         mock_netbox.extras.journal_entries = MagicMock()
         return mock_netbox
 
-    def _setup_zabbix_mock(self, mock_zabbix_api, version=7.0):
+    def _setup_zabbix_mock(self, mock_zabbix_api, version="7.0.0"):
         """Helper to setup a working Zabbix mock."""
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        mock_zabbix.version = version
+        mock_zabbix.version = APIVersion(version)
         mock_zabbix.hostgroup.get.return_value = [
             {"groupid": "1", "name": self.EXPECTED_HOSTGROUP}
         ]
@@ -1871,12 +1871,11 @@ class TestCombineFilters(unittest.TestCase):
         mock_netbox.extras.journal_entries = MagicMock()
         return mock_netbox
 
-    def _setup_zabbix_mock(self, mock_zabbix_api, version="7.0"):
+    def _setup_zabbix_mock(self, mock_zabbix_api, version="7.0.0"):
         """Helper to setup a working Zabbix mock."""
         mock_zabbix = MagicMock()
         mock_zabbix_api.return_value = mock_zabbix
-        # Set version as float to match expected type in device.py comparisons
-        mock_zabbix.version = float(version)
+        mock_zabbix.version = APIVersion(version)
         mock_zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": "TestGroup"}]
         mock_zabbix.template.get.return_value = [
             {"templateid": "1", "name": "TestTemplate"}

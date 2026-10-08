@@ -17,6 +17,7 @@ from netbox_zabbix_sync.modules.host import Host
 from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
+    PROXY_GROUPS_MINIMUM_VERSION,
     convert_recordset,
     extend_ips,
     jinjafy_config_context,
@@ -111,18 +112,25 @@ class Sync:
         return True
 
     def connect(
-        self, nb_host, nb_token, zbx_host, zbx_user=None, zbx_pass=None, zbx_token=None
+        self,
+        nb_host,
+        nb_token,
+        zbx_host,
+        zbx_user=None,
+        zbx_pass=None,
+        zbx_token=None,
+        skip_version_check=False,
     ):
         """
-        Docstring for connect
+        Connect to NetBox and Zabbix APIs using provided credentials and settings.
 
-        :param self: Description
-        :param nb_host: Description
-        :param nb_token: Description
-        :param zbx_host: Description
-        :param zbx_user: Description
-        :param zbx_pass: Description
-        :param zbx_token: Description
+        :param nb_host: NetBox host URL
+        :param nb_token: NetBox API token
+        :param zbx_host: Zabbix host URL
+        :param zbx_user: Zabbix username
+        :param zbx_pass: Zabbix password
+        :param zbx_token: Zabbix API token
+        :param skip_version_check: Whether to skip version checking
         """
         # Initialize Netbox API connection
         netbox = nbapi(nb_host, token=nb_token, threading=True)
@@ -166,11 +174,20 @@ class Sync:
             if not zbx_token:
                 self.logger.debug("Using user/password authentication for Zabbix API.")
                 self.zabbix = ZabbixAPI(
-                    zbx_host, user=zbx_user, password=zbx_pass, ssl_context=ssl_ctx
+                    zbx_host,
+                    user=zbx_user,
+                    password=zbx_pass,
+                    ssl_context=ssl_ctx,
+                    skip_version_check=skip_version_check,
                 )
             else:
                 self.logger.debug("Using token authentication for Zabbix API.")
-                self.zabbix = ZabbixAPI(zbx_host, token=zbx_token, ssl_context=ssl_ctx)
+                self.zabbix = ZabbixAPI(
+                    zbx_host,
+                    token=zbx_token,
+                    ssl_context=ssl_ctx,
+                    skip_version_check=skip_version_check,
+                )
             self.zabbix.check_auth()
             self.logger.debug("Zabbix version is %s.", self.zabbix.version)
         except (APIRequestError, ProcessingError) as zbx_error:
@@ -332,7 +349,9 @@ class Sync:
                 logger=self.logger,
             )
         # Set API parameter mapping based on API version
-        proxy_name = "host" if str(self.zabbix.version) < "7" else "name"
+        proxy_name = (
+            "host" if self.zabbix.version < PROXY_GROUPS_MINIMUM_VERSION else "name"
+        )
         # Get all Zabbix and NetBox data
         dev_filter_combined = self._combine_filters(
             self.config["nb_device_filter"], device_filter
@@ -360,7 +379,7 @@ class Sync:
         )
         # Set empty list for proxy processing Zabbix <= 6
         zabbix_proxygroups = []
-        if str(self.zabbix.version) >= "7":
+        if self.zabbix.version >= PROXY_GROUPS_MINIMUM_VERSION:
             zabbix_proxygroups = self.zabbix.proxygroup.get(  # type: ignore
                 output=["proxy_groupid", "name"]
             )
