@@ -87,7 +87,7 @@ _STR_ARGS = [
     ),
     (
         "preferred_ip",
-        "Preferred IP version for inventory sync (ipv4 (default) or ipv6).",
+        "IP version used for the host interface: auto (the NetBox primary IP, default), ipv4 or ipv6.",
         "IP_VERSION",
     ),
     (
