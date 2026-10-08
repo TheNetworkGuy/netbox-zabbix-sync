@@ -449,6 +449,20 @@ class TestHostgroups(unittest.TestCase):
         # Empty cluster levels are skipped, like other empty fields
         self.assertEqual(hostgroup.generate("cluster_type/cluster/role"), "TestRole")
 
+    def test_tenant_without_group(self):
+        """Test that tenant_group is left out when the tenant has no group."""
+        tenant = MagicMock()
+        tenant.__str__.return_value = "TestTenant"
+        tenant.group = None
+        self.mock_device.tenant = tenant
+
+        hostgroup = Hostgroup("dev", self.mock_device, "4.0", self.mock_logger)
+
+        self.assertIsNone(hostgroup.format_options["tenant_group"])
+        self.assertEqual(
+            hostgroup.generate("tenant_group/tenant/role"), "TestTenant/TestRole"
+        )
+
     def test_empty_custom_field_skipped_in_format(self):
         """Test that an empty (None) custom field is silently omitted from the hostgroup name."""
         hostgroup = Hostgroup("dev", self.mock_device, "4.0", self.mock_logger)

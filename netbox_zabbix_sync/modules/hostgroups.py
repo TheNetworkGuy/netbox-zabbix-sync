@@ -73,7 +73,9 @@ class Hostgroup:
             format_options["site"] = self.nb.site.name if self.nb.site else None
             format_options["tenant"] = str(self.nb.tenant) if self.nb.tenant else None
             format_options["tenant_group"] = (
-                str(self.nb.tenant.group) if self.nb.tenant else None
+                str(self.nb.tenant.group)
+                if self.nb.tenant and self.nb.tenant.group
+                else None
             )
             format_options["platform"] = (
                 self.nb.platform.name if self.nb.platform else None
