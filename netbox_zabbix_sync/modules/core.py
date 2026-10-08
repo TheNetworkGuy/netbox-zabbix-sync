@@ -17,6 +17,7 @@ from netbox_zabbix_sync.modules.host import Host
 from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
+    PROXY_GROUPS_MINIMUM_VERSION,
     convert_recordset,
     extend_ips,
     jinjafy_config_context,
@@ -348,7 +349,9 @@ class Sync:
                 logger=self.logger,
             )
         # Set API parameter mapping based on API version
-        proxy_name = "host" if str(self.zabbix.version) < "7" else "name"
+        proxy_name = (
+            "host" if self.zabbix.version < PROXY_GROUPS_MINIMUM_VERSION else "name"
+        )
         # Get all Zabbix and NetBox data
         dev_filter_combined = self._combine_filters(
             self.config["nb_device_filter"], device_filter
@@ -376,7 +379,7 @@ class Sync:
         )
         # Set empty list for proxy processing Zabbix <= 6
         zabbix_proxygroups = []
-        if str(self.zabbix.version) >= "7":
+        if self.zabbix.version >= PROXY_GROUPS_MINIMUM_VERSION:
             zabbix_proxygroups = self.zabbix.proxygroup.get(  # type: ignore
                 output=["proxy_groupid", "name"]
             )
