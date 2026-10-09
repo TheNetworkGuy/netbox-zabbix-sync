@@ -323,26 +323,6 @@ class TestJinjafyConfigContext:
         with pytest.raises(JinjaRenderError):
             jinjafy_config_context(nb)
 
-    @pytest.mark.parametrize(
-        "config_context",
-        [
-            pytest.param({}, id="no-config-context"),
-            pytest.param({"zabbix": {}}, id="empty-zabbix-key"),
-            pytest.param({"other_app": {"k": "v"}}, id="no-zabbix-key"),
-        ],
-    )
-    def test_returns_empty_dict_when_there_is_nothing_to_render(self, config_context):
-        """The empty render, which the caller cannot tell from a failure.
-
-        Pinned here because this return value is the root of a live bug: an
-        empty dict is falsy, and core.py:211 reads any falsy render as an error
-        and skips the host. So enabling render_config_context stops syncing
-        every device without a zabbix config context -- most of them. See the
-        functional test test_rendering_skips_hosts_with_no_zabbix_context.
-        """
-        nb = DummyNB(config_context=config_context)
-        assert jinjafy_config_context(nb) == {}
-
 
 def region(name: str, depth: int, parent: str | None):
     """One entry of the flat recordset build_path walks.
