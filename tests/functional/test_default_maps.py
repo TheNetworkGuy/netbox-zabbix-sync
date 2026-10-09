@@ -167,29 +167,26 @@ def test_default_device_usermacro_map_reaches_zabbix(
     assert macros == {
         "{$HW_SERIAL}": SERIAL,
         "{$DEV_ROLE}": seed_netbox.ROLE_NAME,
-        "{$NB_URL}": populated_device.url,
+        "{$NB_URL}": populated_device.display_url,
         "{$NB_ID}": str(populated_device.id),
     }
 
 
-def test_default_nb_url_macro_is_the_api_url_not_the_web_ui(
+def test_default_nb_url_macro_is_the_web_ui_not_the_api_url(
     populated_device, run_sync, zabbix_host
 ):
-    """Pinning a surprise in the shipped map rather than endorsing it.
+    """`{$NB_URL}` maps from `display_url`, the address of the object in the UI.
 
-    `{$NB_URL}` maps from `url`, which pynetbox and NetBox both use for the
-    *API* endpoint of the object. Someone clicking this macro in Zabbix expecting
-    the device's page gets JSON instead. NetBox serves the UI address separately
-    as `display_url`, so the fix -- if it is one -- is a map change, not a code
-    change. Left as-is because changing it would move every existing user's
-    macro; the test is here so the choice is visible.
+    NetBox and pynetbox use `url` for the *API* endpoint of the object, which
+    returns JSON to someone clicking the macro in Zabbix. The shipped map used
+    `url` while config.py.example used `display_url`; both now use the UI address.
     """
     run_sync(populated_device.name, usermacro_sync=True)
 
     nb_url = macro_values(zabbix_host(populated_device.name))["{$NB_URL}"]
     assert nb_url is not None
-    assert "/api/dcim/devices/" in nb_url
-    assert nb_url == populated_device.url
+    assert "/api/" not in nb_url
+    assert nb_url == populated_device.display_url
 
 
 def test_default_device_tag_map_reaches_zabbix(
@@ -233,7 +230,7 @@ def test_default_vm_usermacro_map_reaches_zabbix(vm_factory, run_vm_sync, zabbix
     assert macro_values(zabbix_host(vm.name)) == {
         "{$TOTAL_MEMORY}": "4096",
         "{$DEV_ROLE}": seed_netbox.ROLE_NAME,
-        "{$NB_URL}": vm.url,
+        "{$NB_URL}": vm.display_url,
         "{$NB_ID}": str(vm.id),
     }
 

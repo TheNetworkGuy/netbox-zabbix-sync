@@ -1,5 +1,6 @@
 import argparse
 import logging
+from importlib.metadata import PackageNotFoundError, version
 from os import environ
 
 from netbox_zabbix_sync.modules.core import Sync
@@ -86,7 +87,7 @@ _STR_ARGS = [
     ),
     (
         "preferred_ip",
-        "Preferred IP version for inventory sync (ipv4 (default) or ipv6).",
+        "IP version used for the host interface: auto (the NetBox primary IP, default), ipv4 or ipv6.",
         "IP_VERSION",
     ),
     (
@@ -95,6 +96,14 @@ _STR_ARGS = [
         "PATH",
     ),
 ]
+
+
+def get_version() -> str:
+    """Return the installed package version, or "unknown" when running from source."""
+    try:
+        return version("netbox-zabbix-sync")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 def _apply_cli_overrides(config: dict, arguments: argparse.Namespace) -> dict:
@@ -208,7 +217,9 @@ def parse_cli():
         default=None,
     )
     parser.add_argument(
-        "--version", action="version", version="NetBox-Zabbix Sync 4.0.1"
+        "--version",
+        action="version",
+        version=f"NetBox-Zabbix Sync {get_version()}",
     )
 
     # ── Boolean config overrides ───────────────────────────────────────────────

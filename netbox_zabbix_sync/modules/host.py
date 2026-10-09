@@ -511,7 +511,7 @@ class Host(ABC):
             "md2": 1,
             "md5": 2,
             "straight": 4,
-            "OEM": 5,
+            "oem": 5,
             "rmcp+": 6,
         }
 
@@ -520,7 +520,7 @@ class Host(ABC):
             "user": 2,
             "operator": 3,
             "admin": 4,
-            "OEM": 5,
+            "oem": 5,
         }
         # See if IPMI is defined in Config Context
         if (
@@ -628,7 +628,8 @@ class Host(ABC):
                         self.nb.custom_fields[self.config[field_config]]
                     )
                 elif (
-                    self.config[field_config] in self.nb.site.custom_fields
+                    self.nb.site
+                    and self.config[field_config] in self.nb.site.custom_fields
                     and self.nb.site.custom_fields[self.config[field_config]]
                 ):
                     proxy_name = cf_to_string(

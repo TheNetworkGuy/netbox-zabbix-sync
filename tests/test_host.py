@@ -235,3 +235,54 @@ class TestHostInventory(unittest.TestCase):
         self.assertEqual(
             device.inventory, {"name": "test-device", "serialno_a": "ABC123"}
         )
+
+
+class TestHostIpmi(unittest.TestCase):
+    """Test Host.set_ipmi."""
+
+    def setUp(self):
+        self.mock_nb_device = MagicMock()
+        self.mock_nb_device.id = 1
+        self.mock_nb_device.name = "test-device"
+        self.mock_nb_device.custom_fields = {"zabbix_hostid": None}
+        self.mock_zabbix = MagicMock()
+        self.mock_nb_journal = MagicMock()
+        self.mock_logger = MagicMock()
+
+    def _set_ipmi(self, ipmi):
+        self.mock_nb_device.config_context = {"zabbix": {"ipmi": ipmi}}
+        device = _make_device(
+            self.mock_nb_device,
+            self.mock_zabbix,
+            self.mock_nb_journal,
+            self.mock_logger,
+        )
+        device.set_ipmi()
+        return device.ipmi
+
+    def test_set_ipmi_values(self):
+        """Authtype and privilege names are converted to Zabbix values."""
+        ipmi = self._set_ipmi(
+            {
+                "username": "user",
+                "password": "pass",
+                "authtype": "md5",
+                "privilege": "operator",
+            }
+        )
+        self.assertEqual(ipmi["authtype"], 2)
+        self.assertEqual(ipmi["privilege"], 3)
+
+    def test_set_ipmi_oem_any_case(self):
+        """OEM is accepted for authtype and privilege, regardless of case."""
+        for value in ("OEM", "oem", "Oem"):
+            ipmi = self._set_ipmi(
+                {
+                    "username": "user",
+                    "password": "pass",
+                    "authtype": value,
+                    "privilege": value,
+                }
+            )
+            self.assertEqual(ipmi["authtype"], 5)
+            self.assertEqual(ipmi["privilege"], 5)

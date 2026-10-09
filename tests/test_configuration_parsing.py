@@ -8,6 +8,7 @@ from netbox_zabbix_sync.modules.settings import (
     load_config,
     load_config_file,
     load_env_variable,
+    parse_env_value,
 )
 
 
@@ -157,6 +158,44 @@ def test_load_env_variable_function():
         assert value is None
     finally:
         # Clean up - restore original environment
+        if original_env is not None:
+            os.environ[test_var] = original_env
+        else:
+            os.environ.pop(test_var, None)
+
+
+def test_parse_env_value_booleans():
+    """Test that boolean settings are converted from environment variable text"""
+    for text in ("True", "true", "1", "yes", "on"):
+        assert parse_env_value("clustering", text) is True
+    for text in ("False", "false", "0", "no", "off"):
+        assert parse_env_value("clustering", text) is False
+
+
+def test_parse_env_value_keeps_other_values():
+    """Test that non-boolean values are returned unchanged"""
+    # usermacro_sync defaults to a boolean but also accepts "full"
+    assert parse_env_value("usermacro_sync", "full") == "full"
+    # proxy_cf defaults to False but takes a custom field name
+    assert parse_env_value("proxy_cf", "zabbix_proxy") == "zabbix_proxy"
+    # String settings are never converted
+    assert parse_env_value("tag_name", "false") == "false"
+    assert parse_env_value("hostgroup_format", "site/role") == "site/role"
+
+
+def test_load_config_env_false_disables_boolean():
+    """Test that NBZX_<SETTING>=False disables a boolean setting"""
+    test_var = "NBZX_CLUSTERING"
+    original_env = os.environ.get(test_var, None)
+    try:
+        os.environ[test_var] = "False"
+        with patch(
+            "netbox_zabbix_sync.modules.settings.load_config_file",
+            return_value={**DEFAULT_CONFIG, "clustering": True},
+        ):
+            config = load_config()
+        assert config["clustering"] is False
+    finally:
         if original_env is not None:
             os.environ[test_var] = original_env
         else:
