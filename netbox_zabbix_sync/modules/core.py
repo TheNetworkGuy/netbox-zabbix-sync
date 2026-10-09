@@ -14,6 +14,7 @@ from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
 from netbox_zabbix_sync.modules.host import Host
+from netbox_zabbix_sync.modules.hostgroups import HostgroupFormat
 from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
@@ -21,7 +22,6 @@ from netbox_zabbix_sync.modules.tools import (
     extend_ips,
     jinjafy_config_context,
     proxy_prepper,
-    verify_hg_format,
 )
 from netbox_zabbix_sync.modules.virtual_machine import VirtualMachine
 
@@ -321,9 +321,9 @@ class Sync:
             )
         )
         # Check if the provided Hostgroup layout is valid
-        verify_hg_format(
+        HostgroupFormat.verify(
             self.config["hostgroup_format"],
-            device_cfs=device_cfs,
+            custom_fields=device_cfs,
             hg_type="dev",
             logger=self.logger,
         )
@@ -334,9 +334,9 @@ class Sync:
                     object_type="virtualization.virtualmachine",
                 )
             )
-            verify_hg_format(
+            HostgroupFormat.verify(
                 self.config["vm_hostgroup_format"],
-                vm_cfs=vm_cfs,
+                custom_fields=vm_cfs,
                 hg_type="vm",
                 logger=self.logger,
             )
