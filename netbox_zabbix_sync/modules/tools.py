@@ -99,10 +99,25 @@ def jinjafy_config_context(nb, context=None):
     return context
 
 
+def choice_value(value):
+    """
+    Returns the value of a NetBox choice custom field.
+    NetBox 4.7+ returns select values as {"value": ..., "label": ...}
+    (and multiselect values as a list of those), where older versions
+    return the bare value.
+    """
+    if isinstance(value, dict) and value.keys() == {"value", "label"}:
+        return value["value"]
+    if isinstance(value, list):
+        return [choice_value(item) for item in value]
+    return value
+
+
 def cf_to_string(cf, key="name", logger=None):
     """
     Converts a dict custom fields to string
     """
+    cf = choice_value(cf)
     if isinstance(cf, dict):
         if key in cf:
             return cf[key]
@@ -128,6 +143,9 @@ def field_mapper(host, mapper, nbdevice, logger):
         # ... and step through the dict till we find the needed value
         for item in field_list:
             value = value[item] if value else None
+        # Choice custom fields changed shape in NetBox 4.7, keep the value
+        if field_list[0] == "custom_fields":
+            value = choice_value(value)
         # Check if the result is usable and expected
         # We want to apply any int or float 0 values,
         # even if python thinks those are empty.

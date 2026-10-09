@@ -33,7 +33,9 @@ jobs:
         # line. Mark pre-releases `experimental: true` to keep them
         # non-blocking.
         include:
-          - netbox: "v4.6.5"
+          - netbox: "v4.6.10"
+            zabbix: "alpine-7.0-latest"
+          - netbox: "v4.7.0"
             zabbix: "alpine-7.0-latest"
     env:
       NETBOX_TAG: ${{ matrix.netbox }}
