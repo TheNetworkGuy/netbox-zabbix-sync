@@ -194,8 +194,14 @@ class Sync:
         Render config context with Jinja2 if enabled.
         Returns False if rendering failed and the host should be skipped.
         """
-        if not self.config["render_config_context"]:
+        # Test that we have config context rendering enabled and that they `zabbix` key is in the config context
+        # Return True if rendering is disabled or the `zabbix` key is not present, as we don't need to render in those cases
+        if (
+            not self.config["render_config_context"]
+            or "zabbix" not in nb_obj.config_context
+        ):
             return True
+
         self.logger.debug(
             "Host %s: *EXPERIMENTAL* Rendering config context with Jinja2.",
             host.name,

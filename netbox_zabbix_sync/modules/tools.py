@@ -64,16 +64,16 @@ def proxy_prepper(proxy_list, proxy_group_list):
     return output
 
 
-def jinjafy_config_context(nb, context=None):
+def jinjafy_config_context(nb, context: dict | None = None) -> dict:
     """
     Renders Config Context through the Jinja2 templating engine
+
+    @param nb: NetBox object to use for rendering
+    @param context: Optional; Config Context to use for rendering. If not provided, will use the Zabbix key from the NetBox object's config context.
+    @return: Rendered Config Context as a dictionary
     """
     # Set our context to the Zabbix key within the config context
-    if (
-        not context
-        and "config_context" in dict(nb)
-        and "zabbix" in dict(nb)["config_context"]
-    ):
+    if not context and hasattr(nb, "config_context") and "zabbix" in nb.config_context:
         context = nb.config_context["zabbix"]
     elif not context:
         context = {}
