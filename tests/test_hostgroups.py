@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from netbox_zabbix_sync.modules.exceptions import HostgroupError
-from netbox_zabbix_sync.modules.hostgroups import Hostgroup
+from netbox_zabbix_sync.modules.hostgroups import Hostgroup, HostgroupFormat
 from tests.fakes import FakeNetBox
 
 
@@ -92,6 +92,20 @@ class TestHostgroups(unittest.TestCase):
         self.assertEqual(hostgroup.format_options["platform"], "TestPlatform")
         self.assertEqual(hostgroup.format_options["cluster"], "TestCluster")
         self.assertEqual(hostgroup.format_options["cluster_type"], "TestClusterType")
+
+    def test_format_options_match_hostgroup_format(self):
+        """Every variable HostgroupFormat allows is resolved, and nothing more.
+
+        HostgroupFormat decides what verification accepts, while
+        _set_format_options decides what a host can resolve. If they differ, a
+        format passes verification at startup and then fails per host.
+        """
+        for obj_type, nb_obj in (("dev", self.mock_device), ("vm", self.mock_vm)):
+            with self.subTest(obj_type=obj_type):
+                hostgroup = Hostgroup(obj_type, nb_obj, "4.0", self.mock_logger)
+                self.assertCountEqual(
+                    hostgroup.format_options, HostgroupFormat.valid_options(obj_type)
+                )
 
     def test_invalid_object_type(self):
         """Test that an invalid object type raises an exception."""

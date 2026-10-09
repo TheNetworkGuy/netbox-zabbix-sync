@@ -10,7 +10,7 @@ from j2ipaddr import filters as j2ipfilters  # adds IP filtering to jinja2
 from jinja2 import Environment, TemplateError
 
 from netbox_zabbix_sync.modules import jinja_filters
-from netbox_zabbix_sync.modules.exceptions import HostgroupError, JinjaRenderError
+from netbox_zabbix_sync.modules.exceptions import JinjaRenderError
 
 
 def convert_recordset(recordset):
@@ -219,71 +219,6 @@ def remove_duplicates(
         output_list.sort(key=cast(Any, sortkey))
 
     return output_list
-
-
-def verify_hg_format(
-    hg_format, device_cfs=None, vm_cfs=None, hg_type="dev", logger=None
-):
-    """
-    Verifies hostgroup field format
-    """
-    if not device_cfs:
-        device_cfs = []
-    if not vm_cfs:
-        vm_cfs = []
-    allowed_objects = {
-        "dev": [
-            "location",
-            "rack",
-            "role",
-            "manufacturer",
-            "region",
-            "site",
-            "site_group",
-            "tenant",
-            "tenant_group",
-            "platform",
-            "cluster",
-        ],
-        "vm": [
-            "cluster_type",
-            "role",
-            "manufacturer",
-            "region",
-            "site",
-            "site_group",
-            "tenant",
-            "tenant_group",
-            "cluster",
-            "device",
-            "platform",
-        ],
-        "cfs": {"dev": [], "vm": []},
-    }
-    for cf in device_cfs:
-        allowed_objects["cfs"]["dev"].append(cf.name)  # type: ignore[index]
-    for cf in vm_cfs:
-        allowed_objects["cfs"]["vm"].append(cf.name)  # type: ignore[index]
-    hg_objects = []
-    if isinstance(hg_format, list):
-        for f in hg_format:
-            hg_objects = hg_objects + f.split("/")
-    else:
-        hg_objects = hg_format.split("/")
-    hg_objects = sorted(set(hg_objects))
-    for hg_object in hg_objects:
-        if (
-            hg_object not in allowed_objects[hg_type]
-            and hg_object not in allowed_objects["cfs"][hg_type]  # type: ignore[index]
-            and not hg_object.startswith(('"', "'"))
-        ):
-            e = (
-                f"Hostgroup item {hg_object} is not valid. Make sure you"
-                " use valid items and separate them with '/'."
-            )
-            if logger:
-                logger.warning(e)
-            raise HostgroupError(e)
 
 
 def sanatize_log_output(data):
