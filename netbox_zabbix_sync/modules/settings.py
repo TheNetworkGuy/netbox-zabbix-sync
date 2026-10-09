@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = getLogger(__name__)
 
-# PLEASE NOTE: This is a sample config file. Please do NOT make any edits in this file!
+# PLEASE NOTE: This is a defaults config file. Please do NOT make any edits in this file!
 # You should create your own config.py and it will overwrite the default config.
 
 DEFAULT_CONFIG = {
@@ -20,6 +20,7 @@ DEFAULT_CONFIG = {
     "proxy_cf": False,
     "proxy_group_cf": False,
     "clustering": False,
+    "oob_sync": False,
     "create_hostgroups": True,
     "create_journal": False,
     "sync_vms": False,
@@ -36,6 +37,9 @@ DEFAULT_CONFIG = {
     "inventory_sync": False,
     "extended_site_properties": False,
     "extended_virtual_chassis": False,
+    "extended_ips": False,
+    "prefer_dns": False,
+    "preferred_ip": "auto",
     "device_inventory_map": {
         "asset_tag": "asset_tag",
         "virtual_chassis/name": "chassis",
@@ -60,13 +64,13 @@ DEFAULT_CONFIG = {
     "device_usermacro_map": {
         "serial": "{$HW_SERIAL}",
         "role/name": "{$DEV_ROLE}",
-        "url": "{$NB_URL}",
+        "display_url": "{$NB_URL}",
         "id": "{$NB_ID}",
     },
     "vm_usermacro_map": {
         "memory": "{$TOTAL_MEMORY}",
         "role/name": "{$DEV_ROLE}",
-        "url": "{$NB_URL}",
+        "display_url": "{$NB_URL}",
         "id": "{$NB_ID}",
     },
     "tag_sync": False,
@@ -85,6 +89,11 @@ DEFAULT_CONFIG = {
     },
     "description_dt_format": "%Y-%m-%d %H:%M:%S",
     "description": "static",
+    "render_config_context": False,
+    "log_file": None,
+    "log_rotation": True,
+    "log_console": True,
+    "log_handlers": None,
 }
 
 
@@ -100,8 +109,23 @@ def load_config(config_file=None):
     for key in conf:
         value_setting = load_env_variable(key)
         if value_setting is not None:
-            conf[key] = value_setting
+            conf[key] = parse_env_value(key, value_setting)
     return conf
+
+
+def parse_env_value(key, value):
+    """
+    Converts the text of an environment variable for boolean settings.
+    Other values, such as "full" for usermacro_sync or a custom field
+    name for proxy_cf, are returned unchanged.
+    """
+    if not isinstance(value, str) or not isinstance(DEFAULT_CONFIG.get(key), bool):
+        return value
+    if value.strip().lower() in ("true", "1", "yes", "on"):
+        return True
+    if value.strip().lower() in ("false", "0", "no", "off"):
+        return False
+    return value
 
 
 def load_env_variable(config_environvar):

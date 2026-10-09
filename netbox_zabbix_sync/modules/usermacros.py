@@ -66,11 +66,9 @@ class ZabbixUsermacros:
                     return False
                 macro["value"] = macro_properties["value"]
 
-                if (
-                    "type" in macro_properties
-                    and macro_properties["type"].lower() in macrotypes
-                ):
-                    macro["type"] = str(macrotypes[macro_properties["type"]])
+                macro_type = macro_properties.get("type")
+                if isinstance(macro_type, str) and macro_type.lower() in macrotypes:
+                    macro["type"] = str(macrotypes[macro_type.lower()])
                 else:
                     macro["type"] = str(0)
 
