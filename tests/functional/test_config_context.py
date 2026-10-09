@@ -349,16 +349,6 @@ def test_broken_jinja_skips_host_without_killing_the_run(
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "render_config_context=True skips every host whose config context has no "
-        "usable zabbix key. jinjafy_config_context returns {} for those "
-        "(tools.py:78-79, 96), and core.py:211 reads a falsy render as a failure "
-        "and skips the host. Remove this marker once an empty render leaves the "
-        "host's config context alone instead."
-    ),
-)
 @pytest.mark.parametrize(
     "context",
     [
