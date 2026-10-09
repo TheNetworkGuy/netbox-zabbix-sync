@@ -266,11 +266,10 @@ def test_hostgroup_reaches_cluster_type_but_a_map_cannot(
     does not nest `type` inside the cluster it returns on a VM.
 
     So the field is simultaneously available and unavailable depending on which
-    feature asks. The map does not merely miss it -- the KeyError escapes
-    `Sync.start()` and ends the run, which is the bug pinned in
-    test_extended_models.py::test_unextended_mapped_field_aborts_the_run. Here
-    the hostgroup half is asserted as the contrast; the map half is left to that
-    test rather than duplicating an xfail.
+    feature asks: the map gets "" for it, as covered by
+    test_extended_models.py::test_unextended_mapped_field_maps_to_empty_string.
+    Here the hostgroup half is asserted as the contrast; the map half is left to
+    that test rather than duplicating it.
     """
     vm = vm_factory()
 

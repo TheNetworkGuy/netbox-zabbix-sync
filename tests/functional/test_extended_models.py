@@ -23,10 +23,10 @@ expect. Both come from one pynetbox detail: a nested `Record` lazily fetches
 its full details on *attribute* access (`site.latitude`), but `Record[key]`
 is `dict(self)[key]` and does no such thing.
 
-1. `field_mapper` walks with `value[item]` (tools.py:130), so a mapped field
-   NetBox did not nest raises `KeyError` rather than mapping to "". It escapes
-   `start()`, which only catches `SyncError`, and takes the whole run down --
-   see `test_unextended_mapped_field_aborts_the_run`.
+1. `field_mapper` walks with `value[item]` (tools.py:147), so a mapped field
+   NetBox did not nest is never lazily fetched. It maps to "" like an empty
+   value rather than to its real value -- see
+   `test_unextended_mapped_field_maps_to_empty_string`.
 2. `extended_site_properties` is redundant for devices: `Hostgroup` reads
    `self.nb.site.region` (hostgroups.py:64) for every device with a site,
    which lazily fetches the site anyway -- see
@@ -46,18 +46,6 @@ INVENTORY_MANUAL_CONFIG = {"inventory_sync": True, "inventory_mode": "manual"}
 # expects the site to be fetched exactly once for each of them.
 SYNCED_HOSTS = 2
 
-# field_mapper indexes rather than getattrs, so it never triggers pynetbox's
-# lazy fetch and a field that was not nested is simply missing. The KeyError
-# that follows is not caught anywhere: start() handles SyncError only, so one
-# such field in the map ends the entire run, not just that host. Mapping an
-# absent field is already handled for empty values (tools.py:135) -- an absent
-# key looks like the same intent.
-UNEXTENDED_FIELD_BUG = (
-    "field_mapper raises KeyError on a mapped field that NetBox did not nest, "
-    "aborting the whole run instead of mapping it to an empty string "
-    "(tools.py:130). Remove this marker once it maps to '' like an empty value."
-)
-
 
 def site_detail_requests(exchanges, site_id: int):
     """The recorded requests that fetched this site's full details."""
@@ -68,21 +56,21 @@ def site_detail_requests(exchanges, site_id: int):
 # --- the mapped-but-absent field --------------------------------------------
 
 
-@pytest.mark.xfail(strict=True, reason=UNEXTENDED_FIELD_BUG)
-def test_unextended_mapped_field_aborts_the_run(
+def test_unextended_mapped_field_maps_to_empty_string(
     device_factory, virtual_chassis_factory, run_sync, zabbix_host
 ):
-    """A field that needs extending, mapped without it, should be skipped.
+    """A field that needs extending, mapped without it, maps to "".
 
     `virtual_chassis/domain` is not on the nested chassis, and the flag that
     would fetch it is off -- the same shape as a user who copied a map out of
     the wiki and forgot the setting, or who upgraded into a NetBox that nests
     one field fewer.
 
-    What should happen is what happens for a field that is present but empty:
-    an empty inventory value, host synced. What happens instead is a KeyError
-    out of `Sync.start()` that ends the run, so every host queued behind this
-    one goes unsynced too.
+    `field_mapper` indexes rather than getattrs, so it never triggers
+    pynetbox's lazy fetch and the field is simply missing. It is treated like a
+    field that is present but empty: an empty inventory value, host synced.
+    Before tools.py:148-151 caught the KeyError, it escaped `Sync.start()` and
+    ended the run, leaving every host queued behind this one unsynced.
     """
     device = device_factory(address="10.0.0.130/24")
     virtual_chassis_factory(device, domain="chassis.example.com")
@@ -114,8 +102,8 @@ def test_site_is_fetched_even_without_extended_site_properties(
     So the config file's warning that this setting "will increase the number of
     API queries" does not hold for devices, and neither does needing it to map
     `site/latitude`. Pinned rather than left implicit because the day pynetbox
-    stops lazy-loading, every user mapping site geo without the flag starts
-    hitting the KeyError above -- and this test is where that shows up.
+    stops lazy-loading, every user mapping site geo without the flag silently
+    gets empty values instead -- and this test is where that shows up.
     """
     device = device_factory(address="10.0.0.100/24")
 
@@ -128,7 +116,7 @@ def test_site_is_fetched_even_without_extended_site_properties(
 
     assert site_detail_requests(netbox_requests, seeded["site"].id), (
         "the site was not fetched; the lazy load this test documents is gone "
-        "and mapping site/latitude without the flag now raises KeyError"
+        "and mapping site/latitude without the flag now maps to an empty value"
     )
     host = zabbix_host(device.name)
     assert host is not None
@@ -301,8 +289,8 @@ def test_ip_status_synced_with_extended_ips(device_factory, run_sync, zabbix_hos
 
     `status` is not nested on an IP, so this needs the flag -- unlike
     `dns_name`, which is nested and needs nothing, despite DNS being the
-    documented reason for the setting. Without the flag this map does not
-    yield "" but raises; that is `test_unextended_mapped_field_aborts_the_run`.
+    documented reason for the setting. Without the flag this map yields "";
+    that is `test_unextended_mapped_field_maps_to_empty_string`.
     """
     device = device_factory(address="10.0.0.121/24")
 

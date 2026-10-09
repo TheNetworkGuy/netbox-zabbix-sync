@@ -454,11 +454,11 @@ def test_unknown_inventory_field_costs_only_its_own_host(
     """A map naming a field Zabbix does not have fails that host, not the run.
 
     This is the same user error as the one in
-    test_extended_models.py::test_unextended_mapped_field_aborts_the_run -- a
-    typo in a map -- but on the Zabbix side of it, and the blast radius is
-    completely different. Zabbix rejects `host.create`, the sync catches it, logs
-    it and moves on; a NetBox path that does not resolve raises KeyError out of
-    `Sync.start()` and takes every remaining host with it.
+    test_extended_models.py::test_unextended_mapped_field_maps_to_empty_string
+    -- a typo in a map -- but on the Zabbix side of it, and the outcome is
+    different. Zabbix rejects `host.create`, the sync catches it, logs it and
+    moves on without that host; a NetBox path that does not resolve maps to ""
+    and the host still syncs.
 
     The VM proves the run really continued rather than merely not raising: VMs
     are synced before devices (core.py:348), so a broken VM that ended the run
