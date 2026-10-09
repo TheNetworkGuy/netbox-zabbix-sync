@@ -762,13 +762,13 @@ class TestDeviceHandeling(unittest.TestCase):
             virtual_chassis=virtual_chassis,
         )
 
-        mock_netbox = self._setup_netbox_mock(mock_api)
+        mock_netbox = netbox_mock(mock_api)
         mock_netbox.dcim.devices.filter.side_effect = lambda **kwargs: (
             [new_primary, former_primary]
             if "virtual_chassis_id" in kwargs
             else [new_primary]
         )
-        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
 
         syncer = Sync({"clustering": True})
         syncer.connect(
@@ -839,9 +839,9 @@ class TestDeviceHandeling(unittest.TestCase):
             zabbix_hostid=42,
             virtual_chassis=virtual_chassis,
         )
-        mock_netbox = self._setup_netbox_mock(mock_api)
+        mock_netbox = netbox_mock(mock_api)
         mock_netbox.dcim.devices.filter.return_value = [device]
-        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = [{"hostid": "42"}]
 
         syncer = Sync({"clustering": True})
@@ -875,9 +875,9 @@ class TestDeviceHandeling(unittest.TestCase):
             zabbix_hostid=42,
             virtual_chassis=virtual_chassis,
         )
-        mock_netbox = self._setup_netbox_mock(mock_api)
+        mock_netbox = netbox_mock(mock_api)
         mock_netbox.dcim.devices.filter.return_value = [device]
-        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = [{"hostid": "42"}]
 
         syncer = Sync({"clustering": True})
@@ -1162,8 +1162,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
             zabbix_hostid=42,
             primary_ip=False,
         )
-        self._setup_netbox_mock(mock_api, devices=[device])
-        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        netbox_mock(mock_api, devices=[device])
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = [{"hostid": "42"}]
 
         syncer = Sync()
@@ -1191,8 +1191,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
             zabbix_hostid=42,
             primary_ip=False,
         )
-        self._setup_netbox_mock(mock_api, devices=[device])
-        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        netbox_mock(mock_api, devices=[device])
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = self._make_zabbix_host()
 
         syncer = Sync()
@@ -1428,8 +1428,8 @@ class TestVMStatusHandling(unittest.TestCase):
             zabbix_hostid=42,
             primary_ip=False,
         )
-        self._setup_netbox_mock(mock_api, vms=[vm])
-        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        netbox_mock(mock_api, vms=[vm])
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = [{"hostid": "42"}]
 
         syncer = Sync(self._SYNC_CFG)
@@ -1457,8 +1457,8 @@ class TestVMStatusHandling(unittest.TestCase):
             zabbix_hostid=42,
             primary_ip=False,
         )
-        self._setup_netbox_mock(mock_api, vms=[vm])
-        mock_zabbix = self._setup_zabbix_mock(mock_zabbix_api)
+        netbox_mock(mock_api, vms=[vm])
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
         mock_zabbix.host.get.return_value = self._make_zabbix_host()
 
         syncer = Sync(self._SYNC_CFG)
