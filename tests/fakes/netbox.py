@@ -39,7 +39,7 @@ from copy import deepcopy
 from functools import cached_property
 from itertools import count
 from json import dumps
-from typing import Any
+from typing import Any, cast
 from unittest.mock import create_autospec
 
 import pynetbox
@@ -219,7 +219,7 @@ class FakeNetBox:
     # ------------------------------------------------------------------
 
     @property
-    def patches(self) -> list[tuple[str, dict]]:
+    def patches(self) -> list[tuple[str, dict | None]]:
         """(url, body) of every PATCH, i.e. every `Record.save()` that sent data."""
         return [(url, body) for method, url, body in self.requests if method == "PATCH"]
 
@@ -229,7 +229,11 @@ class FakeNetBox:
             obj_id = next(self._ids[endpoint])
             while self._url(endpoint, obj_id) in self.objects:
                 obj_id = next(self._ids[endpoint])
-        payload = {"id": obj_id, "url": self._url(endpoint, obj_id), **fields}
+        payload: dict[str, Any] = {
+            "id": obj_id,
+            "url": self._url(endpoint, obj_id),
+            **fields,
+        }
         payload.setdefault(
             "display",
             fields.get("name") or fields.get("address") or fields.get("model"),
@@ -597,7 +601,7 @@ class FakeNetBox:
         """
         role = self.default_device_role if role is DEFAULT else role
         role_field = "role" if version_tuple(self.version) >= (4, 0) else "device_role"
-        payload = {
+        payload: dict[str, Any] = {
             "name": name,
             "device_type": self._resolve(
                 self.default_device_type if device_type is DEFAULT else device_type,
@@ -642,7 +646,7 @@ class FakeNetBox:
             payload["owner"] = None
         payload.update(self._related(fields))
         obj_id = payload.pop("id", None)
-        return self.record(self.add("dcim/devices", obj_id, **payload))
+        return cast(Devices, self.record(self.add("dcim/devices", obj_id, **payload)))
 
     def virtual_machine(
         self,
@@ -663,7 +667,7 @@ class FakeNetBox:
         empty, as in NetBox: a VM only gets templates from its config context,
         so a test that needs it synced has to pass one.
         """
-        payload = {
+        payload: dict[str, Any] = {
             "name": name,
             "status": choice(status),
             "site": self._resolve(
@@ -699,6 +703,7 @@ class FakeNetBox:
             payload["owner"] = None
         payload.update(self._related(fields))
         obj_id = payload.pop("id", None)
-        return self.record(
-            self.add("virtualization/virtual-machines", obj_id, **payload)
+        return cast(
+            VirtualMachines,
+            self.record(self.add("virtualization/virtual-machines", obj_id, **payload)),
         )

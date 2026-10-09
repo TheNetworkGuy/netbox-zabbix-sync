@@ -85,6 +85,7 @@ class TestProxyCustomField:
         device = physical_device(nb_device({"proxy": value}), proxy_cf="proxy")
 
         assert device._set_proxy(proxies("decoy", EXPECTED[cf_type]))
+        assert device.zbxproxy is not None
         assert device.zbxproxy["name"] == EXPECTED[cf_type]
 
     @pytest.mark.parametrize(("value", "cf_type"), cf_cases(*NAMED_TYPES))
@@ -93,6 +94,7 @@ class TestProxyCustomField:
         device = physical_device(nb, proxy_cf="proxy")
 
         assert device._set_proxy(proxies("decoy", EXPECTED[cf_type]))
+        assert device.zbxproxy is not None
         assert device.zbxproxy["name"] == EXPECTED[cf_type]
 
     @pytest.mark.parametrize(("value", "cf_type"), cf_cases(*NAMED_TYPES))
@@ -101,6 +103,7 @@ class TestProxyCustomField:
         groups = proxies("decoy", EXPECTED[cf_type], proxy_type="proxy_group")
 
         assert device._set_proxy(groups)
+        assert device.zbxproxy is not None
         assert device.zbxproxy["name"] == EXPECTED[cf_type]
 
 

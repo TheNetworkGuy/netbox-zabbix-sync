@@ -6,7 +6,7 @@ from unittest.mock import patch
 from zabbix_utils import APIRequestError
 
 from netbox_zabbix_sync.modules.exceptions import SyncExternalError
-from tests.fakes import FakeNetBox, physical_device, zabbix_api
+from tests.fakes import FakeNetBox, mock_logger, physical_device, zabbix_api
 
 
 class TestDeviceDeletion(unittest.TestCase):
@@ -23,8 +23,10 @@ class TestDeviceDeletion(unittest.TestCase):
         )
         self.zabbix = zabbix_api(version="6.0")
         self.zabbix.host.get.return_value = [{"hostid": "456"}]
-        self.device = physical_device(self.nb, zabbix=self.zabbix, journal_enabled=True)
-        self.logger = self.device.logger
+        self.logger = mock_logger()
+        self.device = physical_device(
+            self.nb, zabbix=self.zabbix, journal_enabled=True, logger=self.logger
+        )
         self.journal = self.netbox.journal_entries
         # What clearing the link sends to NetBox
         self.cleared = [(self.nb.url, {"custom_fields": {"zabbix_hostid": None}})]
