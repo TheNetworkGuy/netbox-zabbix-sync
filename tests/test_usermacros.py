@@ -3,66 +3,22 @@ from unittest.mock import MagicMock, patch
 
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.usermacros import ZabbixUsermacros
-
-
-class DummyNB:
-    def __init__(self, name="dummy", config_context=None, **kwargs):
-        self.name = name
-        self.config_context = config_context or {}
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-    def __getitem__(self, key):
-        return getattr(self, key)
+from tests.fakes import FakeNetBox, physical_device
 
 
 class TestUsermacroSync(unittest.TestCase):
     def setUp(self):
-        self.nb = DummyNB(serial="1234")
-        self.logger = MagicMock()
+        self.netbox = FakeNetBox()
         self.usermacro_map = {"serial": "{$HW_SERIAL}"}
 
-    def create_mock_device(self, config=None):
-        """Helper method to create a properly mocked PhysicalDevice"""
-        # Mock the NetBox device with all required attributes
-        mock_nb = MagicMock()
-        mock_nb.id = 1
-        mock_nb.name = "dummy"
-        mock_nb.status.label = "Active"
-        mock_nb.tenant = None
-        mock_nb.config_context = {}
-        mock_nb.primary_ip.address = "192.168.1.1/24"
-        mock_nb.custom_fields = {"zabbix_hostid": None}
-
-        device_config = (
-            config
-            if config is not None
-            else {"device_cf": "zabbix_hostid", "preferred_ip": "auto"}
-        )
-
-        # Create device with proper initialization
-        device = PhysicalDevice(
-            nb=mock_nb,
-            zabbix=MagicMock(),
-            nb_journal_class=MagicMock(),
-            nb_version="3.0",
-            logger=self.logger,
-            config=device_config,
-        )
-
-        return device
+    def create_mock_device(self, **config):
+        """A PhysicalDevice for a plain NetBox device."""
+        return physical_device(self.netbox.device("dummy", serial="1234"), **config)
 
     @patch.object(PhysicalDevice, "_usermacro_map")
     def test_usermacro_sync_false(self, mock_usermacro_map):
         mock_usermacro_map.return_value = self.usermacro_map
-        device = self.create_mock_device(
-            config={
-                "usermacro_sync": False,
-                "device_cf": "zabbix_hostid",
-                "tag_sync": False,
-                "preferred_ip": "auto",
-            }
-        )
+        device = self.create_mock_device(usermacro_sync=False)
 
         # Call set_usermacros
         result = device.set_usermacros()
@@ -82,14 +38,7 @@ class TestUsermacroSync(unittest.TestCase):
         ]
         mock_usermacros_class.return_value = mock_macros_instance
 
-        device = self.create_mock_device(
-            config={
-                "usermacro_sync": True,
-                "device_cf": "zabbix_hostid",
-                "tag_sync": False,
-                "preferred_ip": "auto",
-            }
-        )
+        device = self.create_mock_device(usermacro_sync=True)
 
         # Call set_usermacros
         device.set_usermacros()
@@ -109,14 +58,7 @@ class TestUsermacroSync(unittest.TestCase):
         ]
         mock_usermacros_class.return_value = mock_macros_instance
 
-        device = self.create_mock_device(
-            config={
-                "usermacro_sync": "full",
-                "device_cf": "zabbix_hostid",
-                "tag_sync": False,
-                "preferred_ip": "auto",
-            }
-        )
+        device = self.create_mock_device(usermacro_sync="full")
 
         # Call set_usermacros
         device.set_usermacros()
@@ -127,7 +69,8 @@ class TestUsermacroSync(unittest.TestCase):
 
 class TestZabbixUsermacros(unittest.TestCase):
     def setUp(self):
-        self.nb = DummyNB()
+        self.netbox = FakeNetBox()
+        self.nb = self.netbox.device("dummy")
         self.logger = MagicMock()
 
     def test_validate_macro_valid(self):
@@ -185,17 +128,19 @@ class TestZabbixUsermacros(unittest.TestCase):
         self.logger.warning.assert_called()
 
     def test_generate_from_map(self):
-        nb = DummyNB(memory="bar", role="baz")
-        usermacro_map = {"memory": "{$FOO}", "role": "{$BAR}"}
+        nb = self.netbox.virtual_machine(memory=2048, role=self.netbox.role("baz"))
+        usermacro_map = {"memory": "{$FOO}", "role/name": "{$BAR}"}
         macros = ZabbixUsermacros(nb, usermacro_map, True, logger=self.logger)
         result = macros.generate()
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["macro"], "{$FOO}")
+        self.assertEqual(result[0]["value"], "2048")
         self.assertEqual(result[1]["macro"], "{$BAR}")
+        self.assertEqual(result[1]["value"], "baz")
 
     def test_generate_from_config_context(self):
         config_context = {"zabbix": {"usermacros": {"{$TEST_MACRO}": "test_value"}}}
-        nb = DummyNB(config_context=config_context)
+        nb = self.netbox.device(config_context=config_context)
         macros = ZabbixUsermacros(nb, {}, True, logger=self.logger)
         result = macros.generate()
         self.assertEqual(len(result), 1)

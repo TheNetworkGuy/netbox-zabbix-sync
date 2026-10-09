@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from netbox_zabbix_sync.modules.host_description import Description
+from tests.fakes import FakeNetBox
 
 
 class TestDescription(unittest.TestCase):
@@ -11,11 +12,9 @@ class TestDescription(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        # Create mock NetBox object
-        self.mock_nb_object = MagicMock()
-        self.mock_nb_object.name = "test-host"
-        self.mock_nb_object.owner = "admin"
-        self.mock_nb_object.config_context = {}
+        # Owner exists from NetBox 4.5; it is a nested object, not a string
+        self.netbox = FakeNetBox(version="4.5")
+        self.mock_nb_object = self.netbox.device("test-host", owner="admin")
 
         # Create logger mock
         self.mock_logger = MagicMock()
@@ -32,9 +31,11 @@ class TestDescription(unittest.TestCase):
         mock_datetime.now.return_value = mock_now
 
         # Set config context with description
-        self.mock_nb_object.config_context = {
-            "zabbix": {"description": "Custom override for {owner}"}
-        }
+        self.mock_nb_object = self.netbox.device(
+            "test-host",
+            owner="admin",
+            config_context={"zabbix": {"description": "Custom override for {owner}"}},
+        )
 
         config = {"description": "static"}
         desc = Description(self.mock_nb_object, config, "4.5", logger=self.mock_logger)
@@ -124,8 +125,11 @@ class TestDescription(unittest.TestCase):
         mock_datetime.now.return_value = mock_now
 
         config = {"description": "Device owned by {owner}"}
+        # A 3.2 device has no owner field at all
+        nb_object = FakeNetBox(version="3.2").device("test-host")
+        self.assertNotIn("owner", dict(nb_object))
         desc = Description(
-            self.mock_nb_object,
+            nb_object,
             config,
             "3.2",  # Lower NetBox version
             logger=self.mock_logger,

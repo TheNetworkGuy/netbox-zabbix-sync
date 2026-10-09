@@ -78,22 +78,6 @@ def test_sanatize_log_output_non_dict():
     assert sanitized == data
 
 
-class DummyNB(dict):
-    """A stand-in for a pynetbox Record.
-
-    Subclasses dict because that is the part of a Record these functions use:
-    field_mapper indexes (`value[item]`), and jinjafy_config_context calls
-    dict() on the object. Attribute access is wired to the same data so
-    `.config_context` and `.name` work like a Record's.
-    """
-
-    def __getattr__(self, item):
-        try:
-            return self[item]
-        except KeyError as e:
-            raise AttributeError(item) from e
-
-
 @pytest.fixture
 def logger():
     return getLogger(__name__)
@@ -102,74 +86,64 @@ def logger():
 class TestFieldMapper:
     """field_mapper walks NetBox fields by name for inventory, macros and tags."""
 
-    def test_maps_top_level_field(self, logger):
-        nb = DummyNB(serial="SN-123")
+    def test_maps_top_level_field(self, logger, netbox):
+        nb = netbox.device(serial="SN-123")
         assert field_mapper("host", {"serial": "serialno_a"}, nb, logger) == {
             "serialno_a": "SN-123"
         }
 
-    def test_walks_nested_fields_on_the_slash(self, logger):
-        nb = DummyNB(device_type={"manufacturer": {"name": "Acme"}})
+    def test_walks_nested_fields_on_the_slash(self, logger, netbox):
+        nb = netbox.device(device_type=netbox.device_type("X1", manufacturer="Acme"))
         mapper = {"device_type/manufacturer/name": "vendor"}
         assert field_mapper("host", mapper, nb, logger) == {"vendor": "Acme"}
 
-    def test_values_are_stringified(self, logger):
+    def test_values_are_stringified(self, logger, netbox):
         """Zabbix takes strings, so an int field must be converted, not sent raw."""
-        nb = DummyNB(id=42)
+        nb = netbox.device(id=42)
         assert field_mapper("host", {"id": "{$NB_ID}"}, nb, logger) == {
             "{$NB_ID}": "42"
         }
 
-    def test_zero_is_kept_rather_than_treated_as_empty(self, logger):
+    def test_zero_is_kept_rather_than_treated_as_empty(self, logger, netbox):
         """0 is a value, not an absence -- the reason for the int/float check."""
-        nb = DummyNB(position=0)
+        nb = netbox.device(position=0)
         assert field_mapper("host", {"position": "site_rack"}, nb, logger) == {
             "site_rack": "0"
         }
 
-    def test_empty_value_becomes_empty_string(self, logger):
+    def test_empty_value_becomes_empty_string(self, logger, netbox):
         """None maps to "", which is what the Zabbix API accepts for a blank."""
-        nb = DummyNB(serial=None)
-        assert field_mapper("host", {"serial": "serialno_a"}, nb, logger) == {
-            "serialno_a": ""
+        nb = netbox.device(asset_tag=None)
+        assert field_mapper("host", {"asset_tag": "asset_tag"}, nb, logger) == {
+            "asset_tag": ""
         }
 
-    def test_empty_nested_parent_stops_the_walk(self, logger):
+    def test_empty_nested_parent_stops_the_walk(self, logger, netbox):
         """A null parent short-circuits instead of raising on the child."""
-        nb = DummyNB(virtual_chassis=None)
+        nb = netbox.device(virtual_chassis=None)
         assert field_mapper(
             "host", {"virtual_chassis/name": "chassis"}, nb, logger
         ) == {"chassis": ""}
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "field_mapper indexes with value[item] (tools.py:130), so a key NetBox "
-            "did not return raises KeyError instead of mapping to ''. The KeyError "
-            "escapes Sync.start(), which catches SyncError only, and ends the whole "
-            "run. Hit in practice by mapping a field that needs one of the "
-            "extended_* settings without enabling it -- see the functional test "
-            "test_unextended_mapped_field_aborts_the_run. Remove this marker once "
-            "an absent key maps to '' like an empty value already does."
-        ),
-    )
-    def test_absent_field_maps_to_empty_string(self, logger):
+    def test_absent_field_maps_to_empty_string(self, logger, netbox):
         """An absent key should be treated like an empty value, not raise.
 
         NetBox serves related objects in a nested form carrying only some of
         their fields, so "the map names a field this object does not have" is
-        an ordinary condition, not a programming error.
+        an ordinary condition, not a programming error. field_mapper reads
+        through dict(record), which does not lazy load: without
+        extended_site_properties the site's latitude is simply not there.
         """
-        nb = DummyNB(site={"name": "AMS-01"})
+        nb = netbox.device(site=netbox.site("AMS-01", latitude=52.37))
 
         assert field_mapper("host", {"site/latitude": "location_lat"}, nb, logger) == {
             "location_lat": ""
         }
 
     @pytest.mark.parametrize("version", NETBOX_VERSIONS)
-    def test_select_custom_field_maps_to_its_value(self, logger, version):
+    def test_select_custom_field_maps_to_its_value(self, logger, netbox, version):
         """`custom_fields/<select>` sends the value, not the 4.7 dict's repr."""
-        nb = DummyNB(custom_fields={"env": cf_value(version, "select")})
+        nb = netbox.device(custom_fields={"env": cf_value(version, "select")})
 
         assert field_mapper("host", {"custom_fields/env": "alias"}, nb, logger) == {
             "alias": "staging"
@@ -177,43 +151,43 @@ class TestFieldMapper:
 
     @pytest.mark.parametrize("version", NETBOX_VERSIONS)
     def test_multiselect_custom_field_is_the_same_on_every_version(
-        self, logger, version
+        self, logger, netbox, version
     ):
         """A multiselect is stringified as a list of values on 4.6 and 4.7 alike."""
-        nb = DummyNB(custom_fields={"fw": cf_value(version, "multiselect")})
+        nb = netbox.device(custom_fields={"fw": cf_value(version, "multiselect")})
 
         assert field_mapper("host", {"custom_fields/fw": "alias"}, nb, logger) == {
             "alias": "['iso27001', 'soc2']"
         }
 
     @pytest.mark.parametrize("version", NETBOX_VERSIONS)
-    def test_object_custom_field_can_be_walked_into(self, logger, version):
+    def test_object_custom_field_can_be_walked_into(self, logger, netbox, version):
         """An object custom field is a nested dict, so its name is a path away."""
-        nb = DummyNB(custom_fields={"owner": cf_value(version, "object")})
+        nb = netbox.device(custom_fields={"owner": cf_value(version, "object")})
 
         assert field_mapper(
             "host", {"custom_fields/owner/name": "alias"}, nb, logger
         ) == {"alias": "Internal IT"}
 
-    def test_label_path_into_a_47_select_keeps_working(self, logger):
+    def test_label_path_into_a_47_select_keeps_working(self, logger, netbox):
         """A map written for 4.7 can still reach the label by walking into it.
 
         Only the value at the end of the path is resolved, so the dict stays
         walkable -- `custom_fields/<select>/label` is how to get the label.
         """
-        nb = DummyNB(custom_fields={"env": cf_value("4.7", "select")})
+        nb = netbox.device(custom_fields={"env": cf_value("4.7", "select")})
 
         assert field_mapper(
             "host", {"custom_fields/env/label": "alias"}, nb, logger
         ) == {"alias": "Staging"}
 
-    def test_choice_fields_outside_custom_fields_are_untouched(self, logger):
+    def test_choice_fields_outside_custom_fields_are_untouched(self, logger, netbox):
         """Only custom fields changed shape, so `status` keeps its dict.
 
         The shipped maps reach it as `status/label`, which has to keep
         resolving to the label rather than stopping at the value.
         """
-        nb = DummyNB(status={"value": "active", "label": "Active"})
+        nb = netbox.device(status="active")
 
         assert field_mapper(
             "host", {"status/label": "deployment_status"}, nb, logger
@@ -269,21 +243,21 @@ class TestCfToString:
 class TestJinjafyConfigContext:
     """jinjafy_config_context renders the zabbix key with the object as `data`."""
 
-    def test_renders_a_netbox_field_into_the_context(self):
-        nb = DummyNB(
+    def test_renders_a_netbox_field_into_the_context(self, netbox):
+        nb = netbox.device(
             serial="SN-123",
             config_context={"zabbix": {"usermacros": {"{$S}": "{{ data.serial }}"}}},
         )
         assert jinjafy_config_context(nb) == {"usermacros": {"{$S}": "SN-123"}}
 
-    def test_renders_nested_data(self):
-        nb = DummyNB(
-            site={"name": "AMS-01"},
+    def test_renders_nested_data(self, netbox):
+        nb = netbox.device(
+            site="AMS-01",
             config_context={"zabbix": {"tags": [{"site": "{{ data.site.name }}"}]}},
         )
         assert jinjafy_config_context(nb) == {"tags": [{"site": "AMS-01"}]}
 
-    def test_config_context_is_not_visible_to_the_template(self):
+    def test_config_context_is_not_visible_to_the_template(self, netbox):
         """`data` excludes config_context, so a context cannot template itself.
 
         Dropped deliberately (tools.py:82-83): leaving it in would let a
@@ -291,31 +265,35 @@ class TestJinjafyConfigContext:
         error, though -- Jinja's default undefined renders as an empty string,
         so the macro silently comes out blank rather than failing loudly.
         """
-        nb = DummyNB(config_context={"zabbix": {"x": "{{ data.config_context }}"}})
+        nb = netbox.device(
+            config_context={"zabbix": {"x": "{{ data.config_context }}"}}
+        )
 
         assert jinjafy_config_context(nb) == {"x": ""}
 
-    def test_explicit_context_overrides_the_objects_own(self):
-        nb = DummyNB(serial="SN-123", config_context={"zabbix": {"a": "unused"}})
+    def test_explicit_context_overrides_the_objects_own(self, netbox):
+        nb = netbox.device(serial="SN-123", config_context={"zabbix": {"a": "unused"}})
         assert jinjafy_config_context(nb, context={"b": "{{ data.serial }}"}) == {
             "b": "SN-123"
         }
 
-    def test_unknown_filter_raises_jinja_render_error(self):
+    def test_unknown_filter_raises_jinja_render_error(self, netbox):
         """Jinja's own errors are wrapped, which is what core.py catches."""
-        nb = DummyNB(config_context={"zabbix": {"x": "{{ data | no_such_filter }}"}})
+        nb = netbox.device(
+            config_context={"zabbix": {"x": "{{ data | no_such_filter }}"}}
+        )
 
         with pytest.raises(JinjaRenderError):
             jinjafy_config_context(nb)
 
-    def test_render_producing_invalid_json_raises(self):
+    def test_render_producing_invalid_json_raises(self, netbox):
         """The context is rendered as JSON text, so a stray quote is fatal.
 
         Rendering templates `dumps(context)` and parses the result back, so a
         value containing a quote breaks the document rather than the value.
         This is the failure mode users hit with unescaped NetBox comments.
         """
-        nb = DummyNB(
+        nb = netbox.device(
             comments='has "quotes"',
             config_context={"zabbix": {"x": "{{ data.comments }}"}},
         )

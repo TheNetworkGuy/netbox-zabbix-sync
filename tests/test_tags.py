@@ -4,20 +4,12 @@ import unittest
 from unittest.mock import MagicMock
 
 from netbox_zabbix_sync.modules.tags import ZabbixTags
+from tests.fakes import FakeNetBox
 
 
-class DummyNBForTags:
-    """Minimal NetBox object that supports field_mapper's dict-style access."""
-
-    def __init__(self, name="test-host", config_context=None, tags=None, site=None):
-        self.name = name
-        self.config_context = config_context or {}
-        self.tags = tags or []
-        # Stored as a plain dict so field_mapper can traverse "site/name"
-        self.site = site if site is not None else {"name": "TestSite"}
-
-    def __getitem__(self, key):
-        return getattr(self, key)
+def nb_device(name="test-host", config_context=None, tags=None):
+    """A NetBox device at site TestSite, with the given context and tags."""
+    return FakeNetBox().device(name, config_context=config_context, tags=tags or [])
 
 
 class TestZabbixTagsInit(unittest.TestCase):
@@ -25,18 +17,18 @@ class TestZabbixTagsInit(unittest.TestCase):
 
     def test_sync_true_when_tag_sync_enabled(self):
         """sync flag should be True when tag_sync=True."""
-        nb = DummyNBForTags()
+        nb = nb_device()
         tags = ZabbixTags(nb, tag_map={}, tag_sync=True, logger=MagicMock())
         self.assertTrue(tags.sync)
 
     def test_sync_false_when_tag_sync_disabled(self):
         """sync flag should be False when tag_sync=False (default)."""
-        nb = DummyNBForTags()
+        nb = nb_device()
         tags = ZabbixTags(nb, tag_map={}, logger=MagicMock())
         self.assertFalse(tags.sync)
 
     def test_repr_and_str_return_host_name(self):
-        nb = DummyNBForTags(name="my-host")
+        nb = nb_device(name="my-host")
         tags = ZabbixTags(nb, tag_map={}, host="my-host", logger=MagicMock())
         self.assertEqual(repr(tags), "my-host")
         self.assertEqual(str(tags), "my-host")
@@ -46,7 +38,7 @@ class TestRenderTag(unittest.TestCase):
     """Tests for ZabbixTags.render_tag()."""
 
     def setUp(self):
-        nb = DummyNBForTags()
+        nb = nb_device()
         self.logger = MagicMock()
         self.tags = ZabbixTags(
             nb, tag_map={}, tag_sync=True, tag_lower=True, logger=self.logger
@@ -59,7 +51,7 @@ class TestRenderTag(unittest.TestCase):
 
     def test_valid_tag_not_lowercased(self):
         """tag_lower=False should preserve original case."""
-        nb = DummyNBForTags()
+        nb = nb_device()
         tags = ZabbixTags(
             nb, tag_map={}, tag_sync=True, tag_lower=False, logger=self.logger
         )
@@ -102,8 +94,8 @@ class TestGenerateFromTagMap(unittest.TestCase):
 
     def test_generate_tag_from_field_map(self):
         """Tags derived from tag_map fields are lowercased and returned correctly."""
-        nb = DummyNBForTags(name="router01")
-        # "site/name" → nb["site"]["name"] → "TestSite", mapped to tag name "site"
+        nb = nb_device(name="router01")
+        # "site/name" → device.site.name → "TestSite", mapped to tag name "site"
         tag_map = {"site/name": "site"}
         tags = ZabbixTags(
             nb,
@@ -119,7 +111,7 @@ class TestGenerateFromTagMap(unittest.TestCase):
 
     def test_generate_empty_field_map_produces_no_tags(self):
         """An empty tag_map with no context or NB tags should return an empty list."""
-        nb = DummyNBForTags()
+        nb = nb_device()
         tags = ZabbixTags(nb, tag_map={}, tag_sync=True, logger=self.logger)
         result = tags.generate()
         self.assertEqual(result, [])
@@ -127,7 +119,7 @@ class TestGenerateFromTagMap(unittest.TestCase):
     def test_generate_deduplicates_tags(self):
         """Duplicate tags produced by the map should be deduplicated."""
         # Two map entries that resolve to the same tag/value pair
-        nb = DummyNBForTags(name="router01")
+        nb = nb_device(name="router01")
         tag_map = {"site/name": "site", "site/name": "site"}  # noqa: F601
         tags = ZabbixTags(
             nb,
@@ -148,7 +140,7 @@ class TestGenerateFromConfigContext(unittest.TestCase):
 
     def test_generates_tags_from_config_context(self):
         """Tags listed in config_context['zabbix']['tags'] are added correctly."""
-        nb = DummyNBForTags(
+        nb = nb_device(
             config_context={
                 "zabbix": {
                     "tags": [
@@ -169,7 +161,7 @@ class TestGenerateFromConfigContext(unittest.TestCase):
 
     def test_skips_config_context_tags_with_invalid_values(self):
         """Config context tags with None value should be silently dropped."""
-        nb = DummyNBForTags(
+        nb = nb_device(
             config_context={
                 "zabbix": {
                     "tags": [
@@ -188,14 +180,14 @@ class TestGenerateFromConfigContext(unittest.TestCase):
 
     def test_ignores_zabbix_tags_key_missing(self):
         """Missing 'tags' key inside config_context['zabbix'] produces no tags."""
-        nb = DummyNBForTags(config_context={"zabbix": {"templates": ["T1"]}})
+        nb = nb_device(config_context={"zabbix": {"templates": ["T1"]}})
         tags = ZabbixTags(nb, tag_map={}, tag_sync=True, logger=self.logger)
         result = tags.generate()
         self.assertEqual(result, [])
 
     def test_ignores_config_context_tags_not_a_list(self):
         """Non-list value for config_context['zabbix']['tags'] produces no tags."""
-        nb = DummyNBForTags(config_context={"zabbix": {"tags": "not-a-list"}})
+        nb = nb_device(config_context={"zabbix": {"tags": "not-a-list"}})
         tags = ZabbixTags(nb, tag_map={}, tag_sync=True, logger=self.logger)
         result = tags.generate()
         self.assertEqual(result, [])
@@ -206,15 +198,12 @@ class TestGenerateFromNetboxTags(unittest.TestCase):
 
     def setUp(self):
         self.logger = MagicMock()
-        # Simulate a list of NetBox tag objects (as dicts, matching real API shape)
-        self.nb_tags = [
-            {"name": "ping", "slug": "ping", "display": "ping"},
-            {"name": "snmp", "slug": "snmp", "display": "snmp"},
-        ]
+        # NetBox tags, nested on the device in their brief form
+        self.nb_tags = ["ping", "snmp"]
 
     def test_generates_tags_from_netbox_tags_using_name(self):
         """NetBox device tags are forwarded using tag_name label and tag_value='name'."""
-        nb = DummyNBForTags(tags=self.nb_tags)
+        nb = nb_device(tags=self.nb_tags)
         tags = ZabbixTags(
             nb,
             tag_map={},
@@ -234,7 +223,7 @@ class TestGenerateFromNetboxTags(unittest.TestCase):
 
     def test_generates_tags_from_netbox_tags_using_slug(self):
         """tag_value='slug' should use the slug field from each NetBox tag."""
-        nb = DummyNBForTags(tags=self.nb_tags)
+        nb = nb_device(tags=self.nb_tags)
         tags = ZabbixTags(
             nb,
             tag_map={},
@@ -251,7 +240,7 @@ class TestGenerateFromNetboxTags(unittest.TestCase):
 
     def test_generates_tags_from_netbox_tags_default_value_field(self):
         """When tag_value is not a recognised field name, falls back to 'name'."""
-        nb = DummyNBForTags(tags=self.nb_tags)
+        nb = nb_device(tags=self.nb_tags)
         tags = ZabbixTags(
             nb,
             tag_map={},
@@ -267,7 +256,7 @@ class TestGenerateFromNetboxTags(unittest.TestCase):
 
     def test_skips_netbox_tags_when_tag_name_not_set(self):
         """NetBox tag forwarding is skipped when tag_name is not configured."""
-        nb = DummyNBForTags(tags=self.nb_tags)
+        nb = nb_device(tags=self.nb_tags)
         tags = ZabbixTags(
             nb,
             tag_map={},

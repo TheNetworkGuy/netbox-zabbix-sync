@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from netbox_zabbix_sync.modules.exceptions import HostgroupError
 from netbox_zabbix_sync.modules.hostgroups import Hostgroup
 from netbox_zabbix_sync.modules.tools import verify_hg_format
+from tests.fakes import FakeNetBox
 
 
 class TestListHostgroupFormats(unittest.TestCase):
@@ -13,69 +14,29 @@ class TestListHostgroupFormats(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        # Create mock logger
         self.mock_logger = MagicMock()
+        self.netbox = FakeNetBox()
+        nb = self.netbox
 
-        # Create mock device
-        self.mock_device = MagicMock()
-        self.mock_device.name = "test-device"
+        site = nb.site("TestSite", region=nb.region("TestRegion"))
+        role = nb.role("TestRole")
+        platform = nb.platform("TestPlatform")
 
-        # Set up site information
-        site = MagicMock()
-        site.name = "TestSite"
-
-        # Set up region information
-        region = MagicMock()
-        region.name = "TestRegion"
-        region.__str__.return_value = "TestRegion"
-        site.region = region
-
-        # Set device site
-        self.mock_device.site = site
-
-        # Set up role information
-        self.mock_device_role = MagicMock()
-        self.mock_device_role.name = "TestRole"
-        self.mock_device_role.__str__.return_value = "TestRole"
-        self.mock_device.role = self.mock_device_role
-
-        # Set up rack information
-        rack = MagicMock()
-        rack.name = "TestRack"
-        self.mock_device.rack = rack
-
-        # Set up platform information
-        platform = MagicMock()
-        platform.name = "TestPlatform"
-        self.mock_device.platform = platform
-
-        # Device-specific properties
-        device_type = MagicMock()
-        manufacturer = MagicMock()
-        manufacturer.name = "TestManufacturer"
-        device_type.manufacturer = manufacturer
-        self.mock_device.device_type = device_type
-
-        # Create mock VM
-        self.mock_vm = MagicMock()
-        self.mock_vm.name = "test-vm"
-
-        # Reuse site from device
-        self.mock_vm.site = site
-
-        # Set up role for VM
-        self.mock_vm.role = self.mock_device_role
-
-        # Set up platform for VM
-        self.mock_vm.platform = platform
-
-        # VM-specific properties
-        cluster = MagicMock()
-        cluster.name = "TestCluster"
-        cluster_type = MagicMock()
-        cluster_type.name = "TestClusterType"
-        cluster.type = cluster_type
-        self.mock_vm.cluster = cluster
+        self.mock_device = nb.device(
+            "test-device",
+            site=site,
+            role=role,
+            platform=platform,
+            rack=nb.rack("TestRack", site=site),
+            device_type=nb.device_type("TestModel", manufacturer="TestManufacturer"),
+        )
+        self.mock_vm = nb.virtual_machine(
+            "test-vm",
+            site=site,
+            role=role,
+            platform=platform,
+            cluster=nb.cluster("TestCluster", type="TestClusterType"),
+        )
 
     def test_verify_list_based_hostgroup_format(self):
         """Test verification of list-based hostgroup formats."""

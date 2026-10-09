@@ -26,8 +26,8 @@ import pynetbox
 import pytest
 from pynetbox.core.response import Record
 
-from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.hostgroups import Hostgroup
+from tests.fakes import FakeNetBox, physical_device
 from tests.netbox_payloads import (
     EXPECTED,
     NETBOX_VERSIONS,
@@ -41,40 +41,19 @@ ZABBIX_HOSTID = 42
 
 
 def nb_device(custom_fields=None, site_custom_fields=None, type_custom_fields=None):
-    """A NetBox device mock carrying the given custom fields."""
-    nb = MagicMock()
-    nb.id = 1
-    nb.name = "test-device"
-    nb.status.label = "Active"
-    nb.config_context = {}
-    nb.oob_ip = None
-    nb.primary_ip = nb.primary_ip4 = MagicMock(address="192.168.1.1/24")
-    nb.primary_ip6 = None
-    nb.custom_fields = {"zabbix_hostid": None, **(custom_fields or {})}
-    nb.site.name = "AMS-01"
-    nb.site.custom_fields = site_custom_fields or {}
-    nb.role.name = "Server"
-    nb.device_type.custom_fields = type_custom_fields or {}
-    return nb
+    """A NetBox device carrying the given custom fields.
 
-
-def physical_device(nb, **config):
-    zabbix = MagicMock()
-    zabbix.version = 7.0
-    return PhysicalDevice(
-        nb,
-        zabbix,
-        MagicMock(),
-        "4.7",
-        logger=MagicMock(),
-        config={
-            "device_cf": "zabbix_hostid",
-            "preferred_ip": "auto",
-            "prefer_dns": False,
-            "proxy_cf": False,
-            "proxy_group_cf": False,
-            **config,
-        },
+    Site and device type custom fields are not in the nested form NetBox
+    returns, so the sync reads them through a lazy load of the full object.
+    """
+    netbox = FakeNetBox()
+    return netbox.device(
+        site=netbox.site("AMS-01", custom_fields=site_custom_fields or {}),
+        role=netbox.role("Server"),
+        device_type=netbox.device_type(
+            "Test Model", custom_fields=type_custom_fields or {}
+        ),
+        custom_fields=custom_fields,
     )
 
 

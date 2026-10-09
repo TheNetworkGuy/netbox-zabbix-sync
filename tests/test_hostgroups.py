@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from netbox_zabbix_sync.modules.exceptions import HostgroupError
 from netbox_zabbix_sync.modules.hostgroups import Hostgroup
+from tests.fakes import FakeNetBox
 
 
 class TestHostgroups(unittest.TestCase):
@@ -12,117 +13,48 @@ class TestHostgroups(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        # Create mock logger
         self.mock_logger = MagicMock()
+        self.netbox = FakeNetBox()
+        nb = self.netbox
 
-        # *** Mock NetBox Device setup ***
-        # Create mock device with all properties
-        self.mock_device = MagicMock()
-        self.mock_device.name = "test-device"
+        # Shared between the device and the VM, as in a real NetBox
+        site = nb.site(
+            "TestSite",
+            region=nb.region("TestRegion", parent="ParentRegion"),
+            group=nb.site_group("TestSiteGroup", parent="ParentSiteGroup"),
+        )
+        self.role = nb.role("TestRole")
+        tenant = nb.tenant("TestTenant", group="TestTenantGroup")
+        platform = nb.platform("TestPlatform")
 
-        # Set up site information
-        site = MagicMock()
-        site.name = "TestSite"
+        # *** NetBox Device ***
+        # empty_cf is intentionally None to test the empty CF path
+        self.mock_device = nb.device(
+            "test-device",
+            site=site,
+            role=self.role,
+            tenant=tenant,
+            platform=platform,
+            device_type=nb.device_type("TestModel", manufacturer="TestManufacturer"),
+            location=nb.location("TestLocation", site=site),
+            rack=nb.rack("TestRack", site=site),
+            custom_fields={"test_cf": "TestCF", "empty_cf": None},
+        )
 
-        # Set up region information
-        region = MagicMock()
-        region.name = "TestRegion"
-        # Ensure region string representation returns the name
-        region.__str__.return_value = "TestRegion"
-        site.region = region
+        # *** NetBox VM ***
+        self.mock_vm = nb.virtual_machine(
+            "test-vm",
+            site=site,
+            role=self.role,
+            tenant=tenant,
+            platform=platform,
+            cluster=nb.cluster("TestCluster", type="TestClusterType"),
+            custom_fields={"test_cf": "TestCF"},
+        )
 
-        # Set up site group information
-        site_group = MagicMock()
-        site_group.name = "TestSiteGroup"
-        # Ensure site group string representation returns the name
-        site_group.__str__.return_value = "TestSiteGroup"
-        site.group = site_group
-
-        self.mock_device.site = site
-
-        # Set up role information (varies based on NetBox version)
-        self.mock_device_role = MagicMock()
-        self.mock_device_role.name = "TestRole"
-        # Ensure string representation returns the name
-        self.mock_device_role.__str__.return_value = "TestRole"
-        self.mock_device.device_role = self.mock_device_role
-        self.mock_device.role = self.mock_device_role
-
-        # Set up tenant information
-        tenant = MagicMock()
-        tenant.name = "TestTenant"
-        # Ensure tenant string representation returns the name
-        tenant.__str__.return_value = "TestTenant"
-        tenant_group = MagicMock()
-        tenant_group.name = "TestTenantGroup"
-        # Ensure tenant group string representation returns the name
-        tenant_group.__str__.return_value = "TestTenantGroup"
-        tenant.group = tenant_group
-        self.mock_device.tenant = tenant
-
-        # Set up platform information
-        platform = MagicMock()
-        platform.name = "TestPlatform"
-        self.mock_device.platform = platform
-
-        # Device-specific properties
-        device_type = MagicMock()
-        manufacturer = MagicMock()
-        manufacturer.name = "TestManufacturer"
-        device_type.manufacturer = manufacturer
-        self.mock_device.device_type = device_type
-
-        location = MagicMock()
-        location.name = "TestLocation"
-        # Ensure location string representation returns the name
-        location.__str__.return_value = "TestLocation"
-        self.mock_device.location = location
-
-        rack = MagicMock()
-        rack.name = "TestRack"
-        self.mock_device.rack = rack
-
-        # Custom fields — empty_cf is intentionally None to test the empty CF path
-        self.mock_device.custom_fields = {"test_cf": "TestCF", "empty_cf": None}
-
-        # *** Mock NetBox VM setup ***
-        # Create mock VM with all properties
-        self.mock_vm = MagicMock()
-        self.mock_vm.name = "test-vm"
-
-        # Reuse site from device
-        self.mock_vm.site = site
-
-        # Set up role for VM
-        self.mock_vm.role = self.mock_device_role
-
-        # Set up tenant for VM (same as device)
-        self.mock_vm.tenant = tenant
-
-        # Set up platform for VM (same as device)
-        self.mock_vm.platform = platform
-
-        # VM-specific properties
-        cluster = MagicMock()
-        cluster.name = "TestCluster"
-        cluster_type = MagicMock()
-        cluster_type.name = "TestClusterType"
-        cluster.type = cluster_type
-        self.mock_vm.cluster = cluster
-
-        # Custom fields
-        self.mock_vm.custom_fields = {"test_cf": "TestCF"}
-
-        # Mock data for nesting tests
-        self.mock_regions_data = [
-            {"name": "ParentRegion", "parent": None, "_depth": 0},
-            {"name": "TestRegion", "parent": "ParentRegion", "_depth": 1},
-        ]
-
-        self.mock_groups_data = [
-            {"name": "ParentSiteGroup", "parent": None, "_depth": 0},
-            {"name": "TestSiteGroup", "parent": "ParentSiteGroup", "_depth": 1},
-        ]
+        # What convert_recordset makes of dcim.regions / dcim.site_groups.all()
+        self.mock_regions_data = [vars(r) for r in nb.all("dcim/regions")]
+        self.mock_groups_data = [vars(g) for g in nb.all("dcim/site-groups")]
 
     def test_device_hostgroup_creation(self):
         """Test basic device hostgroup creation."""
@@ -199,37 +131,22 @@ class TestHostgroups(unittest.TestCase):
     def test_device_netbox_version_differences(self):
         """Test hostgroup generation with different NetBox versions.
 
-        device_role (v2/v3) and role (v4+) are set to different values so the
-        test can verify that the correct attribute is read for each version.
+        NetBox 2/3 serialise a device's role as `device_role` and 4+ as
+        `role`; each payload carries only its own field, so reading the wrong
+        one fails instead of silently picking up a value.
         """
-        # Build a device with deliberately different names on each role attribute
-        versioned_device = MagicMock()
-        versioned_device.name = "versioned-device"
-        versioned_device.site = self.mock_device.site
-        versioned_device.tenant = self.mock_device.tenant
-        versioned_device.platform = self.mock_device.platform
-        versioned_device.location = self.mock_device.location
-        versioned_device.rack = self.mock_device.rack
-        versioned_device.device_type = self.mock_device.device_type
-        versioned_device.custom_fields = self.mock_device.custom_fields
+        for version, field in (("2.11", "device_role"), ("3.5", "device_role")):
+            netbox = FakeNetBox(version=version)
+            device = netbox.device(role=netbox.role("OldRole"))
+            self.assertIn(field, dict(device))
+            self.assertNotIn("role", dict(device))
+            hostgroup = Hostgroup("dev", device, version, self.mock_logger)
+            self.assertEqual(hostgroup.format_options["role"], "OldRole")
 
-        old_role = MagicMock()
-        old_role.name = "OldRole"
-        new_role = MagicMock()
-        new_role.name = "NewRole"
-        versioned_device.device_role = old_role  # read by NetBox v2 / v3 code path
-        versioned_device.role = new_role  # read by NetBox v4+ code path
-
-        # v2 must use device_role
-        hostgroup_v2 = Hostgroup("dev", versioned_device, "2.11", self.mock_logger)
-        self.assertEqual(hostgroup_v2.format_options["role"], "OldRole")
-
-        # v3 must also use device_role
-        hostgroup_v3 = Hostgroup("dev", versioned_device, "3.5", self.mock_logger)
-        self.assertEqual(hostgroup_v3.format_options["role"], "OldRole")
-
-        # v4+ must use role
-        hostgroup_v4 = Hostgroup("dev", versioned_device, "4.0", self.mock_logger)
+        netbox = FakeNetBox(version="4.0")
+        device = netbox.device(role=netbox.role("NewRole"))
+        self.assertNotIn("device_role", dict(device))
+        hostgroup_v4 = Hostgroup("dev", device, "4.0", self.mock_logger)
         self.assertEqual(hostgroup_v4.format_options["role"], "NewRole")
 
     def test_custom_field_lookup(self):
@@ -261,25 +178,15 @@ class TestHostgroups(unittest.TestCase):
 
     def test_missing_hostgroup_format_item(self):
         """Test handling of missing hostgroup format items."""
-        # Create a device with minimal attributes
-        minimal_device = MagicMock()
-        minimal_device.name = "minimal-device"
-        minimal_device.site = None
-        minimal_device.tenant = None
-        minimal_device.platform = None
-        minimal_device.custom_fields = {}
-
-        # Create role
-        role = MagicMock()
-        role.name = "MinimalRole"
-        minimal_device.role = role
-
-        # Create device_type with manufacturer
-        device_type = MagicMock()
-        manufacturer = MagicMock()
-        manufacturer.name = "MinimalManufacturer"
-        device_type.manufacturer = manufacturer
-        minimal_device.device_type = device_type
+        # A device with no site, tenant or platform
+        minimal_device = self.netbox.device(
+            "minimal-device",
+            site=None,
+            role=self.netbox.role("MinimalRole"),
+            device_type=self.netbox.device_type(
+                "Minimal", manufacturer="MinimalManufacturer"
+            ),
+        )
 
         # Create hostgroup
         hostgroup = Hostgroup("dev", minimal_device, "4.0", self.mock_logger)
@@ -409,20 +316,7 @@ class TestHostgroups(unittest.TestCase):
 
     def test_generate_returns_none_when_all_fields_empty(self):
         """Test that generate() returns None when every format field resolves to no value."""
-        empty_device = MagicMock()
-        empty_device.name = "empty-device"
-        empty_device.site = None
-        empty_device.tenant = None
-        empty_device.platform = None
-        empty_device.role = None
-        empty_device.location = None
-        empty_device.rack = None
-        empty_device.custom_fields = {}
-        device_type = MagicMock()
-        manufacturer = MagicMock()
-        manufacturer.name = "SomeManufacturer"
-        device_type.manufacturer = manufacturer
-        empty_device.device_type = device_type
+        empty_device = self.netbox.device("empty-device", site=None, role=None)
 
         hostgroup = Hostgroup("dev", empty_device, "4.0", self.mock_logger)
         # site, tenant and platform all have no value → hg_output stays empty → None
@@ -431,14 +325,9 @@ class TestHostgroups(unittest.TestCase):
 
     def test_vm_without_cluster(self):
         """Test that cluster/cluster_type are left out of the hostgroup when VM has no cluster."""
-        clusterless_vm = MagicMock()
-        clusterless_vm.name = "clusterless-vm"
-        clusterless_vm.site = self.mock_vm.site
-        clusterless_vm.tenant = self.mock_vm.tenant
-        clusterless_vm.platform = self.mock_vm.platform
-        clusterless_vm.role = self.mock_device_role
-        clusterless_vm.cluster = None
-        clusterless_vm.custom_fields = {}
+        clusterless_vm = self.netbox.virtual_machine(
+            "clusterless-vm", role=self.role, cluster=None
+        )
 
         hostgroup = Hostgroup("vm", clusterless_vm, "4.0", self.mock_logger)
 
@@ -450,13 +339,14 @@ class TestHostgroups(unittest.TestCase):
         self.assertEqual(hostgroup.generate("cluster_type/cluster/role"), "TestRole")
 
     def test_tenant_without_group(self):
-        """Test that tenant_group is left out when the tenant has no group."""
-        tenant = MagicMock()
-        tenant.__str__.return_value = "TestTenant"
-        tenant.group = None
-        self.mock_device.tenant = tenant
+        """Test that tenant_group is left out when the tenant has no group.
 
-        hostgroup = Hostgroup("dev", self.mock_device, "4.0", self.mock_logger)
+        NetBox returns null for an ungrouped tenant's group; it used to be
+        stringified into a "None" hostgroup level.
+        """
+        device = self.netbox.device("test-device", role=self.role, tenant="TestTenant")
+
+        hostgroup = Hostgroup("dev", device, "4.0", self.mock_logger)
 
         self.assertIsNone(hostgroup.format_options["tenant_group"])
         self.assertEqual(
@@ -470,6 +360,20 @@ class TestHostgroups(unittest.TestCase):
         # empty_cf has no value → it is skipped; only site and role appear
         result = hostgroup.generate("site/empty_cf/role")
         self.assertEqual(result, "TestSite/TestRole")
+
+    def test_region_and_site_group_come_from_the_full_site(self):
+        """A nested site has no region or group, so reading them loads the site.
+
+        NetBox nests related objects in a brief form; pynetbox fetches the full
+        site on first access to a field it lacks. This is the extra request the
+        sync makes per device unless extended_site_properties preloads it.
+        """
+        site_url = self.mock_device.site.url
+        self.assertNotIn("region", dict(self.mock_device.site))
+
+        Hostgroup("dev", self.mock_device, "4.0", self.mock_logger)
+
+        self.assertIn(("GET", site_url, None), self.netbox.requests)
 
 
 if __name__ == "__main__":
