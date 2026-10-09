@@ -132,9 +132,14 @@ class Hostgroup:
                     cf_data = self.custom_field_lookup(hg_item)
                     # CF does not exist
                     if not cf_data["result"]:
+                        obj_label = "virtual machine" if self.type == "vm" else "device"
                         msg = (
                             f"Unable to generate hostgroup for host {self.name}. "
-                            f"Item type {hg_item} not supported."
+                            f"Item '{hg_item}' in hostgroup format '{hg_format}' is "
+                            f"not a supported hostgroup variable and no custom field "
+                            f"with this name exists on this {obj_label}. If "
+                            f"'{hg_item}' is a custom field, check in NetBox that it "
+                            f"is assigned to the {obj_label} object type."
                         )
                         self.logger.error(msg)
                         raise HostgroupError(msg)
