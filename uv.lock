@@ -311,7 +311,7 @@ requires-dist = [
     { name = "igraph", specifier = ">=1.0.0" },
     { name = "j2ipaddr", specifier = ">=1.0.6" },
     { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "pynetbox", specifier = ">=7.6.1" },
+    { name = "pynetbox", specifier = ">=7.9.0" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "python-jsonpath", specifier = ">=2.0.2" },
     { name = "zabbix-utils", specifier = ">=2.0.4" },
@@ -354,15 +354,16 @@ wheels = [
 
 [[package]]
 name = "pynetbox"
-version = "7.6.1"
+version = "7.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
     { name = "requests" },
+    { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/11/0a/f0b733d44c4793ee3be0ee142a8ac92cfdd6232f64e4ae2dda256a08fb41/pynetbox-7.6.1.tar.gz", hash = "sha256:8a7ee99b89d08848be134793015afc17c85711a18e8c7e67c353362e1c8d7fc7", size = 92489, upload-time = "2026-01-28T16:50:50.223Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/58/66/9156cd3486c9017be6923e2e44e01110a85dcdfdf7a03558aadbaf4ffc4d/pynetbox-7.9.0.tar.gz", hash = "sha256:a50e5caa07df1795a9706e5262a864cf371ae63592585191c1ad361d42695d8b", size = 149198, upload-time = "2026-10-08T21:48:15.788Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c0/f6/a11612421017fdd8f93e653ea1505d4e64e9a24de0974c53a36b154cd945/pynetbox-7.6.1-py3-none-any.whl", hash = "sha256:daa064b1cc4e7d871124ddca1e0de3a36e7ff9e0814fb046a90e36024fd59e4b", size = 39319, upload-time = "2026-01-28T16:50:49.234Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/ce/7dbb8a2ec85161af46d2004f8669f8ae22eb133c7b45247aa884a62f16ae/pynetbox-7.9.0-py3-none-any.whl", hash = "sha256:f0bc3c07f71ae9d564f14b37111fc749084601ed98d5c3c1ec8e94a08810892f", size = 56109, upload-time = "2026-10-08T21:48:14.805Z" },
 ]
 
 [[package]]
