@@ -81,6 +81,7 @@ def jinjafy_config_context(nb, context: dict | None = None) -> dict:
     data = dict(copy(nb))
     if "config_context" in data:
         data.pop("config_context")
+
     if context and isinstance(context, dict):
         # create Jinja2 environment
         j2env = Environment(autoescape=False)  # noqa: S701
@@ -92,10 +93,11 @@ def jinjafy_config_context(nb, context: dict | None = None) -> dict:
             # and render it using the objects data dictionary
             template = j2env.from_string(str(dumps(context)))
             rendered_context = loads(template.render(data=data))
+
+            return rendered_context
         except (JSONDecodeError, TemplateError, TypeError) as e:
             raise JinjaRenderError(e) from e
-        else:
-            return rendered_context
+
     return context
 
 

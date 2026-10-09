@@ -206,6 +206,7 @@ class Sync:
             "Host %s: *EXPERIMENTAL* Rendering config context with Jinja2.",
             host.name,
         )
+
         try:
             rendered_context = jinjafy_config_context(nb_obj)
         except JinjaRenderError as e:
@@ -220,7 +221,8 @@ class Sync:
                 pformat(nb_obj.config_context),
             )
             return False
-        if rendered_context and isinstance(rendered_context, dict):
+
+        if isinstance(rendered_context, dict):
             host.config_context["zabbix"] = rendered_context
         else:
             self.logger.error(
@@ -228,6 +230,7 @@ class Sync:
                 host.name,
             )
             return False
+
         return True
 
     def _is_cluster_secondary(self, device: PhysicalDevice) -> bool:
