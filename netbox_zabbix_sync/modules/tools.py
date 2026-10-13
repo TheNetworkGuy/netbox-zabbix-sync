@@ -12,6 +12,9 @@ from jinja2 import Environment, TemplateError
 from netbox_zabbix_sync.modules import jinja_filters
 from netbox_zabbix_sync.modules.exceptions import HostgroupError, JinjaRenderError
 
+PROXY_GROUPS_MINIMUM_VERSION = 7.0
+HOST_GROUPS_NAMING_THRESHOLD = 6.0
+
 
 def convert_recordset(recordset):
     """Converts netbox RecordSet to list of dicts."""

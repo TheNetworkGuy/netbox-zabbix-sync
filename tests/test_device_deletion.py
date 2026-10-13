@@ -21,7 +21,7 @@ class TestDeviceDeletion(unittest.TestCase):
             status="Decommissioning",
             custom_fields={"zabbix_hostid": "456"},
         )
-        self.zabbix = zabbix_api(version="6.0")
+        self.zabbix = zabbix_api(version="6.0.0")
         self.zabbix.host.get.return_value = [{"hostid": "456"}]
         self.logger = mock_logger()
         self.device = physical_device(

@@ -8,16 +8,18 @@ the defaults below are dicts and lists as the API returns them.
 
 from unittest.mock import MagicMock
 
+from zabbix_utils import APIVersion
 
-def zabbix_api(version=7.0, hostgroup="TestGroup") -> MagicMock:
+
+def zabbix_api(version="7.0.0", hostgroup="TestGroup") -> MagicMock:
     """A Zabbix API with one hostgroup and one template, and no hosts yet.
 
-    `version` is passed through as given: core.py compares it as a string and
-    host.py as a number, so a test picks the type its code path needs. A test
+    `version` is wrapped in an `APIVersion`, as zabbix_utils reports it, so the
+    sync's version comparisons behave as they do against a real Zabbix. A test
     that needs an existing host sets `host.get` itself, see `zabbix_host`.
     """
     zabbix = MagicMock(name="ZabbixAPI()")
-    zabbix.version = version
+    zabbix.version = APIVersion(version)
     zabbix.hostgroup.get.return_value = [{"groupid": "1", "name": hostgroup}]
     zabbix.hostgroup.create.return_value = {"groupids": ["2"]}
     zabbix.template.get.return_value = [{"templateid": "1", "name": "TestTemplate"}]
@@ -31,7 +33,7 @@ def zabbix_api(version=7.0, hostgroup="TestGroup") -> MagicMock:
     return zabbix
 
 
-def zabbix_mock(mock_zabbix_api, version=7.0, hostgroup="TestGroup") -> MagicMock:
+def zabbix_mock(mock_zabbix_api, version="7.0.0", hostgroup="TestGroup") -> MagicMock:
     """Point the patched `ZabbixAPI` class at a `zabbix_api()`."""
     zabbix = zabbix_api(version=version, hostgroup=hostgroup)
     mock_zabbix_api.return_value = zabbix

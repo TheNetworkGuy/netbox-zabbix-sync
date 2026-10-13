@@ -192,7 +192,7 @@ class TestSyncZabbixAuthentication(unittest.TestCase):
     def test_sync_uses_token_when_provided(self, mock_api, mock_zabbix_api):
         """Test that sync uses token auth when token is provided."""
         netbox_mock(mock_api, self.netbox)
-        zabbix_mock(mock_zabbix_api, version="7.0")
+        zabbix_mock(mock_zabbix_api, version="7.0.0")
 
         syncer = Sync()
         syncer.connect(
@@ -227,7 +227,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         device2 = self.netbox.device(id=2, name="device2")
 
         netbox_mock(mock_api, self.netbox, devices=[device1, device2])
-        zabbix_mock(mock_zabbix_api, version="6.0")
+        zabbix_mock(mock_zabbix_api, version="6.0.0")
 
         # Mock PhysicalDevice to have no template (skip further processing)
         mock_device_instance = MagicMock()
@@ -253,7 +253,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         vm2 = self.netbox.virtual_machine(id=2, name="vm2")
 
         netbox_mock(mock_api, self.netbox, vms=[vm1, vm2])
-        zabbix_mock(mock_zabbix_api, version="6.0")
+        zabbix_mock(mock_zabbix_api, version="6.0.0")
 
         # Mock VM to have no template (skip further processing)
         mock_vm_instance = MagicMock()
@@ -277,7 +277,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         vm1 = self.netbox.virtual_machine(id=1, name="vm1")
 
         netbox_mock(mock_api, self.netbox, vms=[vm1])
-        zabbix_mock(mock_zabbix_api, version="6.0")
+        zabbix_mock(mock_zabbix_api, version="6.0.0")
 
         syncer = Sync()
         connect(syncer)
@@ -299,7 +299,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         """Test that sync uses 'host' as proxy name field for Zabbix 6."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0.0")
         mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "host": "proxy1"}]
 
         syncer = Sync()
@@ -315,7 +315,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         """Test that sync uses 'name' as proxy name field for Zabbix 7."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="7.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="7.0.0")
         mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "name": "proxy1"}]
 
         syncer = Sync()
@@ -331,7 +331,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         """Test that sync fetches proxy groups for Zabbix 7."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="7.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="7.0.0")
 
         syncer = Sync()
         connect(syncer)
@@ -346,7 +346,7 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         """Test that sync does NOT fetch proxy groups for Zabbix 6."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0.0")
 
         syncer = Sync()
         connect(syncer)
@@ -371,7 +371,7 @@ class TestSyncProxyNameSanitization(unittest.TestCase):
         """Test that for Zabbix 6, proxy 'host' field is renamed to 'name'."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0.0")
         # Zabbix 6 returns 'host' field
         mock_zabbix.proxy.get.return_value = [
             {"proxyid": "1", "host": "proxy1"},
