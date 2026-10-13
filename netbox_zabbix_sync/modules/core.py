@@ -332,18 +332,19 @@ class Sync:
         device_cfs = []
         vm_cfs = []
         # Create API call to get all custom fields which are on the device objects
-        device_cfs = list(
-            self.netbox.extras.custom_fields.filter(
-                type=["text", "object", "select"], object_type="dcim.device"
+        if self.config["sync_devices"]:
+            device_cfs = list(
+                self.netbox.extras.custom_fields.filter(
+                    type=["text", "object", "select"], object_type="dcim.device"
+                )
             )
-        )
-        # Check if the provided Hostgroup layout is valid
-        verify_hg_format(
-            self.config["hostgroup_format"],
-            device_cfs=device_cfs,
-            hg_type="dev",
-            logger=self.logger,
-        )
+            # Check if the provided Hostgroup layout is valid
+            verify_hg_format(
+                self.config["hostgroup_format"],
+                device_cfs=device_cfs,
+                hg_type="dev",
+                logger=self.logger,
+            )
         if self.config["sync_vms"]:
             vm_cfs = list(
                 self.netbox.extras.custom_fields.filter(
@@ -358,15 +359,25 @@ class Sync:
                 logger=self.logger,
             )
         # Set API parameter mapping based on API version
+<<<<<<< HEAD
         proxy_name = (
             "host" if self.zabbix.version < PROXY_GROUPS_MINIMUM_VERSION else "name"
         )
+=======
+        proxy_name = "host" if str(self.zabbix.version) < "7" else "name"
+
+>>>>>>> e49e766 (Added option to disable device syncs)
         # Get all Zabbix and NetBox data
-        dev_filter_combined = self._combine_filters(
-            self.config["nb_device_filter"], device_filter
-        )
-        netbox_devices = list(self.netbox.dcim.devices.filter(**dev_filter_combined))
+        netbox_devices = []
         netbox_vms = []
+        if self.config["sync_devices"]:
+            dev_filter_combined = self._combine_filters(
+                self.config["nb_device_filter"], device_filter
+            )   
+            netbox_devices = list(
+                self.netbox.dcim.devices.filter(**dev_filter_combined)
+            )
+        
         if self.config["sync_vms"]:
             vm_filter_combined = self._combine_filters(
                 self.config["nb_vm_filter"], vm_filter
