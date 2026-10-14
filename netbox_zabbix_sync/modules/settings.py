@@ -24,6 +24,7 @@ DEFAULT_CONFIG = {
     "create_hostgroups": True,
     "create_journal": False,
     "sync_vms": False,
+    "sync_devices": True,
     "vm_hostgroup_format": "cluster_type/cluster/role",
     "full_proxy_sync": False,
     "zabbix_device_removal": ["Decommissioning", "Inventory"],

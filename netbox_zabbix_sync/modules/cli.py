@@ -14,6 +14,7 @@ _BOOL_ARGS = [
     ("create_hostgroups", "Enable hostgroup generation (requires Zabbix permissions)."),
     ("create_journal", "Create NetBox journal entries on changes."),
     ("sync_vms", "Enable virtual machine sync."),
+    ("sync_devices", "Enable device sync."),
     (
         "full_proxy_sync",
         "Enable full proxy sync (removes proxies not in config context).",

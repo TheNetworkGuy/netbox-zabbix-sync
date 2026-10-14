@@ -33,6 +33,11 @@ templates_config_context_overrule = False
 template_cf = "zabbix_template"
 device_cf = "zabbix_hostid"
 
+## Device sync
+# Set sync_devices to False in order to skip device syncing.
+# This is useful if you'd only like to sync 
+sync_devices = True
+
 # Zabbix host description
 # The following options are available for the description of all created hosts in Zabbix
 # static: Uses the default static string "Host added by NetBox sync script."
@@ -72,7 +77,7 @@ create_journal = False
 oob_sync = False
 
 ## Virtual machine sync
-# Set sync_vms to True in order to use this new feature
+# Set sync_vms to True in order to sync VMs.
 # Use the hostgroup vm_hostgroup_format mapper for specific
 # hostgroup atributes of VM's such as cluster_type and cluster
 sync_vms = False
