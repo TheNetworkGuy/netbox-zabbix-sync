@@ -21,7 +21,7 @@ class ZabbixInterface:
 
     def _set_default_port(self):
         """Sets default TCP / UDP port for different interface types"""
-        interface_mapping = {1: 10050, 2: 161, 3: 623, 4: 12345}
+        interface_mapping = {0: 0, 1: 10050, 2: 161, 3: 623, 4: 12345}
         # Check if interface type is listed in mapper.
         if self.interface["type"] not in interface_mapping:
             return False
@@ -31,7 +31,7 @@ class ZabbixInterface:
 
     def get_context(self):
         """check if NetBox custom context has been defined."""
-        int_types = {"agent": 1, "snmp": 2, "ipmi": 3, "jmx": 4}
+        int_types = {"none": 0, "agent": 1, "snmp": 2, "ipmi": 3, "jmx": 4}
         int_type = "interface_type"
         int_port = "interface_port"
         max_port = 65536
@@ -44,7 +44,7 @@ class ZabbixInterface:
             if int_type in zabbix:
                 # Use valid integer for type if set
                 if str(zabbix[int_type]).isdigit() and (
-                    int(zabbix[int_type]) > 0 and int(zabbix[int_type]) < max_type
+                    int(zabbix[int_type]) >= 0 and int(zabbix[int_type]) < max_type
                 ):
                     self.interface["type"] = zabbix[int_type]
                 # Otherwise, convert string to type integer
@@ -59,7 +59,7 @@ class ZabbixInterface:
                     return True
                 # Otherwise, validate Config Context port value
                 elif str(zabbix[int_port]).isdigit() and (
-                    int(zabbix[int_port]) > 0 and int(zabbix[int_port]) < max_port
+                    int(zabbix[int_port]) >= 0 and int(zabbix[int_port]) < max_port
                 ):
                     self.interface["port"] = zabbix[int_port]
                     return True
