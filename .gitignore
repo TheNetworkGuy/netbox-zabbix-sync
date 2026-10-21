@@ -1,4 +1,5 @@
 *.log
+*.log.[0-9]*
 .venv
 .env
 /config.py

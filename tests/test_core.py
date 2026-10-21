@@ -597,6 +597,76 @@ class TestDeviceHandeling(unittest.TestCase):
         # Verify the custom field template was NOT used
         self.assertNotIn({"templateid": "1"}, create_call_kwargs["templates"])
 
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_device_oob_ip_only(self, mock_api, mock_zabbix_api):
+        """Test that an device without a primary IP address is still created with its oob IP address."""
+        oob = self.netbox.ip_address("172.17.1.1/24")
+
+        device = self.netbox.device(id=1, name="Router01", primary_ip=None, oob_ip=oob)
+
+        netbox_mock(mock_api, self.netbox, devices=[device])
+
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync({"oob_sync": True})
+        connect(syncer)
+        syncer.start()
+
+        mock_zabbix.host.create.assert_called_once()
+        create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
+        self.assertEqual(
+            create_call_kwargs["interfaces"][0],
+            {
+                "details": {
+                    "bulk": "1",
+                    "community": "{$SNMP_COMMUNITY}",
+                    "version": "2",
+                },
+                "dns": "",
+                "ip": "172.17.1.1",
+                "main": "1",
+                "port": "161",
+                "type": "2",
+                "useip": "1",
+            },
+        )
+
+    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    def test_device_dns_name_only(self, mock_api, mock_zabbix_api):
+        """Test that an device without a primary IP address is still created with its oob IP address."""
+        ip_address = self.netbox.ip_address("", dns_name="router01.example.com")
+
+        device = self.netbox.device(id=1, name="Router01", primary_ip=ip_address)
+
+        netbox_mock(mock_api, self.netbox, devices=[device])
+
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync()
+        connect(syncer)
+        syncer.start()
+
+        mock_zabbix.host.create.assert_called_once()
+        create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
+        self.assertEqual(
+            create_call_kwargs["interfaces"][0],
+            {
+                "details": {
+                    "bulk": "1",
+                    "community": "{$SNMP_COMMUNITY}",
+                    "version": "2",
+                },
+                "dns": "router01.example.com",
+                "ip": "",
+                "main": "1",
+                "port": "161",
+                "type": "2",
+                "useip": "0",
+            },
+        )
+
 
 class TestDeviceStatusHandling(unittest.TestCase):
     """

@@ -213,8 +213,8 @@ class Host(ABC):
                 self.oob_dns = self.config_context["zabbix"]["oob_interface_dns"]
 
         # Fail if no IP or DNS was set
-        if not (self.ip or self.dns):
-            e = f"Host {self.name}: No primary IP or DNS set."
+        if not (self.ip or self.oob_ip or self.dns or self.oob_dns):
+            e = f"Host {self.name}: No IP or DNS set, cannot add host."
             self.logger.warning(e)
             raise SyncInventoryError(e)
 
@@ -688,9 +688,14 @@ class Host(ABC):
             for template in self.zbx_templates:
                 templateids.append({"templateid": template["templateid"]})
             # Setup interfaces
-            interfaces.append(self.set_interface_details())
-            if self.config["oob_sync"] and "oob_ip" in dict(self.nb) and self.nb.oob_ip:
+            if self.ip or self.dns:
+                interfaces.append(self.set_interface_details())
+            if self.config["oob_sync"] and (self.oob_ip or self.oob_dns):
                 interfaces.append(self.set_interface_details(oob=True))
+            # remove any none type interfaces
+            for interface in interfaces:
+                if not interface["type"]:
+                    interfaces.remove(interface)
             if not self._verify_interfaces(interfaces):
                 e = f"Inconsistent interface configuration for host {self.name}."
                 self.logger.error(e)
@@ -1070,9 +1075,14 @@ class Host(ABC):
 
         # Verify interfaces
         interfaces = []
-        interfaces.append(self.set_interface_details())
-        if self.config["oob_sync"] and "oob_ip" in dict(self.nb) and self.nb.oob_ip:
+        if self.ip or self.dns:
+            interfaces.append(self.set_interface_details())
+        if self.config["oob_sync"] and (self.oob_ip or self.oob_dns):
             interfaces.append(self.set_interface_details(oob=True))
+        # remove none type interfaces
+        for interface in interfaces:
+            if not interface["type"]:
+                interfaces.remove(interface)
         if not self._verify_interfaces(interfaces):
             e = f"Inconsistent interface configuration for host {self.name}."
             self.logger.error(e)
