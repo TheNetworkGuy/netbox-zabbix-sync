@@ -1,4 +1,5 @@
 """Tests for the Host abstract base class, exercised via PhysicalDevice."""
+
 import unittest
 from ipaddress import ip_interface
 from typing import Literal
@@ -234,8 +235,8 @@ class TestHostInterface(unittest.TestCase):
 
     def test_oob_additional_interface(self):
         """Test allowed values for interface requirement, one"""
-        nb =  self.netbox.device(
-            oob_ip = self.oob, primary_ip=None, primary_ip4=None, primary_ip6=None
+        nb = self.netbox.device(
+            oob_ip=self.oob, primary_ip=None, primary_ip4=None, primary_ip6=None
         )
 
         device = physical_device(nb, preferred_ip="auto")
