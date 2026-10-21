@@ -90,7 +90,7 @@ BRIEF_FIELDS = {
     "dcim/sites": ("id", "url", "display", "name", "slug", "description"),
     "dcim/virtual-chassis": ("id", "url", "display", "name", "master", "description"),
     "extras/tags": ("id", "url", "display", "name", "slug", "color"),
-    "ipam/ip-addresses": ("id", "url", "display", "family", "address", "description"),
+    "ipam/ip-addresses": ("id", "url", "display", "family", "address", "description", "dns_name"),
     "tenancy/tenant-groups": (
         "id",
         "url",
