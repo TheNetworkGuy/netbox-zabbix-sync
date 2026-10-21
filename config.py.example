@@ -115,6 +115,14 @@ traverse_site_groups = False
 # Be aware that this will increase the number of API queries to NetBox.
 extended_site_properties = False
 
+## Extended IP properties
+# the primary_ip and oob_ip will contain basic information by default.
+# By setting `extended_ips` to True, the script will query NetBox for additional IP info
+# like IP status, role, description, nat info, assigned interface, etc.
+# You can use this info in tags, inventory or macros if desired.
+# Be aware that this will increase the number of API queries to NetBox.
+extended_ips = False
+
 ## Filtering
 # Custom device filter, variable must be present but can be left empty with no filtering.
 # A couple of examples:

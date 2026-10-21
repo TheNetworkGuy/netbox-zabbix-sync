@@ -43,7 +43,7 @@ _BOOL_ARGS = [
     ),
     (
         "prefer_dns",
-        "Sets host interfaces to use DNS instead of IP if available. The DNS record can be supplied via config_context or by enabling extended_ips.",
+        "Sets host interfaces to use DNS instead of IP if available.",
     ),
     ("inventory_sync", "Sync NetBox device properties to Zabbix inventory."),
     ("oob_sync", "Sync NetBox Out-of-Band interfaces based on OOB IP."),
