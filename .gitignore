@@ -5,6 +5,8 @@
 /config.py
 Pipfile
 Pipfile.lock
+*.swp
+*.swo
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
