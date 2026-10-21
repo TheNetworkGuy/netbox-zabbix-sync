@@ -1,6 +1,7 @@
 """Tests for the Host abstract base class, exercised via PhysicalDevice."""
-
 import unittest
+from ipaddress import ip_interface
+from typing import Literal
 from unittest.mock import patch
 
 from netbox_zabbix_sync.modules.device import PhysicalDevice
@@ -191,3 +192,53 @@ class TestHostIpmi(unittest.TestCase):
             )
             self.assertEqual(ipmi["authtype"], 5)
             self.assertEqual(ipmi["privilege"], 5)
+
+
+class TestHostInterface(unittest.TestCase):
+    """Test Host.set_ip."""
+
+    def setUp(self):
+        self.netbox = FakeNetBox()
+
+        self.ipv4 = self.netbox.ip_address("192.168.1.1/24")
+        self.ipv6 = self.netbox.ip_address("2001:db8::370:7334/64")
+        self.oob = self.netbox.ip_address("172.17.1.1/24")
+
+    def _nb_device(self, primary: Literal["ipv4", "ipv6"]):
+        return self.netbox.device(
+            primary_ip=self.ipv4 if primary == "ipv4" else self.ipv6,
+            primary_ip4=self.ipv4,
+            primary_ip6=self.ipv6,
+        )
+
+    def __as_address(self, interface: str) -> str:
+        return str(ip_interface(interface).ip)
+
+    def test_use_primary_ipv4(self):
+        """Test configuration where Primary IPv4 is preferred over IPv6"""
+        nb = self._nb_device(primary="ipv4")
+
+        device = physical_device(nb, preferred_ip="ipv4")
+        device.set_ips()
+
+        self.assertEqual(device.ip, self.__as_address(self.ipv4["address"]))
+
+    def test_use_primary_ipv6(self):
+        """Test configuration where Primary IPv6 is preferred over IPv4"""
+        nb = self._nb_device(primary="ipv6")
+
+        device = physical_device(nb, preferred_ip="ipv6")
+        device.set_ips()
+
+        self.assertEqual(device.ip, self.__as_address(self.ipv6["address"]))
+
+    def test_oob_additional_interface(self):
+        """Test allowed values for interface requirement, one"""
+        nb =  self.netbox.device(
+            oob_ip = self.oob, primary_ip=None, primary_ip4=None, primary_ip6=None
+        )
+
+        device = physical_device(nb, preferred_ip="auto")
+        device.set_ips()
+
+        self.assertEqual(device.oob_ip, self.__as_address(self.oob["address"]))
