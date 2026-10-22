@@ -762,7 +762,8 @@ class Host(ABC):
             except NetboxRequestError as e:
                 msg = (
                     f"Host {self.name}: Unable to update custom field "
-                    f"{self.config['device_cf']} in NetBox. NetBox returned {e}."
+                    f"{self.config['device_cf']} in NetBox with value {int(self.zabbix_id)}. "
+                    f"NetBox returned {e}."
                 )
                 self.logger.error(msg)
         else:
