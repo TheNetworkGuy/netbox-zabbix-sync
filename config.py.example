@@ -19,103 +19,70 @@ log_console = True
 # The log levels set with -v / -vv / -vvv / -q apply to these handlers as well.
 log_handlers = None
 
-## Template logic.
-# Set to true to enable the template source information
-# coming from config context instead of a custom field.
-templates_config_context = False
 
-# Set to true to give config context templates a
-# higher priority then custom field templates
-templates_config_context_overrule = False
-
-# Set template and device NetBox "custom field" names
-# Template_cf is not used when templates_config_context is enabled
-template_cf = "zabbix_template"
+## Device and VM sync
+# Set the custom field that will be used to track Zabbix hosts ids in NetBox.
+# This custom field is used by devices and VMs!
 device_cf = "zabbix_hostid"
 
-## Device sync
 # Set sync_devices to False in order to skip device syncing.
-# This is useful if you'd only like to sync 
+# This is useful if you'd only like to sync VMs.
 sync_devices = True
 
-# Zabbix host description
-# The following options are available for the description of all created hosts in Zabbix
-# static: Uses the default static string "Host added by NetBox sync script."
-# dynamic: "Uses a predefined dynamic string which resolves the owner of an object and datetime. Recommended for users who use Netbox 4.5+
-# custom: Use a custom string such as "This host was created by Zabbix-sync on machine MGMT01.internal". It is also posible to resolve dynamic values in this string using {} markers.
+# Set sync_vms to True in order to sync VMs.
+sync_vms = False
+
+# Create journal entries on sync
+create_journal = False
+
+
+## Template logic.
+# See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#template-source
+# for more information.
+
+# Set template custom field for device types.
+# This allows you to assing a template based on the device type.
+# If you need more control, use config context instead.
+template_cf = "zabbix_template"
+
+# Set to True to enable assigning templates from config context instead of a custom field.
+templates_config_context = False
+
+# Set to True to give template assingment through config context a
+# higher priority than via the device type custom field.
+templates_config_context_overrule = False
+
+
+## Zabbix host descriptions
+# See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#zabbix-host-description
+# for the available options.
 description = "static"
-# The timedate format which is used for generating the datetime macro when used in the dynamic description type or custom type.
+
+# The timedate format which is used for generating the timestamp in the Zabbix host description when used in the dynamic or custom type.
 description_dt_format = "%Y-%m-%d %H:%M:%S"
 
-## Enable clustering of devices with virtual chassis setup
+## Virtual Chassis Syncing
+# Enabling clustering will allow monitoring of virtual chassis through the VC master device.
 clustering = False
 
-## Extend Virtual Chassis Information
+# Extend Virtual Chassis Information
 # When set to True, the script will pull extended virtual chassis information which is then available for use in usermacros, tags and inventory.
 # Be aware that this will increase the number of API queries to NetBox.
 extended_virtual_chassis = False
 
-## Preferred IP version
-# This setting determines which IP address will be used for the Zabbix host interface when a device has multiple IP addresses assigned.
-# The following options are available:
-# auto: Use primary_ip field by NetBox. (default)
-# ipv4: Prefer IPv4 address over IPv6 address.
-# ipv6: Prefer IPv6 address over IPv4 address.
+
+## Zabbix Interface Assignment
+# prefered_ip determines which address will be used when a device has multiple IP families assigned.
+# auto: Use primary_ip field by NetBox (default)
+# ipv4: Prefer IPv4
+# ipv6: Prefer IPv6
 preferred_ip = "auto"
 
-## Enable hostgroup generation. Requires permissions in Zabbix
-create_hostgroups = True
-
-## Create journal entries
-create_journal = False
-
-## Sync Out-Of-Band IPs
-# When set to True, the script will create an additional Zabbix interface for the OOB IP set configured on the device in NetBox.
-# This will need to be a different interface typ than the interface type used for the primary interface.
-# This can be configured through config contxt, see documentation for futher info:
+# When oob_sync is set to True, the script will create an interface for the OOB IP configured on the device in NetBox.
+# oob_interface_type can be configured through config context, see documentation for futher info:
 # https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#out-of-band-interfaces
 oob_sync = False
 
-## Virtual machine sync
-# Set sync_vms to True in order to sync VMs.
-# Use the hostgroup vm_hostgroup_format mapper for specific
-# hostgroup atributes of VM's such as cluster_type and cluster
-sync_vms = False
-
-# See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#layout for values to use in the VM hostgroup format.
-vm_hostgroup_format = "cluster_type/cluster/role"
-
-## Proxy Sync
-# Set to true to enable removal of proxy's under hosts. Use with caution and make sure that you specified
-# all the required proxy's in the device config context before enabeling this option.
-# With this option disabled proxy's will only be added and modified for Zabbix hosts.
-full_proxy_sync = False
-
-## NetBox to Zabbix device state convertion
-zabbix_device_removal = ["Decommissioning", "Inventory"]
-zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
-
-## Hostgroup mapping
-# See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#layout for available options
-# You can also use CF (custom field) names under the device. The CF content will be used for the hostgroup generation.
-#
-# When using region in the group name, the default behaviour is to use name of the directly assigned region.
-# By setting traverse_regions to True the full path of all parent regions will be used in the hostgroup, e.g.:
-#
-# 'Global/Europe/Netherlands/Amsterdam' instead of just 'Amsterdam'.
-#
-# traverse_site_groups controls the same behaviour for any assigned site_groups.
-hostgroup_format = "site/manufacturer/role"
-traverse_regions = False
-traverse_site_groups = False
-
-## Extended site properties
-# By default, NetBox will only return basic site info for any device or VM.
-# By setting `extended_site_properties` to True, the script will query NetBox for additional site info.
-# Be aware that this will increase the number of API queries to NetBox.
-extended_site_properties = False
-
-## Extended IP properties
 # the primary_ip and oob_ip will contain basic information by default.
 # By setting `extended_ips` to True, the script will query NetBox for additional IP info
 # like IP status, role, description, nat info, assigned interface, etc.
@@ -123,8 +90,49 @@ extended_site_properties = False
 # Be aware that this will increase the number of API queries to NetBox.
 extended_ips = False
 
+
+## Proxy Sync
+# Set to True to enable removal of proxy's under hosts. Use with caution and make sure that you specified
+# all the required proxy's in the device config context before enabeling this option.
+# With this option disabled proxy's will only be added and modified for Zabbix hosts.
+full_proxy_sync = False
+
+
+## NetBox to Zabbix device state convertion
+zabbix_device_removal = ["Decommissioning", "Inventory"]
+zabbix_device_disable = ["Offline", "Planned", "Staged", "Failed"]
+
+
+## Hostgroup assigment
+# See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Sync-Behavior#layout for available options
+# device hostgroup assignment
+hostgroup_format = "site/manufacturer/role"
+
+# VM hostgroup assignment
+vm_hostgroup_format = "cluster_type/cluster/role"
+
+# When using region in the group name, the default behaviour is to use the name of the assigned region.
+# By setting traverse_regions to True the full path of all parent regions will be used in the hostgroup, e.g.:
+#
+# 'Global/Europe/Netherlands/Amsterdam' instead of just 'Amsterdam'.
+#
+# traverse_site_groups controls the same behaviour for any assigned site_groups.
+traverse_regions = False
+traverse_site_groups = False
+
+# enable or disable hostgroup generation. 
+# Requires additional permissions in Zabbix
+create_hostgroups = True
+
+
+## Extended site properties
+# By default, NetBox will only return basic site info for any device or VM.
+# By setting `extended_site_properties` to True, the script will query NetBox for additional site info.
+# Be aware that this will increase the number of API queries to NetBox.
+extended_site_properties = False
+
 ## Filtering
-# Custom device filter, variable must be present but can be left empty with no filtering.
+# Custom filter, variable must be present but can be left empty for no filtering.
 # A couple of examples:
 #  nb_device_filter = {} #No filter
 #  nb_device_filter = {"tag": "zabbix"} #Use a tag
@@ -134,12 +142,14 @@ extended_ips = False
 
 # Default device filter, only get devices which have a name in NetBox:
 nb_device_filter = {"name__n": "null"}
+
 # Default filter for VMs
 nb_vm_filter = {"name__n": "null"}
 
+
 ## Inventory
 # See https://www.zabbix.com/documentation/current/en/manual/config/hosts/inventory#building-inventory
-# Choice between disabled, manual or automatic.
+# Choose between disabled, manual or automatic.
 # Make sure to select at least manual or automatic in use with the inventory_sync function.
 inventory_mode = "disabled"
 
@@ -152,7 +162,8 @@ inventory_sync = False
 #
 # device_inventory_map = { "custom_fields/mycustomfield/name": "alias"}
 #
-# The following maps should provide some nice defaults:
+# The following maps should provide some nice defaults.
+# Replace latitude and longitude with site/latitude and and site/longitude to use site geo data!
 device_inventory_map = { "asset_tag": "asset_tag",
                          "virtual_chassis/name": "chassis",
                          "status/label": "deployment_status",
@@ -166,14 +177,14 @@ device_inventory_map = { "asset_tag": "asset_tag",
                          "device_type/model": "type",
                          "device_type/manufacturer/name": "vendor",
                          "oob_ip/address": "oob_ip" }
-# Replace latitude and longitude with site/latitude and and site/longitude to use
-# site geo data. Enable extended_site_properties for this to work!
 
 # We also support inventory mapping on Virtual Machines.
 vm_inventory_map = { "status/label": "deployment_status",
                      "comments": "notes",
                      "name": "name" }
 
+
+## Usermacro sync
 # To allow syncing of usermacros from NetBox, set to True.
 # this will enable both field mapping and config context usermacros.
 #
@@ -193,6 +204,8 @@ vm_usermacro_map = {"memory": "{$TOTAL_MEMORY}",
                     "display_url": "{$NB_URL}",
                     "id": "{$NB_ID}"}
 
+
+## Tag sync
 # To sync host tags to Zabbix, set to True.
 tag_sync = False
 
@@ -223,7 +236,7 @@ vm_tag_map = {"site/name": "site",
               "platform/name": "target"}
 
 
-### EXPERIMENTAL FEATURES
+### EXPERIMENTAL FEATURES ###
 # The features below are experimental and should be run on your own risk.
 # Please see https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features
 
@@ -232,6 +245,7 @@ vm_tag_map = {"site/name": "site",
 # This will allow you to perform advanced NetBox lookups and transform data before passing it to Zabbix.
 # See https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features#config-context-rendering
 render_config_context = False
+
 
 ## Skip version Check
 # Disabled zabbix_utils version check, allows for runs against unsupported Zabbix versions (ex: development and release candidates)
