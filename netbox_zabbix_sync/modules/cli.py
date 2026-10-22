@@ -30,10 +30,6 @@ _BOOL_ARGS = [
     ("traverse_regions", "Use the full parent-region path in hostgroup names."),
     ("traverse_site_groups", "Use the full parent-site-group path in hostgroup names."),
     (
-        "extended_site_properties",
-        "Fetch additional site info from NetBox (increases API queries).",
-    ),
-    (
         "extended_virtual_chassis",
         "Fetch additional virtual chassis info from NetBox (increases API queries).",
     ),

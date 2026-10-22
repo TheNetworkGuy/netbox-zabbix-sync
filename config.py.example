@@ -125,12 +125,6 @@ traverse_site_groups = False
 create_hostgroups = True
 
 
-## Extended site properties
-# By default, NetBox will only return basic site info for any device or VM.
-# By setting `extended_site_properties` to True, the script will query NetBox for additional site info.
-# Be aware that this will increase the number of API queries to NetBox.
-extended_site_properties = False
-
 ## Filtering
 # Custom filter, variable must be present but can be left empty for no filtering.
 # A couple of examples:
