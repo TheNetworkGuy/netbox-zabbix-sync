@@ -751,12 +751,20 @@ class Host(ABC):
                 msg = f"Host {self.name}: Couldn't create. Zabbix returned {e}."
                 self.logger.error(msg)
                 raise SyncExternalError(msg) from e
-            # Set NetBox custom field to hostID value.
-            self.nb.custom_fields[self.config["device_cf"]] = int(self.zabbix_id)
-            self.nb.save()
+            # Log host creation
             msg = f"Host {self.name}: Created host in Zabbix. (ID:{self.zabbix_id})"
             self.logger.info(msg)
             self.create_journal_entry("success", msg)
+            # Set NetBox custom field to hostID value.
+            self.nb.custom_fields[self.config["device_cf"]] = int(self.zabbix_id)
+            try:
+                self.nb.save()
+            except NetboxRequestError as e:
+                msg = (
+                    f"Host {self.name}: Unable to update custom field "
+                    f"{self.config['device_cf']} in NetBox. NetBox returned {e}."
+                )
+                self.logger.error(msg)
         else:
             self.logger.error(
                 "Host %s: Unable to add to Zabbix. Host already present.", self.name
