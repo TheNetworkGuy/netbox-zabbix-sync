@@ -36,7 +36,6 @@ DEFAULT_CONFIG = {
     "nb_vm_filter": {"name__n": "null"},
     "inventory_mode": "disabled",
     "inventory_sync": False,
-    "extended_site_properties": False,
     "extended_virtual_chassis": False,
     "extended_ips": False,
     "prefer_dns": False,

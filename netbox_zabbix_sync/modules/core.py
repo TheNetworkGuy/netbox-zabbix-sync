@@ -418,27 +418,30 @@ class Sync:
                 self.logger.debug("Host %s: Started operations on VM.", vm.name)
                 if self._remove_host(vm):
                     continue
-                if self.config["extended_site_properties"] and nb_vm.site:
-                    self.logger.debug("Host %s: Extending site information.", vm.name)
+                if nb_vm.site:
                     nb_vm.site.full_details()
                 if self.config["extended_ips"]:
                     self.logger.debug("Host %s: Extending IP information.", vm.name)
                     extend_ips(nb_vm)
                 if not self._render_config_context(vm, nb_vm):
                     continue
-                self.logger.debug(
-                    "Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm))
-                )
                 vm.set_ips()
                 vm.set_vm_template()
-                if not vm.zbx_template_names:
-                    continue
                 vm.set_hostgroup(
                     self.config["vm_hostgroup_format"],
                     netbox_site_groups,
                     netbox_regions,
                 )
+                self.logger.debug(
+                    "Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm))
+                )
+                if not vm.zbx_template_names:
+                    continue
                 if not vm.hostgroups:
+                    self.logger.warning(
+                        "Host %s: has no valid hostgroups, Skipping this host...",
+                        vm.name,
+                    )
                     continue
                 self._sync_host(vm, zabbix_groups, zabbix_templates, zabbix_proxy_list)
             except SyncError:
@@ -458,10 +461,7 @@ class Sync:
                 self.logger.debug("Host %s: Started operations on device.", device.name)
                 if self._remove_host(device):
                     continue
-                if self.config["extended_site_properties"] and nb_device.site:
-                    self.logger.debug(
-                        "Host %s: Extending site information.", device.name
-                    )
+                if nb_device.site:
                     nb_device.site.full_details()
                 if (
                     self.config["extended_virtual_chassis"]
@@ -479,20 +479,20 @@ class Sync:
                     extend_ips(nb_device)
                 if not self._render_config_context(device, nb_device):
                     continue
-                self.logger.debug(
-                    "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
-                )
                 device.set_ips()
                 device.set_template(
                     self.config["templates_config_context"],
                     self.config["templates_config_context_overrule"],
                 )
-                if not device.zbx_template_names:
-                    continue
                 device.set_hostgroup(
                     self.config["hostgroup_format"], netbox_site_groups, netbox_regions
                 )
                 device.set_ipmi()
+                self.logger.debug(
+                    "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
+                )
+                if not device.zbx_template_names:
+                    continue
                 if not device.hostgroups:
                     self.logger.warning(
                         "Host %s: has no valid hostgroups, Skipping this host...",
