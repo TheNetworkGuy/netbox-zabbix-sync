@@ -1,4 +1,5 @@
 """A collection of tools used by several classes"""
+
 from collections.abc import Callable
 from copy import copy
 from inspect import getmembers, isfunction
@@ -91,9 +92,7 @@ def jinjafy_config_context(nb, context: dict | None = None) -> dict:
         j2env.filters.update(j2ipfilters.load_all())  # j2ipaddr filters
         j2env.filters.update(getmembers(jinja_filters, isfunction))  # custom filters
 
-        additional_context = {
-            "nb": nb.api
-        }
+        additional_context = {"nb": nb.api}
 
         try:
             json_string = str(dumps(context))
