@@ -53,6 +53,8 @@ ignore = [
     "E501",
     # Ignore too many arguments
     "PLR0913",
+    # Ignore too many positional arguments
+    "PLR0917",
     # Ignore too many statements
     "PLR0915",
     # Ignore too many branches

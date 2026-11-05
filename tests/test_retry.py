@@ -4,6 +4,7 @@ import json
 import ssl
 import threading
 import unittest
+from email.message import Message
 from http.client import RemoteDisconnected
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
@@ -36,7 +37,7 @@ def processing_error(cause: Exception) -> ProcessingError:
 
 
 def http_error(code: int) -> ProcessingError:
-    return processing_error(HTTPError("http://zabbix", code, "error", {}, None))  # type: ignore[arg-type]
+    return processing_error(HTTPError("http://zabbix", code, "error", Message(), None))
 
 
 def url_error(reason: Exception) -> ProcessingError:
@@ -187,7 +188,7 @@ class FlakyServer:
         server = self
 
         class Handler(BaseHTTPRequestHandler):
-            def log_message(self, *args):
+            def log_message(self, format, *args):
                 pass
 
             def _reply(self):
@@ -257,7 +258,7 @@ class TestNetboxRetry(unittest.TestCase):
         for url in ("http://netbox.local/api/", "https://netbox.local/api/"):
             with self.subTest(url=url):
                 adapter = netbox.http_session.get_adapter(url)
-                self.assertIsInstance(adapter, HTTPAdapter)
+                assert isinstance(adapter, HTTPAdapter)
                 self.assertIs(adapter.max_retries, NETBOX_RETRY)
 
     def test_policy(self):

@@ -214,7 +214,8 @@ class FakeNetBox:
     def __init__(self, version: str = DEFAULT_VERSION):
         self.version = version
         self.api = pynetbox.api(BASE_URL, token=TOKEN)
-        self.api.http_session = FakeSession(self)
+        # Duck-typed stand-in for requests.Session, see FakeSession.
+        self.api.http_session = FakeSession(self)  # ty: ignore[invalid-assignment]
         self.objects: dict[str, dict] = {}
         # (method, url, json body) of every request a Record made.
         self.requests: list[tuple[str, str, dict | None]] = []

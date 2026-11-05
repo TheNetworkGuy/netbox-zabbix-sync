@@ -93,7 +93,7 @@ def is_idempotent(method: str) -> bool:
     return not method.endswith(NON_IDEMPOTENT_SUFFIXES)
 
 
-def retry_reason(error: BaseException, method: str) -> str | None:
+def retry_reason(error: BaseException | None, method: str) -> str | None:
     """Return why a failed Zabbix request may be retried, or None if it may not."""
     if not isinstance(error, TRANSIENT_ERROR_TYPES):
         return None
@@ -133,11 +133,12 @@ class RetryingZabbixAPI(ZabbixAPI):
         self, method: str, params: dict | None = None, need_auth=True
     ) -> dict:
         def log_retry(retry_state: RetryCallState) -> None:
-            error = retry_state.outcome.exception()  # type: ignore[union-attr]
+            outcome = retry_state.outcome
+            error = outcome.exception() if outcome else None
             logger.warning(
                 "Zabbix API call %s failed (%s). Retrying in %ss (retry %d of %d).",
                 method,
-                retry_reason(error, method),  # type: ignore[arg-type]
+                retry_reason(error, method),
                 retry_state.upcoming_sleep,
                 retry_state.attempt_number,
                 HTTP_RETRIES,
