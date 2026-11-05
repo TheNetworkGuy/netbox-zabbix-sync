@@ -6,7 +6,7 @@ from tests.fakes.netbox import FakeNetBox
 
 
 def netbox_mock(mock_api, netbox: FakeNetBox, devices=(), vms=()) -> MagicMock:
-    """Point the patched `nbapi` at an API serving these records.
+    """Point the patched `RetryingNetBoxAPI` at an API serving these records.
 
     The endpoints stay mocks so a test can assert how they were queried (the
     filters passed to `devices.filter`, say), but everything they return comes
@@ -14,7 +14,7 @@ def netbox_mock(mock_api, netbox: FakeNetBox, devices=(), vms=()) -> MagicMock:
     Everything `Sync.start()` reads before the hosts is an empty result, so a
     test only states the devices and VMs it cares about.
     """
-    api = MagicMock(name="nbapi()")
+    api = MagicMock(name="RetryingNetBoxAPI()")
     mock_api.return_value = api
     api.version = netbox.version
     api.dcim.devices.count.return_value = len(devices)

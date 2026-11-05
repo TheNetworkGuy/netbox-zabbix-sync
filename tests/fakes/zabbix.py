@@ -34,7 +34,7 @@ def zabbix_api(version="7.0.0", hostgroup="TestGroup") -> MagicMock:
 
 
 def zabbix_mock(mock_zabbix_api, version="7.0.0", hostgroup="TestGroup") -> MagicMock:
-    """Point the patched `ZabbixAPI` class at a `zabbix_api()`."""
+    """Point the patched `RetryingZabbixAPI` class at a `zabbix_api()`."""
     zabbix = zabbix_api(version=version, hostgroup=hostgroup)
     mock_zabbix_api.return_value = zabbix
     return zabbix
