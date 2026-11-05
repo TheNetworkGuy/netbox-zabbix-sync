@@ -8,7 +8,9 @@ from typing import Any
 
 from pynetbox import api as nbapi
 from pynetbox.core.query import RequestError as NetBoxRequestError
+from requests.adapters import HTTPAdapter
 from requests.exceptions import ConnectionError as RequestsConnectionError
+from urllib3 import Retry
 from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
 
 from netbox_zabbix_sync.modules.device import PhysicalDevice
@@ -25,6 +27,20 @@ from netbox_zabbix_sync.modules.tools import (
     verify_hg_format,
 )
 from netbox_zabbix_sync.modules.virtual_machine import VirtualMachine
+
+# Retry policy for NetBox API calls: 3 attempts in total (1 try + 2 retries)
+# with exponential backoff on connection errors and transient 5xx responses.
+NETBOX_RETRY = Retry(
+    total=2,
+    backoff_factor=1,
+    status_forcelist=[502, 503, 504],
+    # PATCH is idempotent, so safe to retry. POST is left out to avoid
+    # creating duplicate objects when a response gets lost.
+    allowed_methods=Retry.DEFAULT_ALLOWED_METHODS | {"PATCH"},
+    # Once retries are exhausted, hand the last response back to pynetbox so it
+    # raises its usual RequestError instead of requests.exceptions.RetryError.
+    raise_on_status=False,
+)
 
 
 class Sync:
@@ -134,6 +150,9 @@ class Sync:
         """
         # Initialize Netbox API connection
         netbox = nbapi(nb_host, token=nb_token, threading=True)
+        adapter = HTTPAdapter(max_retries=NETBOX_RETRY)
+        netbox.http_session.mount("https://", adapter)
+        netbox.http_session.mount("http://", adapter)
         try:
             # Get NetBox version
             nb_version = netbox.version
