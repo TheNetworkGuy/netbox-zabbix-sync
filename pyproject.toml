@@ -10,6 +10,7 @@ dependencies = [
     "pynetbox>=7.9.0",
     "python-dateutil>=2.9.0.post0",
     "python-jsonpath>=2.0.2",
+    "tenacity>=9.2.1",
     "zabbix-utils>=2.0.4",
 ]
 dynamic = ["version"]
