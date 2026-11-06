@@ -144,7 +144,7 @@ def field_mapper(host, mapper, nbdevice, logger):
     for nb_field, zbx_field in mapper.items():
         field_list = nb_field.split("/")  # convert str to list based on delimiter
         # start at the base of the dict...
-        value: object | dict = nbdevice
+        value: Any = nbdevice
         # ... and step through the dict till we find the needed value
         # Records have no .get(); indexing works on both Records and dicts.
         for item in field_list:

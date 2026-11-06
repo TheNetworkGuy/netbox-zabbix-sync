@@ -6,11 +6,11 @@ from os import environ
 from pprint import pformat
 from typing import Any
 
-from pynetbox import api as nbapi
 from pynetbox.core.query import RequestError as NetBoxRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
-from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
+from zabbix_utils import APIRequestError, ProcessingError
 
+from netbox_zabbix_sync.modules.api_clients import RetryingNetBoxAPI, RetryingZabbixAPI
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
 from netbox_zabbix_sync.modules.host import Host
@@ -133,7 +133,7 @@ class Sync:
         :param skip_version_check: Whether to skip version checking
         """
         # Initialize Netbox API connection
-        netbox = nbapi(nb_host, token=nb_token, threading=True)
+        netbox = RetryingNetBoxAPI(nb_host, token=nb_token, threading=True)
         try:
             # Get NetBox version
             nb_version = netbox.version
@@ -173,7 +173,7 @@ class Sync:
                 ssl_ctx.load_verify_locations(environ["REQUESTS_CA_BUNDLE"])
             if not zbx_token:
                 self.logger.debug("Using user/password authentication for Zabbix API.")
-                self.zabbix = ZabbixAPI(
+                self.zabbix = RetryingZabbixAPI(
                     zbx_host,
                     user=zbx_user,
                     password=zbx_pass,
@@ -182,7 +182,7 @@ class Sync:
                 )
             else:
                 self.logger.debug("Using token authentication for Zabbix API.")
-                self.zabbix = ZabbixAPI(
+                self.zabbix = RetryingZabbixAPI(
                     zbx_host,
                     token=zbx_token,
                     ssl_context=ssl_ctx,

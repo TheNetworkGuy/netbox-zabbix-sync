@@ -28,6 +28,8 @@ requests==2.32.5
     # via pynetbox
 six==1.17.0
     # via python-dateutil
+tenacity==9.2.1
+    # via netbox-zabbix-sync
 texttable==1.7.0
     # via igraph
 urllib3==2.6.3
