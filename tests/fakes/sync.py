@@ -24,6 +24,7 @@ def netbox_mock(mock_api, netbox: FakeNetBox, devices=(), vms=()) -> MagicMock:
     api.extras.journal_entries = netbox.journal_entries
     api.dcim.site_groups.all.side_effect = lambda: netbox.all("dcim/site-groups")
     api.dcim.regions.all.side_effect = lambda: netbox.all("dcim/regions")
+    api.dcim.device_roles.all.side_effect = lambda: netbox.all("dcim/device-roles")
     return api
 
 

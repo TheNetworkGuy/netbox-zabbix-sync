@@ -63,7 +63,15 @@ DEFAULT: Any = object()
 # related object is reduced to these keys before it is nested in another one.
 BRIEF_FIELDS = {
     "dcim/devices": ("id", "url", "display", "name", "description"),
-    "dcim/device-roles": ("id", "url", "display", "name", "slug", "description"),
+    "dcim/device-roles": (
+        "id",
+        "url",
+        "display",
+        "name",
+        "slug",
+        "description",
+        "_depth",
+    ),
     "dcim/device-types": (
         "id",
         "url",
@@ -432,7 +440,19 @@ class FakeNetBox:
             **fields,
         )
 
-    def role(self, name: str, **fields) -> dict:
+    def role(self, name: str, parent=None, **fields) -> dict:
+        # Device roles are a tree since NetBox 4.3; before that a role has no
+        # parent and no _depth at all, which build_path has to tolerate.
+        if version_tuple(self.version) >= (4, 3):
+            parent = self._resolve(parent, self.role)
+            fields = {
+                "parent": parent,
+                "_depth": parent["_depth"] + 1 if parent else 0,
+                **fields,
+            }
+        elif parent is not None:
+            msg = f"NetBox {self.version} has no nested device roles"
+            raise ValueError(msg)
         return self.add(
             "dcim/device-roles",
             name=name,
