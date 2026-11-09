@@ -1354,3 +1354,48 @@ class TestCombineFilters(unittest.TestCase):
         self.assertEqual(filter_call_kwargs.get("site"), "fra01")
         self.assertEqual(filter_call_kwargs.get("status"), "active")
         self.assertEqual(filter_call_kwargs.get("name"), "router*")
+
+
+class TestRoleTraversal(unittest.TestCase):
+    """traverse_roles reaches the hostgroup through the whole sync.
+
+    Sync.start() fetches dcim.device_roles once and hands it to every host;
+    a role nested two levels deep lands in Zabbix as its full path only when
+    the flag is on. The Zabbix fake serves exactly the expected group, so a
+    host linked to groupid 1 got the right name.
+    """
+
+    def setUp(self):
+        self.netbox = FakeNetBox()
+        network = self.netbox.role("Network")
+        switching = self.netbox.role("Switching", parent=network)
+        self.device = self.netbox.device(
+            "sw01", role=self.netbox.role("Access", parent=switching)
+        )
+
+    def sync(self, mock_api, mock_zabbix_api, traverse, expected_group):
+        netbox_mock(mock_api, self.netbox, devices=[self.device])
+        zabbix = zabbix_mock(mock_zabbix_api, hostgroup=expected_group)
+        syncer = Sync({"hostgroup_format": "role", "traverse_roles": traverse})
+        connect(syncer)
+        syncer.start()
+        return zabbix
+
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
+    def test_full_role_path_when_enabled(self, mock_api, mock_zabbix_api):
+        zabbix = self.sync(mock_api, mock_zabbix_api, True, "Network/Switching/Access")
+        mock_api.return_value.dcim.device_roles.all.assert_called_once_with()
+        # The leaf group exists; its parents are created so Zabbix shows a tree
+        created = {c.kwargs["name"] for c in zabbix.hostgroup.create.call_args_list}
+        self.assertEqual(created, {"Network", "Network/Switching"})
+        groups = zabbix.host.create.call_args.kwargs["groups"]
+        self.assertEqual(groups, [{"groupid": "1"}])
+
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
+    def test_leaf_role_when_disabled(self, mock_api, mock_zabbix_api):
+        zabbix = self.sync(mock_api, mock_zabbix_api, False, "Access")
+        zabbix.hostgroup.create.assert_not_called()
+        groups = zabbix.host.create.call_args.kwargs["groups"]
+        self.assertEqual(groups, [{"groupid": "1"}])

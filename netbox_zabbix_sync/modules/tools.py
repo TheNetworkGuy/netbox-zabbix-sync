@@ -36,7 +36,7 @@ def build_path(endpoint, list_of_dicts):
     if item is None:
         return []
     item_path.append(item["name"])
-    while item["_depth"] > 0:
+    while item.get("_depth", 0) > 0:
         itemlist = [i for i in list_of_dicts if i["name"] == str(item["parent"])]
         item = itemlist[0] if len(itemlist) == 1 else None
         if item is None:

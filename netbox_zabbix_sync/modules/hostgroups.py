@@ -2,6 +2,8 @@
 
 from logging import getLogger
 
+from pynetbox.core.response import Record
+
 from netbox_zabbix_sync.modules.exceptions import HostgroupError
 from netbox_zabbix_sync.modules.tools import build_path, cf_to_string
 
@@ -18,8 +20,10 @@ class Hostgroup:
         logger=None,
         nested_sitegroup_flag=False,
         nested_region_flag=False,
+        nested_role_flag=False,
         nb_regions=None,
         nb_groups=None,
+        nb_roles=None,
     ):
         self.logger = logger if logger else getLogger(__name__)
         if obj_type not in ("vm", "dev"):
@@ -32,7 +36,12 @@ class Hostgroup:
         self.nb_version = version
         # Used for nested data objects
         self.set_nesting(
-            nested_sitegroup_flag, nested_region_flag, nb_groups, nb_regions
+            nested_sitegroup_flag,
+            nested_region_flag,
+            nested_role_flag,
+            nb_groups,
+            nb_regions,
+            nb_roles,
         )
         self._set_format_options()
 
@@ -51,11 +60,11 @@ class Hostgroup:
         # Set variables for both type of devices
         if self.type in ("vm", "dev"):
             # Role fix for NetBox <=3
-            role = None
+            role: Record | None
             if self.nb_version.startswith(("2", "3")) and self.type == "dev":
-                role = self.nb.device_role.name if self.nb.device_role else None
+                role = self.nb.device_role if self.nb.device_role else None
             else:
-                role = self.nb.role.name if self.nb.role else None
+                role = self.nb.role if self.nb.role else None
             # Add default formatting options
             # Check if a site is configured. A site is optional for VMs
             format_options["region"] = None
@@ -69,7 +78,10 @@ class Hostgroup:
                     format_options["site_group"] = self.generate_parents(
                         "site_group", str(self.nb.site.group)
                     )
-            format_options["role"] = role
+            format_options["role"] = (
+                self.generate_parents("role", str(role)) if role else None
+            )
+
             format_options["site"] = self.nb.site.name if self.nb.site else None
             format_options["tenant"] = str(self.nb.tenant) if self.nb.tenant else None
             format_options["tenant_group"] = (
@@ -103,12 +115,19 @@ class Hostgroup:
         )
 
     def set_nesting(
-        self, nested_sitegroup_flag, nested_region_flag, nb_groups, nb_regions
+        self,
+        nested_sitegroup_flag,
+        nested_region_flag,
+        nested_role_flag,
+        nb_groups,
+        nb_regions,
+        nb_roles,
     ):
         """Set nesting options for this Hostgroup"""
         self.nested_objects = {
             "site_group": {"flag": nested_sitegroup_flag, "data": nb_groups},
             "region": {"flag": nested_region_flag, "data": nb_regions},
+            "role": {"flag": nested_role_flag, "data": nb_roles},
         }
 
     def generate(self, hg_format):

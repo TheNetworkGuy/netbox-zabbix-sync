@@ -381,6 +381,7 @@ class Sync:
             )
         netbox_site_groups = convert_recordset(self.netbox.dcim.site_groups.all())
         netbox_regions = convert_recordset(self.netbox.dcim.regions.all())
+        netbox_roles = convert_recordset(self.netbox.dcim.device_roles.all())
         netbox_journals = self.netbox.extras.journal_entries
         zabbix_groups = self.zabbix.hostgroup.get(  # type: ignore
             output=["groupid", "name"]
@@ -391,16 +392,19 @@ class Sync:
         zabbix_proxies = self.zabbix.proxy.get(  # type: ignore
             output=["proxyid", proxy_name]
         )
+
         # Set empty list for proxy processing Zabbix <= 6
         zabbix_proxygroups = []
         if self.zabbix.version >= PROXY_GROUPS_MINIMUM_VERSION:
             zabbix_proxygroups = self.zabbix.proxygroup.get(  # type: ignore
                 output=["proxy_groupid", "name"]
             )
+
         # Sanitize proxy data
         if proxy_name == "host":
             for proxy in zabbix_proxies:
                 proxy["name"] = proxy.pop("host")
+
         # Prepare list of all proxy and proxy_groups
         zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
 
@@ -431,6 +435,7 @@ class Sync:
                     self.config["vm_hostgroup_format"],
                     netbox_site_groups,
                     netbox_regions,
+                    netbox_roles,
                 )
                 self.logger.debug(
                     "Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm))
@@ -485,7 +490,10 @@ class Sync:
                     self.config["templates_config_context_overrule"],
                 )
                 device.set_hostgroup(
-                    self.config["hostgroup_format"], netbox_site_groups, netbox_regions
+                    self.config["hostgroup_format"],
+                    netbox_site_groups,
+                    netbox_regions,
+                    netbox_roles,
                 )
                 device.set_ipmi()
                 self.logger.debug(

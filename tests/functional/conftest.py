@@ -264,13 +264,15 @@ def device_factory(nb, zapi, seeded):
         oob_address: str | None = None,
         address6: str | None = None,
         site: int | None = None,
+        role: int | None = None,
         **fields,
     ):
         name = f"fn-{uuid4().hex[:8]}"
         device = nb.dcim.devices.create(
             name=name,
             device_type=seeded["device_type"].id,
-            role=seeded["role"].id,
+            # Named for the same reason as site below: the role tests pass one.
+            role=role or seeded["role"].id,
             # Named rather than left to **fields: the seeded site is the default
             # and would collide with a site= passed through as a plain field.
             # Overridden by the hostgroup tests, which need a site carrying a
@@ -375,13 +377,16 @@ def vm_factory(nb, zapi, seeded):
         config_context=UNSET,
         tags: list[int] | None = None,
         dns_name: str = "",
+        role=UNSET,
         **fields,
     ):
         name = f"fn-vm-{uuid4().hex[:8]}"
         vm = nb.virtualization.virtual_machines.create(
             name=name,
             cluster=seeded["cluster"].id,
-            role=seeded["role"].id,
+            # UNSET rather than None as the default: a role is optional on a
+            # VM, so None is a value a test asks for.
+            role=seeded["role"].id if role is UNSET else role,
             site=seeded["site"].id,
             status=status,
             local_context_data=vm_context()

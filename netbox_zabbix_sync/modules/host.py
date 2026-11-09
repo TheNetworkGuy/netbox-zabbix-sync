@@ -219,7 +219,11 @@ class Host(ABC):
             raise SyncInventoryError(e)
 
     def set_hostgroup(
-        self, hg_format: list | str, nb_site_groups: list[dict], nb_regions: list[dict]
+        self,
+        hg_format: list | str,
+        nb_site_groups: list[dict],
+        nb_regions: list[dict],
+        nb_roles: list[dict],
     ):
         """Set the hostgroup for this device"""
         # Create new Hostgroup instance
@@ -230,8 +234,10 @@ class Host(ABC):
             logger=self.logger,
             nested_sitegroup_flag=self.config["traverse_site_groups"],
             nested_region_flag=self.config["traverse_regions"],
+            nested_role_flag=self.config["traverse_roles"],
             nb_groups=nb_site_groups,
             nb_regions=nb_regions,
+            nb_roles=nb_roles,
         )
         # Generate hostgroup based on hostgroup format
         if isinstance(hg_format, list):
@@ -240,6 +246,15 @@ class Host(ABC):
                     self.hostgroups.append(gen)
         elif full_hostgroup := hg.generate(hg_format):
             self.hostgroups.append(full_hostgroup)
+
+        # Generate hostgroups from config context
+        if hostgroup_context := self.config_context.get("zabbix", {}).get("hostgroup"):
+            if isinstance(hostgroup_context, list):
+                for template in hostgroup_context:
+                    self.hostgroups.append(hg.generate(template))
+            else:
+                self.hostgroups.append(hg.generate(hostgroup_context))
+
         # Remove duplicates and None values
         self.hostgroups = list(filter(None, list(set(self.hostgroups))))
         if self.hostgroups:

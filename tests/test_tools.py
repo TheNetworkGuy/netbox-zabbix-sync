@@ -339,6 +339,15 @@ class TestBuildPath:
     def test_unknown_endpoint_returns_empty(self):
         assert build_path("nope", [region("EU", 0, None)]) == []
 
+    def test_record_without_depth_is_its_own_path(self):
+        """Device roles before NetBox 4.3 are flat: no `_depth`, no `parent`.
+
+        build_path must treat such a record as top level rather than raise
+        KeyError, so traverse_roles is harmless on an older NetBox.
+        """
+        records = [{"name": "Switch"}, {"name": "Router"}]
+        assert build_path("Switch", records) == ["Switch"]
+
     @pytest.mark.xfail(
         strict=True,
         reason=(
