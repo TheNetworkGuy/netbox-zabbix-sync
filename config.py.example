@@ -117,8 +117,16 @@ vm_hostgroup_format = "cluster_type/cluster/role"
 # 'Global/Europe/Netherlands/Amsterdam' instead of just 'Amsterdam'.
 #
 # traverse_site_groups controls the same behaviour for any assigned site_groups.
+#
+# traverse_roles controls the same behaviour for the device or VM role, e.g.:
+#
+# 'Network/Switching/Access' instead of just 'Access'.
+#
+# Nested roles require NetBox 4.3 or later. On older versions roles have no
+# parents, so enabling traverse_roles has no effect.
 traverse_regions = False
 traverse_site_groups = False
+traverse_roles = False
 
 # enable or disable hostgroup generation. 
 # Requires additional permissions in Zabbix
