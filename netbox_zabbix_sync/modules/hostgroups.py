@@ -78,8 +78,9 @@ class Hostgroup:
                     format_options["site_group"] = self.generate_parents(
                         "site_group", str(self.nb.site.group)
                     )
-            if role:
-                format_options["role"] = self.generate_parents("role", str(role))
+            format_options["role"] = (
+                self.generate_parents("role", str(role)) if role else None
+            )
 
             format_options["site"] = self.nb.site.name if self.nb.site else None
             format_options["tenant"] = str(self.nb.tenant) if self.nb.tenant else None
