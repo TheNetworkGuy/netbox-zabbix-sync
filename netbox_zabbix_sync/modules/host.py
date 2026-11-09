@@ -240,6 +240,15 @@ class Host(ABC):
                     self.hostgroups.append(gen)
         elif full_hostgroup := hg.generate(hg_format):
             self.hostgroups.append(full_hostgroup)
+
+        # Generate hostgroups from config context    
+        if hostgroup_context := self.config_context.get("zabbix", {}).get("hostgroup"):
+            if isinstance(hostgroup_context, list):
+                for template in hostgroup_context:
+                    self.hostgroups.append(hg.generate(template))
+            else:
+                self.hostgroups.append(hg.generate(hostgroup_context))
+
         # Remove duplicates and None values
         self.hostgroups = list(filter(None, list(set(self.hostgroups))))
         if self.hostgroups:
