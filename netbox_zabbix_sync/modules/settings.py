@@ -32,6 +32,7 @@ DEFAULT_CONFIG = {
     "hostgroup_format": "site/manufacturer/role",
     "traverse_regions": False,
     "traverse_site_groups": False,
+    "traverse_roles": False,
     "nb_device_filter": {"name__n": "null"},
     "nb_vm_filter": {"name__n": "null"},
     "inventory_mode": "disabled",
