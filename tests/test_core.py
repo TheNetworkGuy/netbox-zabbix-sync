@@ -73,7 +73,7 @@ class TestNetboxTokenHandling(unittest.TestCase):
 class TestSyncNetboxConnection(unittest.TestCase):
     """Test NetBox connection handling in sync function."""
 
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_error_on_netbox_connection_error(self, mock_api):
         """Test that sync returns False when NetBox connection fails."""
         mock_netbox = MagicMock()
@@ -99,7 +99,7 @@ class TestSyncNetboxConnection(unittest.TestCase):
 class TestZabbixUserTokenConflict(unittest.TestCase):
     """Test that sync returns False when both ZABBIX_USER/PASS and ZABBIX_TOKEN are set."""
 
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_error_on_user_token_conflict(self, mock_api):
         """Test that sync returns False when both user/pass and token are provided."""
         mock_netbox = MagicMock()
@@ -125,8 +125,8 @@ class TestSyncZabbixConnection(unittest.TestCase):
     def setUp(self):
         self.netbox = FakeNetBox()
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_exits_on_zabbix_api_error(self, mock_api, mock_zabbix_api):
         """Test that sync exits when Zabbix API authentication fails."""
         # Simulate Netbox API
@@ -165,8 +165,8 @@ class TestSyncZabbixAuthentication(unittest.TestCase):
     def setUp(self):
         self.netbox = FakeNetBox()
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_uses_user_password_when_no_token(self, mock_api, mock_zabbix_api):
         """Test that sync uses user/password auth when no token is provided."""
         netbox_mock(mock_api, self.netbox)
@@ -187,12 +187,12 @@ class TestSyncZabbixAuthentication(unittest.TestCase):
         self.assertEqual(call_kwargs["password"], "zbx_pass")
         self.assertNotIn("token", call_kwargs)
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_uses_token_when_provided(self, mock_api, mock_zabbix_api):
         """Test that sync uses token auth when token is provided."""
         netbox_mock(mock_api, self.netbox)
-        zabbix_mock(mock_zabbix_api, version="7.0")
+        zabbix_mock(mock_zabbix_api, version="7.0.0")
 
         syncer = Sync()
         syncer.connect(
@@ -217,8 +217,8 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         self.netbox = FakeNetBox()
 
     @patch("netbox_zabbix_sync.modules.core.PhysicalDevice")
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_processes_devices_from_netbox(
         self, mock_api, mock_zabbix_api, mock_physical_device
     ):
@@ -227,7 +227,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         device2 = self.netbox.device(id=2, name="device2")
 
         netbox_mock(mock_api, self.netbox, devices=[device1, device2])
-        zabbix_mock(mock_zabbix_api, version="6.0")
+        zabbix_mock(mock_zabbix_api, version="6.0.0")
 
         # Mock PhysicalDevice to have no template (skip further processing)
         mock_device_instance = MagicMock()
@@ -243,8 +243,8 @@ class TestSyncDeviceProcessing(unittest.TestCase):
 
     @patch("netbox_zabbix_sync.modules.core.VirtualMachine")
     @patch("netbox_zabbix_sync.modules.core.PhysicalDevice")
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_processes_vms_when_enabled(
         self, mock_api, mock_zabbix_api, mock_physical_device, mock_virtual_machine
     ):
@@ -253,7 +253,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         vm2 = self.netbox.virtual_machine(id=2, name="vm2")
 
         netbox_mock(mock_api, self.netbox, vms=[vm1, vm2])
-        zabbix_mock(mock_zabbix_api, version="6.0")
+        zabbix_mock(mock_zabbix_api, version="6.0.0")
 
         # Mock VM to have no template (skip further processing)
         mock_vm_instance = MagicMock()
@@ -268,8 +268,8 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         self.assertEqual(mock_virtual_machine.call_count, 2)
 
     @patch("netbox_zabbix_sync.modules.core.VirtualMachine")
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_skips_vms_when_disabled(
         self, mock_api, mock_zabbix_api, mock_virtual_machine
     ):
@@ -277,7 +277,7 @@ class TestSyncDeviceProcessing(unittest.TestCase):
         vm1 = self.netbox.virtual_machine(id=1, name="vm1")
 
         netbox_mock(mock_api, self.netbox, vms=[vm1])
-        zabbix_mock(mock_zabbix_api, version="6.0")
+        zabbix_mock(mock_zabbix_api, version="6.0.0")
 
         syncer = Sync()
         connect(syncer)
@@ -293,13 +293,13 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
     def setUp(self):
         self.netbox = FakeNetBox()
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_uses_host_proxy_name_for_zabbix_6(self, mock_api, mock_zabbix_api):
         """Test that sync uses 'host' as proxy name field for Zabbix 6."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0.0")
         mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "host": "proxy1"}]
 
         syncer = Sync()
@@ -309,13 +309,13 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         # Verify proxy.get was called with 'host' field
         mock_zabbix.proxy.get.assert_called_with(output=["proxyid", "host"])
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_uses_name_proxy_field_for_zabbix_7(self, mock_api, mock_zabbix_api):
         """Test that sync uses 'name' as proxy name field for Zabbix 7."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="7.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="7.0.0")
         mock_zabbix.proxy.get.return_value = [{"proxyid": "1", "name": "proxy1"}]
 
         syncer = Sync()
@@ -325,13 +325,13 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         # Verify proxy.get was called with 'name' field
         mock_zabbix.proxy.get.assert_called_with(output=["proxyid", "name"])
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_fetches_proxygroups_for_zabbix_7(self, mock_api, mock_zabbix_api):
         """Test that sync fetches proxy groups for Zabbix 7."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="7.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="7.0.0")
 
         syncer = Sync()
         connect(syncer)
@@ -340,13 +340,13 @@ class TestSyncZabbixVersionHandling(unittest.TestCase):
         # Verify proxygroup.get was called for Zabbix 7
         mock_zabbix.proxygroup.get.assert_called_once()
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_skips_proxygroups_for_zabbix_6(self, mock_api, mock_zabbix_api):
         """Test that sync does NOT fetch proxy groups for Zabbix 6."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0.0")
 
         syncer = Sync()
         connect(syncer)
@@ -363,15 +363,15 @@ class TestSyncProxyNameSanitization(unittest.TestCase):
         self.netbox = FakeNetBox()
 
     @patch("netbox_zabbix_sync.modules.core.proxy_prepper")
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_renames_host_to_name_for_zabbix_6_proxies(
         self, mock_api, mock_zabbix_api, mock_proxy_prepper
     ):
         """Test that for Zabbix 6, proxy 'host' field is renamed to 'name'."""
         netbox_mock(mock_api, self.netbox)
 
-        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0")
+        mock_zabbix = zabbix_mock(mock_zabbix_api, version="6.0.0")
         # Zabbix 6 returns 'host' field
         mock_zabbix.proxy.get.return_value = [
             {"proxyid": "1", "host": "proxy1"},
@@ -401,8 +401,8 @@ class TestDeviceHandeling(unittest.TestCase):
     def setUp(self):
         self.netbox = FakeNetBox()
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_cluster_where_device_is_primary(self, mock_api, mock_zabbix_api):
         """Test that sync properly handles a device that is the primary in a virtual chassis."""
         # The chassis master is device 1, the device itself
@@ -421,8 +421,8 @@ class TestDeviceHandeling(unittest.TestCase):
         create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
         self.assertEqual(create_call_kwargs["host"], "SW01")
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_cluster_failover_keeps_existing_host(self, mock_api, mock_zabbix_api):
         """After a failover the new primary takes over the Zabbix host of the former primary."""
         virtual_chassis = self.netbox.virtual_chassis("SW01", master=2)
@@ -458,8 +458,8 @@ class TestDeviceHandeling(unittest.TestCase):
             ],
         )
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_sync_cluster_where_device_is_not_primary(self, mock_api, mock_zabbix_api):
         """Test that a non-primary cluster member is skipped and not created in Zabbix."""
         # The chassis master is device 2, so device 1 is secondary
@@ -475,8 +475,8 @@ class TestDeviceHandeling(unittest.TestCase):
         # Secondary cluster member must be skipped — no host should be created
         mock_zabbix.host.create.assert_not_called()
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_removal_state_secondary_cluster_member_is_not_deleted(
         self, mock_api, mock_zabbix_api
     ):
@@ -499,8 +499,8 @@ class TestDeviceHandeling(unittest.TestCase):
 
         mock_zabbix.host.delete.assert_not_called()
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_removal_state_primary_cluster_member_is_deleted(
         self, mock_api, mock_zabbix_api
     ):
@@ -523,8 +523,8 @@ class TestDeviceHandeling(unittest.TestCase):
 
         mock_zabbix.host.delete.assert_called_once_with(42)
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_templates_from_config_context(self, mock_api, mock_zabbix_api):
         """Test that templates_config_context=True uses the config context template."""
         device = self.netbox.device(
@@ -555,8 +555,8 @@ class TestDeviceHandeling(unittest.TestCase):
         create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
         self.assertEqual(create_call_kwargs["templates"], [{"templateid": "2"}])
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_templates_config_context_overrule(self, mock_api, mock_zabbix_api):
         """Test that templates_config_context_overrule=True prefers config context over custom field.
 
@@ -597,6 +597,76 @@ class TestDeviceHandeling(unittest.TestCase):
         # Verify the custom field template was NOT used
         self.assertNotIn({"templateid": "1"}, create_call_kwargs["templates"])
 
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
+    def test_device_oob_ip_only(self, mock_api, mock_zabbix_api):
+        """Test that an device without a primary IP address is still created with its oob IP address."""
+        oob = self.netbox.ip_address("172.17.1.1/24")
+
+        device = self.netbox.device(id=1, name="Router01", primary_ip=None, oob_ip=oob)
+
+        netbox_mock(mock_api, self.netbox, devices=[device])
+
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync({"oob_sync": True})
+        connect(syncer)
+        syncer.start()
+
+        mock_zabbix.host.create.assert_called_once()
+        create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
+        self.assertEqual(
+            create_call_kwargs["interfaces"][0],
+            {
+                "details": {
+                    "bulk": "1",
+                    "community": "{$SNMP_COMMUNITY}",
+                    "version": "2",
+                },
+                "dns": "",
+                "ip": "172.17.1.1",
+                "main": "1",
+                "port": "161",
+                "type": "2",
+                "useip": "1",
+            },
+        )
+
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
+    def test_device_dns_name_only(self, mock_api, mock_zabbix_api):
+        """Test that an device without a primary IP address is still created with its oob IP address."""
+        ip_address = self.netbox.ip_address("", dns_name="router01.example.com")
+
+        device = self.netbox.device(id=1, name="Router01", primary_ip=ip_address)
+
+        netbox_mock(mock_api, self.netbox, devices=[device])
+
+        mock_zabbix = zabbix_mock(mock_zabbix_api)
+
+        syncer = Sync()
+        connect(syncer)
+        syncer.start()
+
+        mock_zabbix.host.create.assert_called_once()
+        create_call_kwargs = mock_zabbix.host.create.call_args.kwargs
+        self.assertEqual(
+            create_call_kwargs["interfaces"][0],
+            {
+                "details": {
+                    "bulk": "1",
+                    "community": "{$SNMP_COMMUNITY}",
+                    "version": "2",
+                },
+                "dns": "router01.example.com",
+                "ip": "",
+                "main": "1",
+                "port": "161",
+                "type": "2",
+                "useip": "0",
+            },
+        )
+
 
 class TestDeviceStatusHandling(unittest.TestCase):
     """
@@ -627,8 +697,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 1: Active device, not yet in Zabbix → created enabled (status=0)
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_active_device_not_in_zabbix_is_created(self, mock_api, mock_zabbix_api):
         """Active device not yet synced to Zabbix should be created with status enabled (0)."""
         device = self.netbox.device(name="test-device", status="Active")
@@ -648,8 +718,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
     # Scenario 2: Active device, already in Zabbix → consistency check,
     #             Zabbix status matches → no updates
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_active_device_in_zabbix_is_consistent(self, mock_api, mock_zabbix_api):
         """Active device already in Zabbix with matching status should require no updates."""
         device = self.netbox.device(
@@ -669,8 +739,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 3: Staged device, not yet in Zabbix → created disabled (status=1)
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_staged_device_not_in_zabbix_is_created_disabled(
         self, mock_api, mock_zabbix_api
     ):
@@ -690,8 +760,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 4: Staged device, already in Zabbix as disabled → no update needed
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_staged_device_in_zabbix_is_consistent(self, mock_api, mock_zabbix_api):
         """Staged device already in Zabbix as disabled should pass consistency check with no updates."""
         device = self.netbox.device(
@@ -711,8 +781,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 5: Decommissioning device, not in Zabbix → skipped (no create, no delete)
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_decommissioning_device_not_in_zabbix_is_skipped(
         self, mock_api, mock_zabbix_api
     ):
@@ -731,8 +801,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 6: Decommissioning device, already in Zabbix → cleanup (host deleted)
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_decommissioning_device_in_zabbix_is_deleted(
         self, mock_api, mock_zabbix_api
     ):
@@ -753,8 +823,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
 
         mock_zabbix.host.delete.assert_called_once_with(42)
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_decommissioning_device_without_primary_ip_is_deleted(
         self, mock_api, mock_zabbix_api
     ):
@@ -775,8 +845,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
 
         mock_zabbix.host.delete.assert_called_once_with(42)
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_active_device_without_primary_ip_is_still_skipped(
         self, mock_api, mock_zabbix_api
     ):
@@ -802,8 +872,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 7: Active device, Zabbix host is disabled → re-enable via consistency check
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_active_device_disabled_in_zabbix_is_enabled(
         self, mock_api, mock_zabbix_api
     ):
@@ -825,8 +895,8 @@ class TestDeviceStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 8: Failed device, Zabbix host is enabled → disable via consistency check
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_failed_device_enabled_in_zabbix_is_disabled(
         self, mock_api, mock_zabbix_api
     ):
@@ -866,8 +936,8 @@ class TestVMStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 1: Active VM, not yet in Zabbix → created enabled (status=0)
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_active_vm_not_in_zabbix_is_created(self, mock_api, mock_zabbix_api):
         """Active VM not yet synced to Zabbix should be created with status enabled (0)."""
         vm = self.netbox.virtual_machine(
@@ -888,8 +958,8 @@ class TestVMStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 2: Active VM, already in Zabbix → consistency check, no update
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_active_vm_in_zabbix_is_consistent(self, mock_api, mock_zabbix_api):
         """Active VM already in Zabbix with matching status should require no updates."""
         vm = self.netbox.virtual_machine(
@@ -912,8 +982,8 @@ class TestVMStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 3: Staged VM, not yet in Zabbix → created disabled (status=1)
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_staged_vm_not_in_zabbix_is_created_disabled(
         self, mock_api, mock_zabbix_api
     ):
@@ -935,8 +1005,8 @@ class TestVMStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 4: Staged VM, already in Zabbix as disabled → no update needed
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_staged_vm_in_zabbix_is_consistent(self, mock_api, mock_zabbix_api):
         """Staged VM already in Zabbix as disabled should pass consistency check with no updates."""
         vm = self.netbox.virtual_machine(
@@ -959,8 +1029,8 @@ class TestVMStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 5: Decommissioning VM, not in Zabbix → skipped (no create, no delete)
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_decommissioning_vm_not_in_zabbix_is_skipped(
         self, mock_api, mock_zabbix_api
     ):
@@ -981,8 +1051,8 @@ class TestVMStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 6: Decommissioning VM, already in Zabbix → cleanup (host deleted)
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_decommissioning_vm_in_zabbix_is_deleted(self, mock_api, mock_zabbix_api):
         """Decommissioning VM with a Zabbix ID should be deleted from Zabbix."""
         vm = self.netbox.virtual_machine(
@@ -1001,8 +1071,8 @@ class TestVMStatusHandling(unittest.TestCase):
 
         mock_zabbix.host.delete.assert_called_once_with(42)
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_decommissioning_vm_without_primary_ip_is_deleted(
         self, mock_api, mock_zabbix_api
     ):
@@ -1024,8 +1094,8 @@ class TestVMStatusHandling(unittest.TestCase):
 
         mock_zabbix.host.delete.assert_called_once_with(42)
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_active_vm_without_primary_ip_is_still_skipped(
         self, mock_api, mock_zabbix_api
     ):
@@ -1052,8 +1122,8 @@ class TestVMStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 7: Active VM, Zabbix host is disabled → re-enable via consistency check
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_active_vm_disabled_in_zabbix_is_enabled(self, mock_api, mock_zabbix_api):
         """Active VM whose Zabbix host is disabled should be re-enabled by consistency check."""
         vm = self.netbox.virtual_machine(
@@ -1075,8 +1145,8 @@ class TestVMStatusHandling(unittest.TestCase):
     # ------------------------------------------------------------------
     # Scenario 8: Failed VM, Zabbix host is enabled → disable via consistency check
     # ------------------------------------------------------------------
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_failed_vm_enabled_in_zabbix_is_disabled(self, mock_api, mock_zabbix_api):
         """Failed VM whose Zabbix host is enabled should be disabled by consistency check."""
         vm = self.netbox.virtual_machine(
@@ -1102,8 +1172,8 @@ class TestCombineFilters(unittest.TestCase):
     def setUp(self):
         self.netbox = FakeNetBox()
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_filter_override_with_name_parameter(self, mock_api, mock_zabbix_api):
         """Test that method filter parameter overrides config filter for name.
 
@@ -1144,8 +1214,8 @@ class TestCombineFilters(unittest.TestCase):
         filter_call_kwargs = mock_netbox.dcim.devices.filter.call_args[1]
         self.assertEqual(filter_call_kwargs.get("name"), "Testdev02")
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_filter_override_site_parameter(self, mock_api, mock_zabbix_api):
         """Test that site filter override works correctly.
 
@@ -1179,8 +1249,8 @@ class TestCombineFilters(unittest.TestCase):
         filter_call_kwargs = mock_netbox.dcim.devices.filter.call_args[1]
         self.assertEqual(filter_call_kwargs.get("site"), "fra01")
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_config_filter_overridden_by_start_parameter(
         self, mock_api, mock_zabbix_api
     ):
@@ -1213,8 +1283,8 @@ class TestCombineFilters(unittest.TestCase):
         self.assertEqual(filter_call_kwargs.get("name"), "Testdev02")
         self.assertEqual(filter_call_kwargs.get("site"), "ams01")
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_vm_filter_override_with_method_parameter(self, mock_api, mock_zabbix_api):
         """Test that VM filter override works correctly.
 
@@ -1257,8 +1327,8 @@ class TestCombineFilters(unittest.TestCase):
         )
         self.assertEqual(filter_call_kwargs.get("name"), "vm-test")
 
-    @patch("netbox_zabbix_sync.modules.core.ZabbixAPI")
-    @patch("netbox_zabbix_sync.modules.core.nbapi")
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_multiple_filter_parameters_combined(self, mock_api, mock_zabbix_api):
         """Test that multiple filter parameters are correctly combined.
 
@@ -1284,3 +1354,48 @@ class TestCombineFilters(unittest.TestCase):
         self.assertEqual(filter_call_kwargs.get("site"), "fra01")
         self.assertEqual(filter_call_kwargs.get("status"), "active")
         self.assertEqual(filter_call_kwargs.get("name"), "router*")
+
+
+class TestRoleTraversal(unittest.TestCase):
+    """traverse_roles reaches the hostgroup through the whole sync.
+
+    Sync.start() fetches dcim.device_roles once and hands it to every host;
+    a role nested two levels deep lands in Zabbix as its full path only when
+    the flag is on. The Zabbix fake serves exactly the expected group, so a
+    host linked to groupid 1 got the right name.
+    """
+
+    def setUp(self):
+        self.netbox = FakeNetBox()
+        network = self.netbox.role("Network")
+        switching = self.netbox.role("Switching", parent=network)
+        self.device = self.netbox.device(
+            "sw01", role=self.netbox.role("Access", parent=switching)
+        )
+
+    def sync(self, mock_api, mock_zabbix_api, traverse, expected_group):
+        netbox_mock(mock_api, self.netbox, devices=[self.device])
+        zabbix = zabbix_mock(mock_zabbix_api, hostgroup=expected_group)
+        syncer = Sync({"hostgroup_format": "role", "traverse_roles": traverse})
+        connect(syncer)
+        syncer.start()
+        return zabbix
+
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
+    def test_full_role_path_when_enabled(self, mock_api, mock_zabbix_api):
+        zabbix = self.sync(mock_api, mock_zabbix_api, True, "Network/Switching/Access")
+        mock_api.return_value.dcim.device_roles.all.assert_called_once_with()
+        # The leaf group exists; its parents are created so Zabbix shows a tree
+        created = {c.kwargs["name"] for c in zabbix.hostgroup.create.call_args_list}
+        self.assertEqual(created, {"Network", "Network/Switching"})
+        groups = zabbix.host.create.call_args.kwargs["groups"]
+        self.assertEqual(groups, [{"groupid": "1"}])
+
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
+    def test_leaf_role_when_disabled(self, mock_api, mock_zabbix_api):
+        zabbix = self.sync(mock_api, mock_zabbix_api, False, "Access")
+        zabbix.hostgroup.create.assert_not_called()
+        groups = zabbix.host.create.call_args.kwargs["groups"]
+        self.assertEqual(groups, [{"groupid": "1"}])

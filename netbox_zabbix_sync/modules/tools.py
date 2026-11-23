@@ -12,6 +12,9 @@ from jinja2 import Environment, TemplateError
 from netbox_zabbix_sync.modules import jinja_filters
 from netbox_zabbix_sync.modules.exceptions import HostgroupError, JinjaRenderError
 
+PROXY_GROUPS_MINIMUM_VERSION = 7.0
+HOST_GROUPS_NAMING_THRESHOLD = 6.0
+
 
 def convert_recordset(recordset):
     """Converts netbox RecordSet to list of dicts."""
@@ -33,7 +36,7 @@ def build_path(endpoint, list_of_dicts):
     if item is None:
         return []
     item_path.append(item["name"])
-    while item["_depth"] > 0:
+    while item.get("_depth", 0) > 0:
         itemlist = [i for i in list_of_dicts if i["name"] == str(item["parent"])]
         item = itemlist[0] if len(itemlist) == 1 else None
         if item is None:
@@ -88,11 +91,15 @@ def jinjafy_config_context(nb, context: dict | None = None) -> dict:
         # Load additional Jinja2 filters
         j2env.filters.update(j2ipfilters.load_all())  # j2ipaddr filters
         j2env.filters.update(getmembers(jinja_filters, isfunction))  # custom filters
+
+        additional_context = {"nb": nb.api}
+
         try:
+            json_string = str(dumps(context))
             # Use our Zabbix config context as the Jinja2 template
             # and render it using the objects data dictionary
-            template = j2env.from_string(str(dumps(context)))
-            rendered_context = loads(template.render(data=data))
+            template = j2env.from_string(json_string)
+            rendered_context = loads(template.render(data=data, **additional_context))
 
             return rendered_context
         except (JSONDecodeError, TemplateError, TypeError) as e:
@@ -141,7 +148,7 @@ def field_mapper(host, mapper, nbdevice, logger):
     for nb_field, zbx_field in mapper.items():
         field_list = nb_field.split("/")  # convert str to list based on delimiter
         # start at the base of the dict...
-        value: object | dict = nbdevice
+        value: Any = nbdevice
         # ... and step through the dict till we find the needed value
         # Records have no .get(); indexing works on both Records and dicts.
         for item in field_list:

@@ -22,6 +22,8 @@ from netbox_zabbix_sync.modules.interface import ZabbixInterface
 from netbox_zabbix_sync.modules.settings import load_config
 from netbox_zabbix_sync.modules.tags import ZabbixTags
 from netbox_zabbix_sync.modules.tools import (
+    HOST_GROUPS_NAMING_THRESHOLD,
+    PROXY_GROUPS_MINIMUM_VERSION,
     cf_to_string,
     field_mapper,
     remove_duplicates,
@@ -211,13 +213,17 @@ class Host(ABC):
                 self.oob_dns = self.config_context["zabbix"]["oob_interface_dns"]
 
         # Fail if no IP or DNS was set
-        if not (self.ip or self.dns):
-            e = f"Host {self.name}: No primary IP or DNS set."
+        if not (self.ip or self.oob_ip or self.dns or self.oob_dns):
+            e = f"Host {self.name}: No IP or DNS set, cannot add host."
             self.logger.warning(e)
             raise SyncInventoryError(e)
 
     def set_hostgroup(
-        self, hg_format: list | str, nb_site_groups: list[dict], nb_regions: list[dict]
+        self,
+        hg_format: list | str,
+        nb_site_groups: list[dict],
+        nb_regions: list[dict],
+        nb_roles: list[dict],
     ):
         """Set the hostgroup for this device"""
         # Create new Hostgroup instance
@@ -228,8 +234,10 @@ class Host(ABC):
             logger=self.logger,
             nested_sitegroup_flag=self.config["traverse_site_groups"],
             nested_region_flag=self.config["traverse_regions"],
+            nested_role_flag=self.config["traverse_roles"],
             nb_groups=nb_site_groups,
             nb_regions=nb_regions,
+            nb_roles=nb_roles,
         )
         # Generate hostgroup based on hostgroup format
         if isinstance(hg_format, list):
@@ -238,6 +246,15 @@ class Host(ABC):
                     self.hostgroups.append(gen)
         elif full_hostgroup := hg.generate(hg_format):
             self.hostgroups.append(full_hostgroup)
+
+        # Generate hostgroups from config context
+        if hostgroup_context := self.config_context.get("zabbix", {}).get("hostgroup"):
+            if isinstance(hostgroup_context, list):
+                for template in hostgroup_context:
+                    self.hostgroups.append(hg.generate(template))
+            else:
+                self.hostgroups.append(hg.generate(hostgroup_context))
+
         # Remove duplicates and None values
         self.hostgroups = list(filter(None, list(set(self.hostgroups))))
         if self.hostgroups:
@@ -609,9 +626,7 @@ class Host(ABC):
         proxy_types = ["proxy"]
         proxy_name = None
 
-        zabbix_7_version = 7.0
-
-        if self.zabbix.version >= zabbix_7_version:
+        if self.zabbix.version >= PROXY_GROUPS_MINIMUM_VERSION:
             # Only insert groups in front of list for Zabbix7
             proxy_types.insert(0, "proxy_group")
 
@@ -688,9 +703,14 @@ class Host(ABC):
             for template in self.zbx_templates:
                 templateids.append({"templateid": template["templateid"]})
             # Setup interfaces
-            interfaces.append(self.set_interface_details())
-            if self.config["oob_sync"] and "oob_ip" in dict(self.nb) and self.nb.oob_ip:
+            if self.ip or self.dns:
+                interfaces.append(self.set_interface_details())
+            if self.config["oob_sync"] and (self.oob_ip or self.oob_dns):
                 interfaces.append(self.set_interface_details(oob=True))
+            # remove any none type interfaces
+            for interface in interfaces:
+                if not interface["type"]:
+                    interfaces.remove(interface)
             if not self._verify_interfaces(interfaces):
                 e = f"Inconsistent interface configuration for host {self.name}."
                 self.logger.error(e)
@@ -732,7 +752,7 @@ class Host(ABC):
             if self.zbxproxy:
                 # If a lower version than 7 is used, we can assume that
                 # the proxy is a normal proxy and not a proxy group
-                if not str(self.zabbix.version).startswith("7"):
+                if not self.zabbix.version >= PROXY_GROUPS_MINIMUM_VERSION:
                     create_data["proxy_hostid"] = self.zbxproxy["id"]
                 else:
                     # Configure either a proxy or proxy group
@@ -746,12 +766,21 @@ class Host(ABC):
                 msg = f"Host {self.name}: Couldn't create. Zabbix returned {e}."
                 self.logger.error(msg)
                 raise SyncExternalError(msg) from e
-            # Set NetBox custom field to hostID value.
-            self.nb.custom_fields[self.config["device_cf"]] = int(self.zabbix_id)
-            self.nb.save()
+            # Log host creation
             msg = f"Host {self.name}: Created host in Zabbix. (ID:{self.zabbix_id})"
             self.logger.info(msg)
             self.create_journal_entry("success", msg)
+            # Set NetBox custom field to hostID value.
+            self.nb.custom_fields[self.config["device_cf"]] = int(self.zabbix_id)
+            try:
+                self.nb.save()
+            except NetboxRequestError as e:
+                msg = (
+                    f"Host {self.name}: Unable to update custom field "
+                    f"{self.config['device_cf']} in NetBox with value {int(self.zabbix_id)}. "
+                    f"NetBox returned {e}."
+                )
+                self.logger.error(msg)
         else:
             self.logger.error(
                 "Host %s: Unable to add to Zabbix. Host already present.", self.name
@@ -903,7 +932,7 @@ class Host(ABC):
 
         group_dictname = "hostgroups"
         # Check if Zabbix version is 6 or higher. Issue #93
-        if str(self.zabbix.version).startswith(("6", "5")):
+        if self.zabbix.version <= HOST_GROUPS_NAMING_THRESHOLD:
             group_dictname = "groups"
         # Check if hostgroups match
         if sorted(host[group_dictname], key=itemgetter("groupid")) == sorted(
@@ -971,8 +1000,8 @@ class Host(ABC):
             # Proxy does not match, update Zabbix
             else:
                 self.logger.info("Host %s: Proxy OUT of sync.", self.name)
-                # Zabbix <= 6 patch
-                if not str(self.zabbix.version).startswith("7"):
+                # Zabbix < 7 patch
+                if self.zabbix.version < PROXY_GROUPS_MINIMUM_VERSION:
                     self.update_zabbix_host(proxy_hostid=self.zbxproxy["id"])
                 # Zabbix 7+
                 else:
@@ -990,7 +1019,7 @@ class Host(ABC):
                 if key in host and bool(int(host[key])):
                     proxy_set = True
             if proxy_power and proxy_set:
-                # Zabbix <= 6 fix
+                # Zabbix < 7 fix
                 self.logger.warning(
                     "Host %s: No proxy is configured in NetBox but is configured in Zabbix."
                     "Removing proxy config in Zabbix",
@@ -1070,9 +1099,14 @@ class Host(ABC):
 
         # Verify interfaces
         interfaces = []
-        interfaces.append(self.set_interface_details())
-        if self.config["oob_sync"] and "oob_ip" in dict(self.nb) and self.nb.oob_ip:
+        if self.ip or self.dns:
+            interfaces.append(self.set_interface_details())
+        if self.config["oob_sync"] and (self.oob_ip or self.oob_dns):
             interfaces.append(self.set_interface_details(oob=True))
+        # remove none type interfaces
+        for interface in interfaces:
+            if not interface["type"]:
+                interfaces.remove(interface)
         if not self._verify_interfaces(interfaces):
             e = f"Inconsistent interface configuration for host {self.name}."
             self.logger.error(e)

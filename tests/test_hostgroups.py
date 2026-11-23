@@ -376,5 +376,118 @@ class TestHostgroups(unittest.TestCase):
         self.assertIn(("GET", site_url, None), self.netbox.requests)
 
 
+class TestRoleTraversal(unittest.TestCase):
+    """traverse_roles folds a nested role's ancestry into the hostgroup.
+
+    Device roles are a tree since NetBox 4.3, and VMs use the same roles.
+    Unlike the region and site-group tests above, build_path is not mocked:
+    the role tree comes from the fake NetBox exactly as convert_recordset
+    would hand it over, so these tests also cover the real path walk.
+    """
+
+    def setUp(self):
+        self.logger = MagicMock()
+        self.netbox = FakeNetBox()
+        nb = self.netbox
+        network = nb.role("Network")
+        switching = nb.role("Switching", parent=network)
+        self.access = nb.role("Access", parent=switching)
+        self.device = nb.device("sw01", role=self.access)
+        self.vm = nb.virtual_machine("vm01", role=self.access, cluster=None)
+
+    def roles(self):
+        """What convert_recordset makes of dcim.device_roles.all()."""
+        return [vars(r) for r in self.netbox.all("dcim/device-roles")]
+
+    def hostgroup(self, obj, obj_type="dev", version="4.4", **kwargs):
+        return Hostgroup(obj_type, obj, version, self.logger, **kwargs)
+
+    def test_role_is_flat_when_traversal_is_off(self):
+        hostgroup = self.hostgroup(self.device, nb_roles=self.roles())
+        self.assertEqual(hostgroup.format_options["role"], "Access")
+
+    def test_device_role_path_when_traversal_is_on(self):
+        hostgroup = self.hostgroup(
+            self.device, nested_role_flag=True, nb_roles=self.roles()
+        )
+        self.assertEqual(
+            hostgroup.generate("site/role"), "TestSite/Network/Switching/Access"
+        )
+
+    def test_vm_role_path_when_traversal_is_on(self):
+        hostgroup = self.hostgroup(
+            self.vm, "vm", nested_role_flag=True, nb_roles=self.roles()
+        )
+        self.assertEqual(hostgroup.generate("role"), "Network/Switching/Access")
+
+    def test_top_level_role_is_unchanged_by_traversal(self):
+        device = self.netbox.device("sw02", role=self.netbox.role("Standalone"))
+        hostgroup = self.hostgroup(device, nested_role_flag=True, nb_roles=self.roles())
+        self.assertEqual(hostgroup.format_options["role"], "Standalone")
+
+    def test_traversal_is_independent_of_the_other_flags(self):
+        """Turning on region traversal must not traverse roles, and vice versa."""
+        site = self.netbox.site(
+            "S", region=self.netbox.region("Child", parent="Parent")
+        )
+        device = self.netbox.device("sw03", site=site, role=self.access)
+        regions = [vars(r) for r in self.netbox.all("dcim/regions")]
+
+        only_regions = self.hostgroup(
+            device, nested_region_flag=True, nb_regions=regions, nb_roles=self.roles()
+        )
+        self.assertEqual(only_regions.generate("region/role"), "Parent/Child/Access")
+
+        only_roles = self.hostgroup(
+            device, nested_role_flag=True, nb_regions=regions, nb_roles=self.roles()
+        )
+        self.assertEqual(
+            only_roles.generate("region/role"), "Child/Network/Switching/Access"
+        )
+
+    def test_flat_roles_on_netbox_before_4_3(self):
+        """Pre-4.3 roles carry no parent or _depth; traversal leaves them as is."""
+        netbox = FakeNetBox(version="4.2")
+        device = netbox.device("sw01", role=netbox.role("Access"))
+        roles = [vars(r) for r in netbox.all("dcim/device-roles")]
+        self.assertNotIn("_depth", roles[0])
+
+        hostgroup = self.hostgroup(
+            device, version="4.2", nested_role_flag=True, nb_roles=roles
+        )
+        self.assertEqual(hostgroup.format_options["role"], "Access")
+
+    def test_netbox_3_device_role_field(self):
+        """NetBox 2/3 serialise the role as device_role; the lookup still works."""
+        netbox = FakeNetBox(version="3.7")
+        device = netbox.device("sw01", role=netbox.role("Access"))
+        roles = [vars(r) for r in netbox.all("dcim/device-roles")]
+
+        hostgroup = self.hostgroup(
+            device, version="3.7", nested_role_flag=True, nb_roles=roles
+        )
+        self.assertEqual(hostgroup.format_options["role"], "Access")
+
+    def test_vm_without_role_skips_the_role_level(self):
+        """A role is optional on a VM; an empty one must be skipped, not fatal.
+
+        format_options["role"] must exist even when it is None. Without the
+        key, generate() treats "role" as an unknown custom field and raises
+        HostgroupError, so with the default vm_hostgroup_format
+        "cluster_type/cluster/role" every role-less VM would be skipped.
+        """
+        vm = self.netbox.virtual_machine(
+            "vm02",
+            role=None,
+            cluster=self.netbox.cluster("TestCluster", type="TestClusterType"),
+        )
+        hostgroup = self.hostgroup(vm, "vm", nb_roles=self.roles())
+        self.assertIsNone(hostgroup.format_options.get("role"))
+        self.assertEqual(
+            hostgroup.generate("cluster_type/cluster/role"),
+            "TestClusterType/TestCluster",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

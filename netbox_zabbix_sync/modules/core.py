@@ -6,17 +6,18 @@ from os import environ
 from pprint import pformat
 from typing import Any
 
-from pynetbox import api as nbapi
 from pynetbox.core.query import RequestError as NetBoxRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
-from zabbix_utils import APIRequestError, ProcessingError, ZabbixAPI
+from zabbix_utils import APIRequestError, ProcessingError
 
+from netbox_zabbix_sync.modules.api_clients import RetryingNetBoxAPI, RetryingZabbixAPI
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
 from netbox_zabbix_sync.modules.host import Host
 from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
+    PROXY_GROUPS_MINIMUM_VERSION,
     convert_recordset,
     extend_ips,
     jinjafy_config_context,
@@ -111,21 +112,28 @@ class Sync:
         return True
 
     def connect(
-        self, nb_host, nb_token, zbx_host, zbx_user=None, zbx_pass=None, zbx_token=None
+        self,
+        nb_host,
+        nb_token,
+        zbx_host,
+        zbx_user=None,
+        zbx_pass=None,
+        zbx_token=None,
+        skip_version_check=False,
     ):
         """
-        Docstring for connect
+        Connect to NetBox and Zabbix APIs using provided credentials and settings.
 
-        :param self: Description
-        :param nb_host: Description
-        :param nb_token: Description
-        :param zbx_host: Description
-        :param zbx_user: Description
-        :param zbx_pass: Description
-        :param zbx_token: Description
+        :param nb_host: NetBox host URL
+        :param nb_token: NetBox API token
+        :param zbx_host: Zabbix host URL
+        :param zbx_user: Zabbix username
+        :param zbx_pass: Zabbix password
+        :param zbx_token: Zabbix API token
+        :param skip_version_check: Whether to skip version checking
         """
         # Initialize Netbox API connection
-        netbox = nbapi(nb_host, token=nb_token, threading=True)
+        netbox = RetryingNetBoxAPI(nb_host, token=nb_token, threading=True)
         try:
             # Get NetBox version
             nb_version = netbox.version
@@ -165,12 +173,21 @@ class Sync:
                 ssl_ctx.load_verify_locations(environ["REQUESTS_CA_BUNDLE"])
             if not zbx_token:
                 self.logger.debug("Using user/password authentication for Zabbix API.")
-                self.zabbix = ZabbixAPI(
-                    zbx_host, user=zbx_user, password=zbx_pass, ssl_context=ssl_ctx
+                self.zabbix = RetryingZabbixAPI(
+                    zbx_host,
+                    user=zbx_user,
+                    password=zbx_pass,
+                    ssl_context=ssl_ctx,
+                    skip_version_check=skip_version_check,
                 )
             else:
                 self.logger.debug("Using token authentication for Zabbix API.")
-                self.zabbix = ZabbixAPI(zbx_host, token=zbx_token, ssl_context=ssl_ctx)
+                self.zabbix = RetryingZabbixAPI(
+                    zbx_host,
+                    token=zbx_token,
+                    ssl_context=ssl_ctx,
+                    skip_version_check=skip_version_check,
+                )
             self.zabbix.check_auth()
             self.logger.debug("Zabbix version is %s.", self.zabbix.version)
         except (APIRequestError, ProcessingError) as zbx_error:
@@ -315,18 +332,19 @@ class Sync:
         device_cfs = []
         vm_cfs = []
         # Create API call to get all custom fields which are on the device objects
-        device_cfs = list(
-            self.netbox.extras.custom_fields.filter(
-                type=["text", "object", "select"], object_type="dcim.device"
+        if self.config["sync_devices"]:
+            device_cfs = list(
+                self.netbox.extras.custom_fields.filter(
+                    type=["text", "object", "select"], object_type="dcim.device"
+                )
             )
-        )
-        # Check if the provided Hostgroup layout is valid
-        verify_hg_format(
-            self.config["hostgroup_format"],
-            device_cfs=device_cfs,
-            hg_type="dev",
-            logger=self.logger,
-        )
+            # Check if the provided Hostgroup layout is valid
+            verify_hg_format(
+                self.config["hostgroup_format"],
+                device_cfs=device_cfs,
+                hg_type="dev",
+                logger=self.logger,
+            )
         if self.config["sync_vms"]:
             vm_cfs = list(
                 self.netbox.extras.custom_fields.filter(
@@ -341,13 +359,19 @@ class Sync:
                 logger=self.logger,
             )
         # Set API parameter mapping based on API version
-        proxy_name = "host" if str(self.zabbix.version) < "7" else "name"
-        # Get all Zabbix and NetBox data
-        dev_filter_combined = self._combine_filters(
-            self.config["nb_device_filter"], device_filter
+        proxy_name = (
+            "host" if self.zabbix.version < PROXY_GROUPS_MINIMUM_VERSION else "name"
         )
-        netbox_devices = list(self.netbox.dcim.devices.filter(**dev_filter_combined))
+        # Get all Zabbix and NetBox data
+        netbox_devices = []
         netbox_vms = []
+        if self.config["sync_devices"]:
+            dev_filter_combined = self._combine_filters(
+                self.config["nb_device_filter"], device_filter
+            )
+            netbox_devices = list(
+                self.netbox.dcim.devices.filter(**dev_filter_combined)
+            )
         if self.config["sync_vms"]:
             vm_filter_combined = self._combine_filters(
                 self.config["nb_vm_filter"], vm_filter
@@ -357,6 +381,7 @@ class Sync:
             )
         netbox_site_groups = convert_recordset(self.netbox.dcim.site_groups.all())
         netbox_regions = convert_recordset(self.netbox.dcim.regions.all())
+        netbox_roles = convert_recordset(self.netbox.dcim.device_roles.all())
         netbox_journals = self.netbox.extras.journal_entries
         zabbix_groups = self.zabbix.hostgroup.get(  # type: ignore
             output=["groupid", "name"]
@@ -367,16 +392,19 @@ class Sync:
         zabbix_proxies = self.zabbix.proxy.get(  # type: ignore
             output=["proxyid", proxy_name]
         )
+
         # Set empty list for proxy processing Zabbix <= 6
         zabbix_proxygroups = []
-        if str(self.zabbix.version) >= "7":
+        if self.zabbix.version >= PROXY_GROUPS_MINIMUM_VERSION:
             zabbix_proxygroups = self.zabbix.proxygroup.get(  # type: ignore
                 output=["proxy_groupid", "name"]
             )
+
         # Sanitize proxy data
         if proxy_name == "host":
             for proxy in zabbix_proxies:
                 proxy["name"] = proxy.pop("host")
+
         # Prepare list of all proxy and proxy_groups
         zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
 
@@ -394,27 +422,31 @@ class Sync:
                 self.logger.debug("Host %s: Started operations on VM.", vm.name)
                 if self._remove_host(vm):
                     continue
-                if self.config["extended_site_properties"] and nb_vm.site:
-                    self.logger.debug("Host %s: Extending site information.", vm.name)
+                if nb_vm.site:
                     nb_vm.site.full_details()
                 if self.config["extended_ips"]:
                     self.logger.debug("Host %s: Extending IP information.", vm.name)
                     extend_ips(nb_vm)
                 if not self._render_config_context(vm, nb_vm):
                     continue
-                self.logger.debug(
-                    "Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm))
-                )
                 vm.set_ips()
                 vm.set_vm_template()
-                if not vm.zbx_template_names:
-                    continue
                 vm.set_hostgroup(
                     self.config["vm_hostgroup_format"],
                     netbox_site_groups,
                     netbox_regions,
+                    netbox_roles,
                 )
+                self.logger.debug(
+                    "Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm))
+                )
+                if not vm.zbx_template_names:
+                    continue
                 if not vm.hostgroups:
+                    self.logger.warning(
+                        "Host %s: has no valid hostgroups, Skipping this host...",
+                        vm.name,
+                    )
                     continue
                 self._sync_host(vm, zabbix_groups, zabbix_templates, zabbix_proxy_list)
             except SyncError:
@@ -434,10 +466,7 @@ class Sync:
                 self.logger.debug("Host %s: Started operations on device.", device.name)
                 if self._remove_host(device):
                     continue
-                if self.config["extended_site_properties"] and nb_device.site:
-                    self.logger.debug(
-                        "Host %s: Extending site information.", device.name
-                    )
+                if nb_device.site:
                     nb_device.site.full_details()
                 if (
                     self.config["extended_virtual_chassis"]
@@ -455,20 +484,23 @@ class Sync:
                     extend_ips(nb_device)
                 if not self._render_config_context(device, nb_device):
                     continue
-                self.logger.debug(
-                    "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
-                )
                 device.set_ips()
                 device.set_template(
                     self.config["templates_config_context"],
                     self.config["templates_config_context_overrule"],
                 )
-                if not device.zbx_template_names:
-                    continue
                 device.set_hostgroup(
-                    self.config["hostgroup_format"], netbox_site_groups, netbox_regions
+                    self.config["hostgroup_format"],
+                    netbox_site_groups,
+                    netbox_regions,
+                    netbox_roles,
                 )
                 device.set_ipmi()
+                self.logger.debug(
+                    "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
+                )
+                if not device.zbx_template_names:
+                    continue
                 if not device.hostgroups:
                     self.logger.warning(
                         "Host %s: has no valid hostgroups, Skipping this host...",

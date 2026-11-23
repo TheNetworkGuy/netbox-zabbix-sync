@@ -10,6 +10,7 @@ dependencies = [
     "pynetbox>=7.9.0",
     "python-dateutil>=2.9.0.post0",
     "python-jsonpath>=2.0.2",
+    "tenacity>=9.2.1",
     "zabbix-utils>=2.0.4",
 ]
 dynamic = ["version"]
@@ -52,6 +53,8 @@ ignore = [
     "E501",
     # Ignore too many arguments
     "PLR0913",
+    # Ignore too many positional arguments
+    "PLR0917",
     # Ignore too many statements
     "PLR0915",
     # Ignore too many branches

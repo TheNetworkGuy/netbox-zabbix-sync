@@ -63,7 +63,15 @@ DEFAULT: Any = object()
 # related object is reduced to these keys before it is nested in another one.
 BRIEF_FIELDS = {
     "dcim/devices": ("id", "url", "display", "name", "description"),
-    "dcim/device-roles": ("id", "url", "display", "name", "slug", "description"),
+    "dcim/device-roles": (
+        "id",
+        "url",
+        "display",
+        "name",
+        "slug",
+        "description",
+        "_depth",
+    ),
     "dcim/device-types": (
         "id",
         "url",
@@ -90,7 +98,15 @@ BRIEF_FIELDS = {
     "dcim/sites": ("id", "url", "display", "name", "slug", "description"),
     "dcim/virtual-chassis": ("id", "url", "display", "name", "master", "description"),
     "extras/tags": ("id", "url", "display", "name", "slug", "color"),
-    "ipam/ip-addresses": ("id", "url", "display", "family", "address", "description"),
+    "ipam/ip-addresses": (
+        "id",
+        "url",
+        "display",
+        "family",
+        "address",
+        "description",
+        "dns_name",
+    ),
     "tenancy/tenant-groups": (
         "id",
         "url",
@@ -206,13 +222,14 @@ class FakeNetBox:
     def __init__(self, version: str = DEFAULT_VERSION):
         self.version = version
         self.api = pynetbox.api(BASE_URL, token=TOKEN)
-        self.api.http_session = FakeSession(self)
+        # Duck-typed stand-in for requests.Session, see FakeSession.
+        self.api.http_session = FakeSession(self)  # ty: ignore[invalid-assignment]
         self.objects: dict[str, dict] = {}
         # (method, url, json body) of every request a Record made.
         self.requests: list[tuple[str, str, dict | None]] = []
         # Journal entries are created through the endpoint, never a Record.
         self.journal_entries = create_autospec(Endpoint, instance=True)
-        self._ids: dict[str, count] = defaultdict(lambda: count(1))
+        self._ids: dict[str, count[int]] = defaultdict(lambda: count(1))
 
     # ------------------------------------------------------------------
     # Plumbing
@@ -423,7 +440,19 @@ class FakeNetBox:
             **fields,
         )
 
-    def role(self, name: str, **fields) -> dict:
+    def role(self, name: str, parent=None, **fields) -> dict:
+        # Device roles are a tree since NetBox 4.3; before that a role has no
+        # parent and no _depth at all, which build_path has to tolerate.
+        if version_tuple(self.version) >= (4, 3):
+            parent = self._resolve(parent, self.role)
+            fields = {
+                "parent": parent,
+                "_depth": parent["_depth"] + 1 if parent else 0,
+                **fields,
+            }
+        elif parent is not None:
+            msg = f"NetBox {self.version} has no nested device roles"
+            raise ValueError(msg)
         return self.add(
             "dcim/device-roles",
             name=name,

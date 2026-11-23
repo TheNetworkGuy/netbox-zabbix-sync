@@ -201,6 +201,18 @@ class TestCliLogFile:
         assert mock_main.call_args.args[0].log_file == expected
 
 
+@pytest.mark.parametrize(
+    ("argv", "expected"),
+    [([], None), (["--traverse-roles"], True), (["--no-traverse-roles"], False)],
+)
+def test_traverse_roles_flag(monkeypatch, argv, expected):
+    """traverse_roles can be toggled from the command line like its siblings."""
+    monkeypatch.setattr("sys.argv", ["netbox_zabbix_sync.py", *argv])
+    with patch("netbox_zabbix_sync.modules.cli.main") as mock_main:
+        parse_cli()
+    assert mock_main.call_args.args[0].traverse_roles is expected
+
+
 class TestLoggingToggles:
     def test_disabled_log_file(self):
         assert get_log_file_path(False) is None

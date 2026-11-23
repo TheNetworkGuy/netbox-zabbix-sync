@@ -32,7 +32,7 @@ ROLE = seed_netbox.ROLE_NAME
 
 @pytest.fixture
 def topology(nb):
-    """Build region / site-group trees and sites, and tear them down in order.
+    """Build region / site-group / role trees and sites; tear them down in order.
 
     Everything created here outlives the per-test device that sits in it, so
     this fixture must be requested *before* device_factory in a test's
@@ -63,6 +63,19 @@ def topology(nb):
             )
             created.append(group)
             return group
+
+        def role(self, name: str | None = None, parent=None):
+            if tuple(int(x) for x in nb.version.split(".")[:2]) < (4, 3):
+                pytest.skip("device roles are nested since NetBox 4.3")
+            suffix = uuid4().hex[:8]
+            role = nb.dcim.device_roles.create(
+                name=name or f"role-{suffix}",
+                slug=f"role-{suffix}",
+                parent=parent.id if parent else None,
+                vm_role=True,
+            )
+            created.append(role)
+            return role
 
         def site(self, region=None, group=None):
             suffix = uuid4().hex[:8]
@@ -139,6 +152,69 @@ def test_nested_site_groups_traversed_when_enabled(
 
     assert hostgroup_of(zabbix_host(device.name)) == (
         f"{parent.name}/{child.name}/{ROLE}"
+    )
+
+
+def test_role_is_flat_by_default(topology, device_factory, run_sync, zabbix_host):
+    """Without traverse_roles, only the device's own role name is used."""
+    parent = topology.role(name=f"Network-{uuid4().hex[:6]}")
+    child = topology.role(name=f"Access-{uuid4().hex[:6]}", parent=parent)
+    device = device_factory(role=child.id)
+
+    run_sync(device.name, hostgroup_format="site/role", traverse_roles=False)
+
+    assert hostgroup_of(zabbix_host(device.name)) == (
+        f"{seed_netbox.SITE_NAME}/{child.name}"
+    )
+
+
+def test_nested_roles_traversed_when_enabled(
+    topology, device_factory, run_sync, zabbix_host
+):
+    """traverse_roles folds the role's ancestry into the hostgroup path.
+
+    The third caller of `build_path`, over dcim/device-roles -- an endpoint
+    that only grew `parent` and `_depth` in NetBox 4.3.
+    """
+    network = topology.role(name=f"Network-{uuid4().hex[:6]}")
+    switching = topology.role(name=f"Switching-{uuid4().hex[:6]}", parent=network)
+    access = topology.role(name=f"Access-{uuid4().hex[:6]}", parent=switching)
+    device = device_factory(role=access.id)
+
+    run_sync(device.name, hostgroup_format="site/role", traverse_roles=True)
+
+    assert hostgroup_of(zabbix_host(device.name)) == (
+        f"{seed_netbox.SITE_NAME}/{network.name}/{switching.name}/{access.name}"
+    )
+
+
+def test_nested_vm_role_traversed_when_enabled(
+    topology, vm_factory, run_vm_sync, zabbix_host
+):
+    """VMs share the device-role tree, so the same flag applies to them."""
+    parent = topology.role(name=f"Compute-{uuid4().hex[:6]}")
+    child = topology.role(name=f"Hypervisor-{uuid4().hex[:6]}", parent=parent)
+    vm = vm_factory(role=child.id)
+
+    run_vm_sync(vm.name, vm_hostgroup_format="role", traverse_roles=True)
+
+    assert hostgroup_of(zabbix_host(vm.name)) == f"{parent.name}/{child.name}"
+
+
+def test_vm_without_role_still_syncs(vm_factory, run_vm_sync, zabbix_host):
+    """A role is optional on a VM; the empty role level is left out.
+
+    Guards against the role-less VM being skipped with a HostgroupError, which
+    happens if format_options has no "role" key at all.
+    """
+    vm = vm_factory(role=None)
+
+    run_vm_sync(vm.name, vm_hostgroup_format="cluster_type/cluster/role")
+
+    host = zabbix_host(vm.name)
+    assert host is not None, "role-less VM was not synced"
+    assert hostgroup_of(host) == (
+        f"{seed_netbox.CLUSTER_TYPE_NAME}/{seed_netbox.CLUSTER_NAME}"
     )
 
 

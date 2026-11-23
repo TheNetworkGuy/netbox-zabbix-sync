@@ -14,6 +14,7 @@ _BOOL_ARGS = [
     ("create_hostgroups", "Enable hostgroup generation (requires Zabbix permissions)."),
     ("create_journal", "Create NetBox journal entries on changes."),
     ("sync_vms", "Enable virtual machine sync."),
+    ("sync_devices", "Enable device sync."),
     (
         "full_proxy_sync",
         "Enable full proxy sync (removes proxies not in config context).",
@@ -28,10 +29,7 @@ _BOOL_ARGS = [
     ),
     ("traverse_regions", "Use the full parent-region path in hostgroup names."),
     ("traverse_site_groups", "Use the full parent-site-group path in hostgroup names."),
-    (
-        "extended_site_properties",
-        "Fetch additional site info from NetBox (increases API queries).",
-    ),
+    ("traverse_roles", "Use the full parent-role path in hostgroup names."),
     (
         "extended_virtual_chassis",
         "Fetch additional virtual chassis info from NetBox (increases API queries).",
@@ -42,7 +40,7 @@ _BOOL_ARGS = [
     ),
     (
         "prefer_dns",
-        "Sets host interfaces to use DNS instead of IP if available. The DNS record can be supplied via config_context or by enabling extended_ips.",
+        "Sets host interfaces to use DNS instead of IP if available.",
     ),
     ("inventory_sync", "Sync NetBox device properties to Zabbix inventory."),
     ("oob_sync", "Sync NetBox Out-of-Band interfaces based on OOB IP."),
@@ -178,6 +176,7 @@ def main(arguments):
         zbx_user=zabbix_user,
         zbx_pass=zabbix_pass,
         zbx_token=zabbix_token,
+        skip_version_check=config["skip_version_check"],
     )
     if config["render_config_context"]:
         logger.warning(
