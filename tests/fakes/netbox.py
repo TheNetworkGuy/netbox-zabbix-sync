@@ -229,7 +229,7 @@ class FakeNetBox:
         self.requests: list[tuple[str, str, dict | None]] = []
         # Journal entries are created through the endpoint, never a Record.
         self.journal_entries = create_autospec(Endpoint, instance=True)
-        self._ids: dict[str, count] = defaultdict(lambda: count(1))
+        self._ids: dict[str, count[int]] = defaultdict(lambda: count(1))
 
     # ------------------------------------------------------------------
     # Plumbing
