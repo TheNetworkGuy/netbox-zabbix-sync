@@ -146,7 +146,12 @@ class Sync:
         :param skip_version_check: Whether to skip version checking
         """
         # Initialize Netbox API connection
-        netbox = RetryingNetBoxAPI(nb_host, token=nb_token, threading=True)
+        # With threading, pynetbox fetches the pages of a paginated list in parallel.
+        netbox = RetryingNetBoxAPI(
+            nb_host,
+            token=nb_token,
+            threading=bool(self.config["netbox_threading"]),
+        )
         try:
             # Get NetBox version
             nb_version = netbox.version

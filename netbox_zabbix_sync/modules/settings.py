@@ -96,6 +96,7 @@ DEFAULT_CONFIG = {
     "zabbix_create_batch_size": 50,
     "zabbix_update_batch_size": 100,
     "netbox_batch_size": 100,
+    "netbox_threading": True,
     "log_file": None,
     "log_rotation": True,
     "log_console": True,

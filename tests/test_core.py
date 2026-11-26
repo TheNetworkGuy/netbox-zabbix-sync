@@ -96,6 +96,30 @@ class TestSyncNetboxConnection(unittest.TestCase):
         self.assertFalse(result)
 
 
+class TestNetboxThreading(unittest.TestCase):
+    """Test that the netbox_threading setting reaches the NetBox API client."""
+
+    def _connect(self, config=None):
+        with patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI") as mock_api:
+            # Stop connect() right after the client is built.
+            type(mock_api.return_value).version = property(
+                lambda self: (_ for _ in ()).throw(RequestsConnectionError())
+            )
+            Sync(config).connect(
+                nb_host="http://netbox.local",
+                nb_token="token",
+                zbx_host="http://zabbix.local",
+                zbx_token="token",
+            )
+        return mock_api.call_args.kwargs["threading"]
+
+    def test_threading_enabled_by_default(self):
+        self.assertIs(self._connect(), True)
+
+    def test_threading_can_be_disabled(self):
+        self.assertIs(self._connect({"netbox_threading": False}), False)
+
+
 class TestZabbixUserTokenConflict(unittest.TestCase):
     """Test that sync returns False when both ZABBIX_USER/PASS and ZABBIX_TOKEN are set."""
 

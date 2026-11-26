@@ -48,6 +48,10 @@ _BOOL_ARGS = [
     ("tag_sync", "Sync host tags to Zabbix."),
     ("tag_lower", "Lowercase tag names and values before syncing."),
     (
+        "netbox_threading",
+        "Fetch the pages of large NetBox lists in parallel threads.",
+    ),
+    (
         "render_config_context",
         "Enables *EXPERIMENTAL* support for Jinja2 config context rendering.",
     ),

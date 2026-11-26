@@ -261,6 +261,12 @@ zabbix_update_batch_size = 100
 # to NetBox in one request.
 netbox_batch_size = 100
 
+# Large lists, such as all devices or all virtual machines, are fetched from
+# NetBox page by page. When set to True, those pages are fetched in parallel
+# threads, which is faster on large installs. Set to False to fetch the pages
+# one after another, for example to lower the load on a busy NetBox server.
+netbox_threading = True
+
 
 ### EXPERIMENTAL FEATURES ###
 # The features below are experimental and should be run on your own risk.
