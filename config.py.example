@@ -250,6 +250,10 @@ zabbix_fetch_batch_size = 100
 # Set to 1 to send every host on its own.
 zabbix_update_batch_size = 100
 
+# Writes to NetBox, such as journal entries, are also sent in batches. This sets
+# how many objects are sent to NetBox in one request.
+netbox_batch_size = 100
+
 
 ### EXPERIMENTAL FEATURES ###
 # The features below are experimental and should be run on your own risk.

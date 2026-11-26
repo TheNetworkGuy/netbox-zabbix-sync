@@ -15,6 +15,7 @@ from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
 from netbox_zabbix_sync.modules.host import Host
 from netbox_zabbix_sync.modules.host_updates import HostUpdateQueue
+from netbox_zabbix_sync.modules.journal import JournalQueue
 from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
@@ -52,6 +53,7 @@ class Sync:
         self.zabbix = None
         self.nb_version = None
         self.host_updates: HostUpdateQueue | None = None
+        self.journals: JournalQueue | None = None
         self.zabbix_hosts: ZabbixHostLookup | None = None
 
         default_config = DEFAULT_CONFIG.copy()
@@ -426,7 +428,13 @@ class Sync:
         netbox_site_groups = convert_recordset(self.netbox.dcim.site_groups.all())
         netbox_regions = convert_recordset(self.netbox.dcim.regions.all())
         netbox_roles = convert_recordset(self.netbox.dcim.device_roles.all())
-        netbox_journals = self.netbox.extras.journal_entries
+        # Journal entries are collected and created in bulk.
+        self.journals = JournalQueue(
+            self.netbox.extras.journal_entries,
+            self.logger,
+            batch_size=self.config["netbox_batch_size"],
+        )
+        netbox_journals = self.journals
         zabbix_groups = self.zabbix.hostgroup.get(  # type: ignore
             output=["groupid", "name"]
         )
@@ -584,6 +592,8 @@ class Sync:
                 )
             except SyncError:
                 pass
-        # Send the host updates that are still waiting for a full batch.
+        # Send what is still waiting for a full batch. Journals go last, as
+        # the host updates add entries of their own.
         self.host_updates.flush()
+        self.journals.flush()
         return True
