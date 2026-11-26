@@ -58,7 +58,7 @@ class Sync:
         self.netbox = None
         self.zabbix = None
         self.nb_version = None
-        
+
         self.host_creates = HostCreateQueue(
             self.zabbix,
             self.logger,
