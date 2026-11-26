@@ -172,6 +172,14 @@ def test_parse_env_value_booleans():
         assert parse_env_value("clustering", text) is False
 
 
+def test_parse_env_value_integers():
+    """Test that integer settings are converted from environment variable text"""
+    assert parse_env_value("zabbix_update_batch_size", "1") == 1
+    assert parse_env_value("zabbix_update_batch_size", " 1 ") == 1
+    # Text that is not a number is returned unchanged
+    assert parse_env_value("zabbix_update_batch_size", "many") == "many"
+
+
 def test_parse_env_value_keeps_other_values():
     """Test that non-boolean values are returned unchanged"""
     # usermacro_sync defaults to a boolean but also accepts "full"
