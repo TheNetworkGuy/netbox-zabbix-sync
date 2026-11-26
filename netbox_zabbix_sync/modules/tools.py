@@ -1,7 +1,7 @@
 """A collection of tools used by several classes"""
 
 from collections.abc import Callable
-from copy import copy
+from copy import copy, deepcopy
 from inspect import getmembers, isfunction
 from json import JSONDecodeError, dumps, loads
 from typing import Any, cast, overload
@@ -301,7 +301,9 @@ def sanatize_log_output(data):
     """
     if not isinstance(data, dict):
         return data
-    sanitized_data = data.copy()
+    # A deep copy: the macros and interface details are masked in place, and
+    # they are the same objects that are (or will be) sent to Zabbix.
+    sanitized_data = deepcopy(data)
     # Check if there are any sensitive macros defined in the data
     if "macros" in data:
         for macro in sanitized_data["macros"]:

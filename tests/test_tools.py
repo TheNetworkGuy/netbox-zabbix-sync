@@ -27,6 +27,16 @@ def test_sanatize_log_output_secrets():
     assert sanitized["macros"][1]["value"] == "notsecret"
 
 
+def test_sanatize_log_output_leaves_its_input_alone():
+    """The masked copy is for the log; the input is what Zabbix gets sent."""
+    macro = {"macro": "{$SECRET}", "type": "1", "value": "supersecret"}
+    details = {"community": "public"}
+    sanatize_log_output({"macros": [macro]})
+    sanatize_log_output({"interfaceid": 1, "details": details})
+    assert macro["value"] == "supersecret"
+    assert details["community"] == "public"
+
+
 def test_sanatize_log_output_interface_secrets():
     data = {
         "interfaceid": 123,
@@ -374,3 +384,4 @@ class TestBuildPath:
             region("Leaf", 2, "North"),
         ]
         assert build_path("Leaf", records) == ["EU", "North", "Leaf"]
+
