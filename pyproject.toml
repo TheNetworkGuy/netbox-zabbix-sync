@@ -119,6 +119,15 @@ select = [
     "T201",
 ]
 
+[[tool.ty.overrides]]
+include = ["tests/**"]
+
+[tool.ty.overrides.rules]
+# Tests pass duck-typed fakes and MagicMocks where real objects are expected.
+invalid-argument-type = "ignore"
+# Tests index results that are Optional in general but known to be set there;
+# a None would fail the test anyway.
+not-subscriptable = "ignore"
 
 [dependency-groups]
 dev = ["pytest>=9.0.2", "pytest-cov>=7.0.0", "ruff>=0.14.14", "ty>=0.0.14"]

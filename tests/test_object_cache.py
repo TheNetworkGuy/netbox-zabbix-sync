@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from requests import Session
+from requests.adapters import HTTPAdapter
 
 from netbox_zabbix_sync.modules.api_clients import (
     ObjectCachingSession,
@@ -105,4 +106,6 @@ def test_netbox_api_uses_the_caching_session():
     api = RetryingNetBoxAPI("http://netbox.example", token="x")
     assert isinstance(api.http_session, ObjectCachingSession)
     # The retry adapter is mounted on the session that is actually used.
-    assert api.http_session.get_adapter("http://netbox.example").max_retries.total
+    adapter = api.http_session.get_adapter("http://netbox.example")
+    assert isinstance(adapter, HTTPAdapter)
+    assert adapter.max_retries.total
