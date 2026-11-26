@@ -59,6 +59,15 @@ class Sync:
         self.zabbix = None
         self.nb_version = None
 
+        default_config = DEFAULT_CONFIG.copy()
+
+        combined_config = {
+            **default_config,
+            **(config if config else {}),
+        }
+
+        self.config: dict[str, Any] = combined_config
+
         self.host_creates = HostCreateQueue(
             self.zabbix,
             self.logger,
@@ -77,15 +86,6 @@ class Sync:
             batch_size=self.config["zabbix_fetch_batch_size"],
         )
         self.journals = None
-
-        default_config = DEFAULT_CONFIG.copy()
-
-        combined_config = {
-            **default_config,
-            **(config if config else {}),
-        }
-
-        self.config: dict[str, Any] = combined_config
 
     def _combine_filters(self, config_filter, method_filter):
         """
