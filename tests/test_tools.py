@@ -8,6 +8,8 @@ from netbox_zabbix_sync.modules.tools import (
     build_path,
     cf_to_string,
     choice_value,
+    extend_ips,
+    fetch_ips,
     field_mapper,
     jinjafy_config_context,
     sanatize_log_output,
@@ -385,3 +387,48 @@ class TestBuildPath:
         ]
         assert build_path("Leaf", records) == ["EU", "North", "Leaf"]
 
+
+class _IP:
+    """A nested IP record: only its ID is known."""
+
+    def __init__(self, ip_id):
+        self.id = ip_id
+        self.full_details = MagicMock(name=f"full_details({ip_id})")
+
+
+class _Host:
+    """A record whose IP fields are plain attributes, as pynetbox sets them."""
+
+    def __init__(self, **ips):
+        for field, ip in ips.items():
+            setattr(self, field, ip)
+
+    def __getattr__(self, name):
+        # pynetbox fetches the whole object when asked for a field it lacks.
+        raise AssertionError(f"lazy load of {name}")
+
+
+def test_fetch_ips_fetches_each_ip_once_in_bulk():
+    shared = _IP(1)
+    hosts = [_Host(primary_ip=shared, primary_ip4=shared), _Host(primary_ip=_IP(2))]
+    netbox = MagicMock()
+    netbox.ipam.ip_addresses.filter.side_effect = lambda id: [
+        MagicMock(id=i) for i in id
+    ]
+
+    lookup = fetch_ips(netbox, hosts)
+
+    netbox.ipam.ip_addresses.filter.assert_called_once_with(id=[1, 2])
+    assert set(lookup) == {1, 2}
+
+
+def test_extend_ips_uses_the_lookup_and_fetches_the_rest():
+    known, unknown = _IP(1), _IP(2)
+    host = _Host(primary_ip=known, oob_ip=unknown)
+    full = MagicMock(name="full IP 1")
+
+    extend_ips(host, {1: full})
+
+    assert host.primary_ip is full
+    known.full_details.assert_not_called()
+    unknown.full_details.assert_called_once()

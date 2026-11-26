@@ -339,11 +339,44 @@ def sanatize_log_output(data):
     return sanitized_data
 
 
-def extend_ips(nb):
+IP_FIELDS = ("primary_ip", "primary_ip4", "primary_ip6", "oob_ip")
+
+
+def _ip_fields(nb):
+    """The IP records an object has set, by field name.
+
+    Read from the record's own attributes rather than with getattr: a field the
+    object type does not have (a VM has no oob_ip) would otherwise make pynetbox
+    fetch the whole object from NetBox to look for it.
     """
-    Extends IP fields for NetBox objects
+    present = vars(nb)
+    return {field: present[field] for field in IP_FIELDS if present.get(field)}
+
+
+def fetch_ips(netbox, objects, chunk_size: int = 100) -> dict:
     """
-    fields = ["primary_ip", "primary_ip4", "primary_ip6", "oob_ip"]
-    for field in fields:
-        if attr := getattr(nb, field, None):
-            attr.full_details()
+    Fetches the full IP records that the IP fields of many objects point to.
+
+    One list call per chunk replaces a detail call per IP.
+    @return: IP records by ID, to pass to extend_ips
+    """
+    ids = sorted({ip.id for nb in objects for ip in _ip_fields(nb).values()})
+    lookup = {}
+    for start in range(0, len(ids), chunk_size):
+        for ip in netbox.ipam.ip_addresses.filter(id=ids[start : start + chunk_size]):
+            lookup[ip.id] = ip
+    return lookup
+
+
+def extend_ips(nb, ip_lookup: dict | None = None):
+    """
+    Extends IP fields for NetBox objects.
+
+    IPs found in ip_lookup (full IP records by ID, see fetch_ips) are used as
+    they are; any other IP is fetched from NetBox.
+    """
+    for field, ip in _ip_fields(nb).items():
+        if ip_lookup and ip.id in ip_lookup:
+            setattr(nb, field, ip_lookup[ip.id])
+        else:
+            ip.full_details()

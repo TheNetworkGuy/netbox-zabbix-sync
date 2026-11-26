@@ -27,6 +27,7 @@ from netbox_zabbix_sync.modules.tools import (
     PROXY_GROUPS_MINIMUM_VERSION,
     convert_recordset,
     extend_ips,
+    fetch_ips,
     jinjafy_config_context,
     proxy_prepper,
     verify_hg_format,
@@ -467,6 +468,10 @@ class Sync:
             batch_size=self.config["netbox_batch_size"],
         )
         netbox_journals = self.journals
+        # With extended_ips, fetch every host's IPs in bulk rather than one by one.
+        ip_lookup = {}
+        if self.config["extended_ips"]:
+            ip_lookup = fetch_ips(self.netbox, [*netbox_devices, *netbox_vms])
         zabbix_groups = self.zabbix.hostgroup.get(  # type: ignore
             output=["groupid", "name"]
         )
@@ -521,7 +526,7 @@ class Sync:
                     nb_vm.site.full_details()
                 if self.config["extended_ips"]:
                     self.logger.debug("Host %s: Extending IP information.", vm.name)
-                    extend_ips(nb_vm)
+                    extend_ips(nb_vm, ip_lookup)
                 if not self._render_config_context(vm, nb_vm):
                     continue
                 vm.set_ips()
@@ -576,7 +581,7 @@ class Sync:
                             member.full_details()
                 if self.config["extended_ips"]:
                     self.logger.debug("Host %s: Extending IP information.", device.name)
-                    extend_ips(nb_device)
+                    extend_ips(nb_device, ip_lookup)
                 if not self._render_config_context(device, nb_device):
                     continue
                 device.set_ips()
