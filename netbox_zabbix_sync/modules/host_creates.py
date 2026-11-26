@@ -133,6 +133,7 @@ class HostCreateQueue:
                         },
                     }
                     for host in hosts
+                    if host.zabbix_id is not None
                 ]
             )
         except NetboxRequestError as e:

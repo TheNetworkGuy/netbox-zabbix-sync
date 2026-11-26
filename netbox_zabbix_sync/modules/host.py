@@ -7,7 +7,6 @@ from re import search
 from typing import Any
 
 from pynetbox import RequestError as NetboxRequestError
-from pynetbox.core.endpoint import Endpoint
 from pynetbox.core.response import Record
 from zabbix_utils import APIRequestError, ZabbixAPI
 
@@ -20,6 +19,7 @@ from netbox_zabbix_sync.modules.exceptions import (
 from netbox_zabbix_sync.modules.host_description import Description
 from netbox_zabbix_sync.modules.hostgroups import Hostgroup
 from netbox_zabbix_sync.modules.interface import ZabbixInterface
+from netbox_zabbix_sync.modules.journal import JournalQueue
 from netbox_zabbix_sync.modules.settings import load_config
 from netbox_zabbix_sync.modules.tags import ZabbixTags
 from netbox_zabbix_sync.modules.tools import (
@@ -53,7 +53,7 @@ class Host(ABC):
     zbxproxy: dict | None
     zabbix_state: int
     journal: bool
-    nb_journals: Endpoint
+    nb_journals: JournalQueue
     nb_object_type: str
     oob_ip: str | None
     inventory_mode: int
@@ -77,7 +77,7 @@ class Host(ABC):
         self,
         nb: Record,
         zabbix: ZabbixAPI,
-        nb_journal_class: Endpoint,
+        nb_journal_class: JournalQueue,
         nb_version: str,
         journal=False,
         logger=None,

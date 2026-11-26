@@ -58,10 +58,25 @@ class Sync:
         self.netbox = None
         self.zabbix = None
         self.nb_version = None
-        self.host_creates: HostCreateQueue | None = None
-        self.host_updates: HostUpdateQueue | None = None
-        self.journals: JournalQueue | None = None
-        self.zabbix_hosts: ZabbixHostLookup | None = None
+        
+        self.host_creates = HostCreateQueue(
+            self.zabbix,
+            self.logger,
+            batch_size=self.config["zabbix_create_batch_size"],
+            netbox_batch_size=self.config["netbox_batch_size"],
+        )
+        self.host_updates = HostUpdateQueue(
+            self.zabbix,
+            self.logger,
+            batch_size=self.config["zabbix_update_batch_size"],
+        )
+        self.zabbix_hosts = ZabbixHostLookup(
+            self.zabbix,
+            self.logger,
+            inventory_fields=self._inventory_fields(),
+            batch_size=self.config["zabbix_fetch_batch_size"],
+        )
+        self.journals = None
 
         default_config = DEFAULT_CONFIG.copy()
 
@@ -161,6 +176,13 @@ class Sync:
             self.logger.debug("NetBox version is %s.", nb_version)
             self.netbox = netbox
             self.nb_version = str(nb_version)
+
+            self.journals = JournalQueue(
+                self.netbox.extras.journal_entries,
+                self.logger,
+                batch_size=self.config["netbox_batch_size"],
+            )
+
         except RequestsConnectionError as e:
             self.logger.error(
                 "Unable to connect to NetBox with URL %s. Please check the URL and status of NetBox. %s",
