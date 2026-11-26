@@ -92,6 +92,11 @@ DEFAULT_CONFIG = {
     "description": "static",
     "render_config_context": False,
     "skip_version_check": False,
+    "zabbix_fetch_batch_size": 100,
+    "zabbix_create_batch_size": 50,
+    "zabbix_update_batch_size": 100,
+    "netbox_batch_size": 100,
+    "netbox_threading": True,
     "log_file": None,
     "log_rotation": True,
     "log_console": True,
@@ -117,16 +122,21 @@ def load_config(config_file=None):
 
 def parse_env_value(key, value):
     """
-    Converts the text of an environment variable for boolean settings.
+    Converts the text of an environment variable for boolean and integer settings.
     Other values, such as "full" for usermacro_sync or a custom field
     name for proxy_cf, are returned unchanged.
     """
-    if not isinstance(value, str) or not isinstance(DEFAULT_CONFIG.get(key), bool):
+    if not isinstance(value, str):
         return value
-    if value.strip().lower() in ("true", "1", "yes", "on"):
-        return True
-    if value.strip().lower() in ("false", "0", "no", "off"):
-        return False
+    default = DEFAULT_CONFIG.get(key)
+    text = value.strip()
+    if isinstance(default, bool):
+        booleans = {"true": True, "1": True, "yes": True, "on": True}
+        booleans |= {"false": False, "0": False, "no": False, "off": False}
+        return booleans.get(text.lower(), value)
+    # bool is a subclass of int, so booleans are handled above.
+    if isinstance(default, int) and text.lstrip("-").isdigit():
+        return int(text)
     return value
 
 

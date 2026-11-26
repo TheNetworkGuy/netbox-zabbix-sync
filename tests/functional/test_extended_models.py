@@ -42,10 +42,6 @@ from tests.functional.conftest import macro_values
 
 INVENTORY_MANUAL_CONFIG = {"inventory_sync": True, "inventory_mode": "manual"}
 
-# Devices synced by test_site_costs_one_fetch_per_host_either_way, which
-# expects the site to be fetched exactly once for each of them.
-SYNCED_HOSTS = 2
-
 
 def site_detail_requests(exchanges, site_id: int):
     """The recorded requests that fetched this site's full details."""
@@ -152,21 +148,20 @@ def test_site_geo_synced_with_extended_site_properties(
 
 
 @pytest.mark.parametrize("extended", [False, True], ids=["flag-off", "flag-on"])
-def test_site_costs_one_fetch_per_host_either_way(
+def test_site_costs_one_fetch_per_run_either_way(
     device_factory, seeded, sync_runner, netbox_requests, zabbix_host, extended
 ):
-    """The site is fetched once per host whether the flag is set or not.
+    """A site shared by several hosts is fetched once per run, flag or not.
 
-    The measured cost of `extended_site_properties` on devices, and it is
-    nothing: two devices, two site fetches, with the flag off and with it on.
-    Each device deserialises its own site Record, so `has_details` is not
-    shared and there is no run-level caching to lose -- the flag simply moves
-    who triggers the fetch, from `Hostgroup` to `core.start`.
+    Each device deserialises its own site Record, so pynetbox's `has_details`
+    is not shared between them and on its own would fetch the site once per
+    host. The run-level object cache (ObjectCachingSession) answers every fetch
+    after the first, so two devices on one site cost one site fetch, with the
+    flag off and with it on -- the flag only moves who triggers the fetch, from
+    `Hostgroup` to `core.start`.
 
     Which means the config file's warning that this setting "will increase the
-    number of API queries" does not describe devices. It is also the N+1 this
-    would need if the fetch ever became conditional: one site, one request per
-    host.
+    number of API queries" does not describe devices.
     """
     first = device_factory(address="10.0.0.102/24")
     second = device_factory(address="10.0.0.103/24")
@@ -180,7 +175,7 @@ def test_site_costs_one_fetch_per_host_either_way(
 
     assert zabbix_host(first.name) is not None
     assert zabbix_host(second.name) is not None
-    assert len(site_detail_requests(netbox_requests, seeded["site"].id)) == SYNCED_HOSTS
+    assert len(site_detail_requests(netbox_requests, seeded["site"].id)) == 1
 
 
 # --- extended_virtual_chassis -----------------------------------------------

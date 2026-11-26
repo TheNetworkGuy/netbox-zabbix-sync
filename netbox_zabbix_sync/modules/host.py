@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from copy import deepcopy
 from logging import Logger, getLogger
 from operator import itemgetter
@@ -6,7 +7,6 @@ from re import search
 from typing import Any
 
 from pynetbox import RequestError as NetboxRequestError
-from pynetbox.core.endpoint import Endpoint
 from pynetbox.core.response import Record
 from zabbix_utils import APIRequestError, ZabbixAPI
 
@@ -19,6 +19,7 @@ from netbox_zabbix_sync.modules.exceptions import (
 from netbox_zabbix_sync.modules.host_description import Description
 from netbox_zabbix_sync.modules.hostgroups import Hostgroup
 from netbox_zabbix_sync.modules.interface import ZabbixInterface
+from netbox_zabbix_sync.modules.journal import JournalQueue
 from netbox_zabbix_sync.modules.settings import load_config
 from netbox_zabbix_sync.modules.tags import ZabbixTags
 from netbox_zabbix_sync.modules.tools import (
@@ -30,6 +31,7 @@ from netbox_zabbix_sync.modules.tools import (
     sanatize_log_output,
 )
 from netbox_zabbix_sync.modules.usermacros import ZabbixUsermacros
+from netbox_zabbix_sync.modules.zabbix_hosts import host_query
 
 
 class Host(ABC):
@@ -39,6 +41,7 @@ class Host(ABC):
 
     nb: Record
     zabbix: Any
+    zabbix_obj: dict | None
 
     id: str
     name: str
@@ -50,7 +53,7 @@ class Host(ABC):
     zbxproxy: dict | None
     zabbix_state: int
     journal: bool
-    nb_journals: Endpoint
+    nb_journals: JournalQueue
     nb_object_type: str
     oob_ip: str | None
     inventory_mode: int
@@ -61,6 +64,7 @@ class Host(ABC):
     logger: Logger
 
     zabbix_id: str | None
+    pending_update: dict[str, Any]
     group_ids: list[dict]
     zbx_template_names: list[str] | None
     zbx_templates: list[dict]
@@ -73,7 +77,7 @@ class Host(ABC):
         self,
         nb: Record,
         zabbix: ZabbixAPI,
-        nb_journal_class: Endpoint,
+        nb_journal_class: JournalQueue,
         nb_version: str,
         journal=False,
         logger=None,
@@ -86,8 +90,10 @@ class Host(ABC):
         self.visible_name = None
         self.status = nb.status.label
         self.zabbix = zabbix
+        self.zabbix_obj = None
         self.zabbix_id = None
         self.group_ids = []
+        self.pending_update: dict[str, Any] = {}
         self.nb_api_version = nb_version
         self.zbx_template_names = []
         self.zbx_templates = []
@@ -686,105 +692,148 @@ class Host(ABC):
     ):
         """
         Creates Zabbix host object with parameters from NetBox object.
-        """
-        interfaces = []
-        # Check if hostname is already present in Zabbix
-        if not self._zabbix_hostname_exists():
-            # Set group and template ID's for host
-            if not self.set_zbx_groupid(groups):
-                e = (
-                    f"Unable to find group '{self.hostgroups}' "
-                    f"for host {self.name} in Zabbix."
-                )
-                self.logger.warning(e)
-                raise SyncInventoryError(e)
-            self.zbx_template_prepper(templates)
-            templateids = []
-            for template in self.zbx_templates:
-                templateids.append({"templateid": template["templateid"]})
-            # Setup interfaces
-            if self.ip or self.dns:
-                interfaces.append(self.set_interface_details())
-            if self.config["oob_sync"] and (self.oob_ip or self.oob_dns):
-                interfaces.append(self.set_interface_details(oob=True))
-            # remove any none type interfaces
-            for interface in interfaces:
-                if not interface["type"]:
-                    interfaces.remove(interface)
-            if not self._verify_interfaces(interfaces):
-                e = f"Inconsistent interface configuration for host {self.name}."
-                self.logger.error(e)
-                raise SyncInventoryError(e)
-            # Set Zabbix proxy if defined
-            self._set_proxy(proxies)
-            # Set description
-            description_handler = Description(
-                self.nb,
-                self.config,
-                logger=self.logger,
-                nb_version=self.nb_api_version,
-            )
-            description = description_handler.generate()
-            # Set basic data for host creation
-            create_data = {
-                "host": self.name,
-                "name": self.visible_name,
-                "status": self.zabbix_state,
-                "interfaces": interfaces,
-                "groups": self.group_ids,
-                "templates": templateids,
-                "description": description,
-                "inventory_mode": self.inventory_mode,
-                "inventory": self.inventory,
-                "macros": self.usermacros,
-                "tags": self.tags,
-            }
-            # Add IPMI parameters if set
-            if self.ipmi:
-                create_data["ipmi_username"] = self.ipmi.get("username")
-                create_data["ipmi_password"] = self.ipmi.get("password")
-                if "authtype" in self.ipmi:
-                    create_data["ipmi_authtype"] = self.ipmi.get("authtype")
-                if "privilege" in self.ipmi:
-                    create_data["ipmi_privilege"] = self.ipmi.get("privilege")
 
-            # If a Zabbix proxy or Zabbix Proxy group has been defined
-            if self.zbxproxy:
-                # If a lower version than 7 is used, we can assume that
-                # the proxy is a normal proxy and not a proxy group
-                if not self.zabbix.version >= PROXY_GROUPS_MINIMUM_VERSION:
-                    create_data["proxy_hostid"] = self.zbxproxy["id"]
-                else:
-                    # Configure either a proxy or proxy group
-                    create_data[self.zbxproxy["idtype"]] = self.zbxproxy["id"]
-                    create_data["monitored_by"] = self.zbxproxy["monitored_by"]
-            # Add host to Zabbix
-            try:
-                host = self.zabbix.host.create(**create_data)
-                self.zabbix_id = host["hostids"][0]
-            except APIRequestError as e:
-                msg = f"Host {self.name}: Couldn't create. Zabbix returned {e}."
-                self.logger.error(msg)
-                raise SyncExternalError(msg) from e
-            # Log host creation
-            msg = f"Host {self.name}: Created host in Zabbix. (ID:{self.zabbix_id})"
-            self.logger.info(msg)
-            self.create_journal_entry("success", msg)
-            # Set NetBox custom field to hostID value.
-            self.nb.custom_fields[self.config["device_cf"]] = int(self.zabbix_id)
-            try:
-                self.nb.save()
-            except NetboxRequestError as e:
-                msg = (
-                    f"Host {self.name}: Unable to update custom field "
-                    f"{self.config['device_cf']} in NetBox with value {int(self.zabbix_id)}. "
-                    f"NetBox returned {e}."
-                )
-                self.logger.error(msg)
-        else:
+        Creates this host on its own. A sync run queues its hosts in a
+        HostCreateQueue instead, which creates them in batches.
+        """
+        create_data = self.prepare_create(groups, templates, proxies)
+        if create_data is None:
+            return
+        try:
+            host = self.zabbix.host.create(**create_data)
+        except APIRequestError as e:
+            raise SyncExternalError(self.log_create_failure(e)) from e
+        self.created(host["hostids"][0])
+        self.save_zabbix_id()
+
+    def prepare_create(
+        self,
+        groups: list[dict],
+        templates: list[dict],
+        proxies: list[dict],
+        name_exists: Callable[["Host"], bool] | None = None,
+    ) -> dict | None:
+        """
+        Builds the host.create parameters for this host.
+
+        :param name_exists: Checks whether Zabbix already has a host by this
+            name. Defaults to asking Zabbix for this host alone.
+        :return: The parameters, or None when Zabbix already has the host.
+        """
+        exists = name_exists(self) if name_exists else self._zabbix_hostname_exists()
+        if exists:
             self.logger.error(
                 "Host %s: Unable to add to Zabbix. Host already present.", self.name
             )
+            return None
+        interfaces = []
+        # Set group and template ID's for host
+        if not self.set_zbx_groupid(groups):
+            e = (
+                f"Unable to find group '{self.hostgroups}' "
+                f"for host {self.name} in Zabbix."
+            )
+            self.logger.warning(e)
+            raise SyncInventoryError(e)
+        self.zbx_template_prepper(templates)
+        templateids = []
+        for template in self.zbx_templates:
+            templateids.append({"templateid": template["templateid"]})
+        # Setup interfaces
+        if self.ip or self.dns:
+            interfaces.append(self.set_interface_details())
+        if self.config["oob_sync"] and (self.oob_ip or self.oob_dns):
+            interfaces.append(self.set_interface_details(oob=True))
+        # remove any none type interfaces
+        for interface in interfaces:
+            if not interface["type"]:
+                interfaces.remove(interface)
+        if not self._verify_interfaces(interfaces):
+            e = f"Inconsistent interface configuration for host {self.name}."
+            self.logger.error(e)
+            raise SyncInventoryError(e)
+        # Set Zabbix proxy if defined
+        self._set_proxy(proxies)
+        # Set description
+        description_handler = Description(
+            self.nb,
+            self.config,
+            logger=self.logger,
+            nb_version=self.nb_api_version,
+        )
+        description = description_handler.generate()
+        # Set basic data for host creation
+        create_data = {
+            "host": self.name,
+            "name": self.visible_name,
+            "status": self.zabbix_state,
+            "interfaces": interfaces,
+            "groups": self.group_ids,
+            "templates": templateids,
+            "description": description,
+            "inventory_mode": self.inventory_mode,
+            "inventory": self.inventory,
+            "macros": self.usermacros,
+            "tags": self.tags,
+        }
+        # Add IPMI parameters if set
+        if self.ipmi:
+            create_data["ipmi_username"] = self.ipmi.get("username")
+            create_data["ipmi_password"] = self.ipmi.get("password")
+            if "authtype" in self.ipmi:
+                create_data["ipmi_authtype"] = self.ipmi.get("authtype")
+            if "privilege" in self.ipmi:
+                create_data["ipmi_privilege"] = self.ipmi.get("privilege")
+
+        # If a Zabbix proxy or Zabbix Proxy group has been defined
+        if self.zbxproxy:
+            # If a lower version than 7 is used, we can assume that
+            # the proxy is a normal proxy and not a proxy group
+            if not self.zabbix.version >= PROXY_GROUPS_MINIMUM_VERSION:
+                create_data["proxy_hostid"] = self.zbxproxy["id"]
+            else:
+                # Configure either a proxy or proxy group
+                create_data[self.zbxproxy["idtype"]] = self.zbxproxy["id"]
+                create_data["monitored_by"] = self.zbxproxy["monitored_by"]
+        return create_data
+
+    def log_create_failure(self, error) -> str:
+        """Log that Zabbix refused to create this host and return the message."""
+        msg = f"Host {self.name}: Couldn't create. Zabbix returned {error}."
+        self.logger.error(msg)
+        return msg
+
+    def created(self, hostid) -> None:
+        """
+        Record that Zabbix created this host.
+
+        Sets the host ID on the NetBox object, but does not save it: see
+        save_zabbix_id, or the bulk write-back of HostCreateQueue.
+        """
+        self.zabbix_id = hostid
+        msg = f"Host {self.name}: Created host in Zabbix. (ID:{self.zabbix_id})"
+        self.logger.info(msg)
+        self.create_journal_entry("success", msg)
+        # Set NetBox custom field to hostID value.
+        self.nb.custom_fields[self.config["device_cf"]] = int(self.zabbix_id)
+
+    def save_zabbix_id(self) -> None:
+        """Save the Zabbix host ID to the NetBox custom field of this host."""
+        try:
+            self.nb.save()
+        except NetboxRequestError as e:
+            self.log_save_failure(e)
+
+    def log_save_failure(self, error) -> None:
+        """Log that NetBox refused the Zabbix host ID of this host."""
+        self.logger.error(
+            "Host %s: Unable to update custom field %s in NetBox with value %s. "
+            "NetBox returned %s.",
+            self.name,
+            self.config["device_cf"],
+            self.zabbix_id,
+            error,
+        )
 
     def create_zbx_hostgroup(self, hostgroups):
         """
@@ -826,22 +875,46 @@ class Host(ABC):
 
     def update_zabbix_host(self, **kwargs):
         """
-        Updates Zabbix host with given parameters.
+        Queues an update of the Zabbix host with the given parameters.
+
+        Nothing is sent to Zabbix here: the changes found by consistency_check
+        are merged into one pending update, which a HostUpdateQueue sends to
+        Zabbix together with the updates of other hosts.
         INPUT: Key word arguments for Zabbix host object.
         """
-        try:
-            self.zabbix.host.update(hostid=self.zabbix_id, **kwargs)
-        except APIRequestError as e:
+        self.pending_update.update(kwargs)
+        self.logger.debug("Host %s: queued update of %s.", self.name, ", ".join(kwargs))
+
+    def _get_zabbix_host(self) -> dict:
+        """
+        The Zabbix host this host is linked to, as consistency_check compares it.
+
+        A sync run fetches these in batches and sets zabbix_obj beforehand (see
+        ZabbixHostLookup). Without it, the host is fetched here on its own.
+        """
+        if self.zabbix_obj is not None:
+            return self.zabbix_obj
+        hosts = self.zabbix.host.get(
+            filter={"hostid": self.zabbix_id},
+            **host_query(self._inventory_map().values()),
+        )
+        if len(hosts) > 1:
             e = (
-                f"Host {self.name}: Unable to update. "
-                f"Zabbix returned the following error: {e}."
+                f"Got {len(hosts)} results for Zabbix hosts "
+                f"with ID {self.zabbix_id} - hostname {self.name}."
             )
             self.logger.error(e)
-            raise SyncExternalError(e) from None
-        self.logger.info(
-            "Host %s: updated with data %s.", self.name, sanatize_log_output(kwargs)
-        )
-        self.create_journal_entry("info", "Updated host in Zabbix with latest NB data.")
+            raise SyncInventoryError(e)
+        if not hosts:
+            e = (
+                f"Host {self.name}: No Zabbix host found. "
+                f"This is likely the result of a deleted Zabbix host "
+                f"without zeroing the ID field in NetBox."
+            )
+            self.logger.error(e)
+            raise SyncInventoryError(e)
+        self.zabbix_obj = hosts[0]
+        return self.zabbix_obj
 
     def consistency_check(
         self, groups, templates, proxies, proxy_power, create_hostgroups
@@ -874,40 +947,7 @@ class Host(ABC):
         self.zbx_template_prepper(templates)
         self._set_proxy(proxies)
         # Get host object from Zabbix
-        host = self.zabbix.host.get(
-            filter={"hostid": self.zabbix_id},
-            selectInterfaces=[
-                "type",
-                "ip",
-                "useip",
-                "dns",
-                "port",
-                "details",
-                "interfaceid",
-            ],
-            selectGroups=["groupid"],
-            selectHostGroups=["groupid"],
-            selectParentTemplates=["templateid"],
-            selectInventory=list(self._inventory_map().values()),
-            selectMacros=["macro", "value", "type", "description"],
-            selectTags=["tag", "value"],
-        )
-        if len(host) > 1:
-            e = (
-                f"Got {len(host)} results for Zabbix hosts "
-                f"with ID {self.zabbix_id} - hostname {self.name}."
-            )
-            self.logger.error(e)
-            raise SyncInventoryError(e)
-        if len(host) == 0:
-            e = (
-                f"Host {self.name}: No Zabbix host found. "
-                f"This is likely the result of a deleted Zabbix host "
-                f"without zeroing the ID field in NetBox."
-            )
-            self.logger.error(e)
-            raise SyncInventoryError(e)
-        host = host[0]
+        host = self._get_zabbix_host()
         if host["host"] == self.name:
             self.logger.debug("Host %s: Hostname in-sync.", self.name)
         else:
@@ -1051,7 +1091,15 @@ class Host(ABC):
             self.update_zabbix_host(inventory_mode=str(self.inventory_mode))
         if self.config["inventory_sync"] and self.inventory_mode in [0, 1]:
             # Check host inventory mapping
-            if host["inventory"] == self.inventory:
+            # A batched fetch also carries the inventory fields of the other
+            # host type's map. Zabbix sends a list when inventory is disabled.
+            mapped = set(self._inventory_map().values())
+            zabbix_inventory = host.get("inventory") or {}
+            if isinstance(zabbix_inventory, dict):
+                zabbix_inventory = {
+                    k: v for k, v in zabbix_inventory.items() if k in mapped
+                }
+            if zabbix_inventory == self.inventory:
                 self.logger.debug("Host %s: Inventory in-sync.", self.name)
             else:
                 self.logger.info("Host %s: Inventory OUT of sync.", self.name)

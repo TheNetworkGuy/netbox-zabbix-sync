@@ -96,6 +96,30 @@ class TestSyncNetboxConnection(unittest.TestCase):
         self.assertFalse(result)
 
 
+class TestNetboxThreading(unittest.TestCase):
+    """Test that the netbox_threading setting reaches the NetBox API client."""
+
+    def _connect(self, config=None):
+        with patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI") as mock_api:
+            # Stop connect() right after the client is built.
+            type(mock_api.return_value).version = property(
+                lambda self: (_ for _ in ()).throw(RequestsConnectionError())
+            )
+            Sync(config).connect(
+                nb_host="http://netbox.local",
+                nb_token="token",
+                zbx_host="http://zabbix.local",
+                zbx_token="token",
+            )
+        return mock_api.call_args.kwargs["threading"]
+
+    def test_threading_enabled_by_default(self):
+        self.assertIs(self._connect(), True)
+
+    def test_threading_can_be_disabled(self):
+        self.assertIs(self._connect({"netbox_threading": False}), False)
+
+
 class TestZabbixUserTokenConflict(unittest.TestCase):
     """Test that sync returns False when both ZABBIX_USER/PASS and ZABBIX_TOKEN are set."""
 
@@ -914,6 +938,88 @@ class TestDeviceStatusHandling(unittest.TestCase):
         syncer.start()
 
         mock_zabbix.host.update.assert_called_once_with(hostid=42, status="1")
+
+    # ------------------------------------------------------------------
+    # Scenario 9: several devices are fetched and updated in one call each
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
+    def test_devices_are_fetched_and_updated_in_batches(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Updates are collected over the run and sent in batches."""
+        devices = [
+            self.netbox.device(
+                name=f"test-device-{hostid}",
+                status="Failed",
+                custom_fields={"zabbix_hostid": hostid},
+            )
+            for hostid in (42, 43)
+        ]
+        netbox_mock(mock_api, self.netbox, devices=devices)
+        mock_zabbix = zabbix_mock(mock_zabbix_api, hostgroup=self.EXPECTED_HOSTGROUP)
+
+        def host_get(**kwargs):
+            if "filter" not in kwargs or "hostid" not in kwargs["filter"]:
+                return []
+            ids = kwargs["filter"]["hostid"]
+            ids = ids if isinstance(ids, list) else [ids]
+            return [
+                zabbix_host(hostname=f"test-device-{i}", status="0", hostid=str(i))[0]
+                for i in ids
+            ]
+
+        mock_zabbix.host.get.side_effect = host_get
+
+        syncer = Sync()
+        connect(syncer)
+        syncer.start()
+
+        mock_zabbix.host.update.assert_called_once_with(
+            [{"hostid": 42, "status": "1"}, {"hostid": 43, "status": "1"}]
+        )
+        # Both hosts were fetched for their consistency check in one call.
+        mock_zabbix.host.get.assert_called_once()
+        self.assertEqual(
+            mock_zabbix.host.get.call_args.kwargs["filter"], {"hostid": ["42", "43"]}
+        )
+
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
+    def test_inventory_of_the_other_host_type_is_not_compared(
+        self, mock_api, mock_zabbix_api
+    ):
+        """The batched fetch selects the device and VM map fields alike.
+
+        A device's check compares only the fields of the device map, so the VM
+        map's field in the response does not put its inventory out of sync.
+        """
+        device = self.netbox.device(
+            name="test-device", status="Active", custom_fields={"zabbix_hostid": 42}
+        )
+        netbox_mock(mock_api, self.netbox, devices=[device])
+        mock_zabbix = zabbix_mock(mock_zabbix_api, hostgroup=self.EXPECTED_HOSTGROUP)
+        host = zabbix_host(status="0")
+        host[0]["inventory_mode"] = "0"
+        host[0]["inventory"] = {"name": "test-device", "alias": "vm-cluster"}
+        mock_zabbix.host.get.return_value = host
+
+        syncer = Sync(
+            {
+                "sync_vms": True,
+                "inventory_sync": True,
+                "inventory_mode": "manual",
+                "device_inventory_map": {"name": "name"},
+                "vm_inventory_map": {"cluster/name": "alias"},
+            }
+        )
+        connect(syncer)
+        syncer.start()
+
+        self.assertEqual(
+            mock_zabbix.host.get.call_args.kwargs["selectInventory"], ["alias", "name"]
+        )
+        mock_zabbix.host.update.assert_not_called()
 
 
 class TestVMStatusHandling(unittest.TestCase):

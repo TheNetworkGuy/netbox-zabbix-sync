@@ -1,7 +1,7 @@
 """Core component of the sync process"""
 
 import ssl
-from logging import Logger
+from logging import DEBUG, Logger
 from os import environ
 from pprint import pformat
 from typing import Any
@@ -10,21 +10,30 @@ from pynetbox.core.query import RequestError as NetBoxRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError
 
-from netbox_zabbix_sync.modules.api_clients import RetryingNetBoxAPI, RetryingZabbixAPI
+from netbox_zabbix_sync.modules.api_clients import (
+    ObjectCachingSession,
+    RetryingNetBoxAPI,
+    RetryingZabbixAPI,
+)
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
 from netbox_zabbix_sync.modules.host import Host
+from netbox_zabbix_sync.modules.host_creates import HostCreateQueue
+from netbox_zabbix_sync.modules.host_updates import HostUpdateQueue
+from netbox_zabbix_sync.modules.journal import JournalQueue
 from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
     PROXY_GROUPS_MINIMUM_VERSION,
     convert_recordset,
     extend_ips,
+    fetch_ips,
     jinjafy_config_context,
     proxy_prepper,
     verify_hg_format,
 )
 from netbox_zabbix_sync.modules.virtual_machine import VirtualMachine
+from netbox_zabbix_sync.modules.zabbix_hosts import ZabbixHostLookup
 
 
 class Sync:
@@ -58,6 +67,25 @@ class Sync:
         }
 
         self.config: dict[str, Any] = combined_config
+
+        self.host_creates = HostCreateQueue(
+            self.zabbix,
+            self.logger,
+            batch_size=self.config["zabbix_create_batch_size"],
+            netbox_batch_size=self.config["netbox_batch_size"],
+        )
+        self.host_updates = HostUpdateQueue(
+            self.zabbix,
+            self.logger,
+            batch_size=self.config["zabbix_update_batch_size"],
+        )
+        self.zabbix_hosts = ZabbixHostLookup(
+            self.zabbix,
+            self.logger,
+            inventory_fields=self._inventory_fields(),
+            batch_size=self.config["zabbix_fetch_batch_size"],
+        )
+        self.journals = None
 
     def _combine_filters(self, config_filter, method_filter):
         """
@@ -133,7 +161,12 @@ class Sync:
         :param skip_version_check: Whether to skip version checking
         """
         # Initialize Netbox API connection
-        netbox = RetryingNetBoxAPI(nb_host, token=nb_token, threading=True)
+        # With threading, pynetbox fetches the pages of a paginated list in parallel.
+        netbox = RetryingNetBoxAPI(
+            nb_host,
+            token=nb_token,
+            threading=bool(self.config["netbox_threading"]),
+        )
         try:
             # Get NetBox version
             nb_version = netbox.version
@@ -143,6 +176,13 @@ class Sync:
             self.logger.debug("NetBox version is %s.", nb_version)
             self.netbox = netbox
             self.nb_version = str(nb_version)
+
+            self.journals = JournalQueue(
+                self.netbox.extras.journal_entries,
+                self.logger,
+                batch_size=self.config["netbox_batch_size"],
+            )
+
         except RequestsConnectionError as e:
             self.logger.error(
                 "Unable to connect to NetBox with URL %s. Please check the URL and status of NetBox. %s",
@@ -205,6 +245,43 @@ class Sync:
             self.logger.debug("Logged out from Zabbix API.")
             return True
         return False
+
+    def _object_cache(self, enabled: bool) -> None:
+        """Turn the NetBox object cache on (emptied) or off for a sync run."""
+        session = getattr(self.netbox, "http_session", None)
+        if not isinstance(session, ObjectCachingSession):
+            return
+        if enabled:
+            session.enable_cache()
+        else:
+            session.disable_cache()
+
+    def _inventory_fields(self) -> set[str]:
+        """The Zabbix inventory fields the consistency checks compare."""
+        if not self.config["inventory_sync"]:
+            return set()
+        fields = set()
+        if self.config["sync_devices"]:
+            fields.update(self.config["device_inventory_map"].values())
+        if self.config["sync_vms"]:
+            fields.update(self.config["vm_inventory_map"].values())
+        return fields
+
+    def _linked_hostids(self, nb_objects) -> list:
+        """
+        Zabbix host IDs of the NetBox objects that get a consistency check.
+
+        Objects in a removal state are left out: their host is deleted rather
+        than checked. A secondary cluster member is still listed, which costs a
+        host in the batch fetch at most.
+        """
+        cf = self.config["device_cf"]
+        return [
+            nb.custom_fields.get(cf)
+            for nb in nb_objects
+            if nb.custom_fields.get(cf)
+            and nb.status.label not in self.config["zabbix_device_removal"]
+        ]
 
     def _render_config_context(self, host, nb_obj):
         """
@@ -305,15 +382,28 @@ class Sync:
                 zabbix_groups.append(group)
 
         if host.zabbix_id:
-            host.consistency_check(
-                zabbix_groups,
-                zabbix_templates,
-                zabbix_proxy_list,
-                self.config["full_proxy_sync"],
-                self.config["create_hostgroups"],
-            )
+            host.zabbix_obj = self.zabbix_hosts.get(host.zabbix_id)
+            try:
+                host.consistency_check(
+                    zabbix_groups,
+                    zabbix_templates,
+                    zabbix_proxy_list,
+                    self.config["full_proxy_sync"],
+                    self.config["create_hostgroups"],
+                )
+            finally:
+                # Changes found before a check failed part-way are still sent,
+                # as they were when every change was pushed to Zabbix at once.
+                self.host_updates.add(host)
             return
-        host.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
+        create_data = host.prepare_create(
+            zabbix_groups,
+            zabbix_templates,
+            zabbix_proxy_list,
+            name_exists=self.host_creates.name_exists,
+        )
+        if create_data is not None:
+            self.host_creates.add(host, create_data)
 
     def start(self, device_filter=None, vm_filter=None):
         """
@@ -328,6 +418,22 @@ class Sync:
         if not self.nb_version:
             self.logger.error("NetBox version is not set. Cannot proceed with sync.")
             return False
+
+        # Related NetBox objects are fetched once per run instead of per host.
+        self._object_cache(enabled=True)
+        # New hosts are created in batches.
+        self.host_creates = HostCreateQueue(
+            self.zabbix,
+            self.logger,
+            batch_size=self.config["zabbix_create_batch_size"],
+            netbox_batch_size=self.config["netbox_batch_size"],
+        )
+        # Host updates found by the consistency checks are sent in batches.
+        self.host_updates = HostUpdateQueue(
+            self.zabbix,
+            self.logger,
+            batch_size=self.config["zabbix_update_batch_size"],
+        )
 
         device_cfs = []
         vm_cfs = []
@@ -382,7 +488,17 @@ class Sync:
         netbox_site_groups = convert_recordset(self.netbox.dcim.site_groups.all())
         netbox_regions = convert_recordset(self.netbox.dcim.regions.all())
         netbox_roles = convert_recordset(self.netbox.dcim.device_roles.all())
-        netbox_journals = self.netbox.extras.journal_entries
+        # Journal entries are collected and created in bulk.
+        self.journals = JournalQueue(
+            self.netbox.extras.journal_entries,
+            self.logger,
+            batch_size=self.config["netbox_batch_size"],
+        )
+        netbox_journals = self.journals
+        # With extended_ips, fetch every host's IPs in bulk rather than one by one.
+        ip_lookup = {}
+        if self.config["extended_ips"]:
+            ip_lookup = fetch_ips(self.netbox, [*netbox_devices, *netbox_vms])
         zabbix_groups = self.zabbix.hostgroup.get(  # type: ignore
             output=["groupid", "name"]
         )
@@ -408,6 +524,17 @@ class Sync:
         # Prepare list of all proxy and proxy_groups
         zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
 
+        # The linked Zabbix hosts are fetched in batches, in the order below.
+        self.zabbix_hosts = ZabbixHostLookup(
+            self.zabbix,
+            self.logger,
+            inventory_fields=self._inventory_fields(),
+            batch_size=self.config["zabbix_fetch_batch_size"],
+        )
+        self.zabbix_hosts.plan(
+            [*self._linked_hostids(netbox_vms), *self._linked_hostids(netbox_devices)]
+        )
+
         for nb_vm in netbox_vms:
             try:
                 vm = VirtualMachine(
@@ -426,7 +553,7 @@ class Sync:
                     nb_vm.site.full_details()
                 if self.config["extended_ips"]:
                     self.logger.debug("Host %s: Extending IP information.", vm.name)
-                    extend_ips(nb_vm)
+                    extend_ips(nb_vm, ip_lookup)
                 if not self._render_config_context(vm, nb_vm):
                     continue
                 vm.set_ips()
@@ -437,9 +564,11 @@ class Sync:
                     netbox_regions,
                     netbox_roles,
                 )
-                self.logger.debug(
-                    "Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm))
-                )
+                # Formatting the record is costly, so only do it when it is logged.
+                if self.logger.isEnabledFor(DEBUG):
+                    self.logger.debug(
+                        "Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm))
+                    )
                 if not vm.zbx_template_names:
                     continue
                 if not vm.hostgroups:
@@ -481,7 +610,7 @@ class Sync:
                             member.full_details()
                 if self.config["extended_ips"]:
                     self.logger.debug("Host %s: Extending IP information.", device.name)
-                    extend_ips(nb_device)
+                    extend_ips(nb_device, ip_lookup)
                 if not self._render_config_context(device, nb_device):
                     continue
                 device.set_ips()
@@ -496,9 +625,13 @@ class Sync:
                     netbox_roles,
                 )
                 device.set_ipmi()
-                self.logger.debug(
-                    "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
-                )
+                # Formatting the record is costly, so only do it when it is logged.
+                if self.logger.isEnabledFor(DEBUG):
+                    self.logger.debug(
+                        "Host %s: NetBox data:\n%s",
+                        device.name,
+                        pformat(dict(nb_device)),
+                    )
                 if not device.zbx_template_names:
                     continue
                 if not device.hostgroups:
@@ -529,4 +662,10 @@ class Sync:
                 )
             except SyncError:
                 pass
+        # Send what is still waiting for a full batch. Journals go last, as
+        # the host creates and updates add entries of their own.
+        self.host_creates.flush()
+        self.host_updates.flush()
+        self.journals.flush()
+        self._object_cache(enabled=False)
         return True
