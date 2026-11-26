@@ -63,6 +63,7 @@ class Host(ABC):
     logger: Logger
 
     zabbix_id: str | None
+    pending_update: dict[str, Any]
     group_ids: list[dict]
     zbx_template_names: list[str] | None
     zbx_templates: list[dict]
@@ -91,6 +92,7 @@ class Host(ABC):
         self.zabbix_obj = None
         self.zabbix_id = None
         self.group_ids = []
+        self.pending_update: dict[str, Any] = {}
         self.nb_api_version = nb_version
         self.zbx_template_names = []
         self.zbx_templates = []
@@ -829,22 +831,15 @@ class Host(ABC):
 
     def update_zabbix_host(self, **kwargs):
         """
-        Updates Zabbix host with given parameters.
+        Queues an update of the Zabbix host with the given parameters.
+
+        Nothing is sent to Zabbix here: the changes found by consistency_check
+        are merged into one pending update, which a HostUpdateQueue sends to
+        Zabbix together with the updates of other hosts.
         INPUT: Key word arguments for Zabbix host object.
         """
-        try:
-            self.zabbix.host.update(hostid=self.zabbix_id, **kwargs)
-        except APIRequestError as e:
-            e = (
-                f"Host {self.name}: Unable to update. "
-                f"Zabbix returned the following error: {e}."
-            )
-            self.logger.error(e)
-            raise SyncExternalError(e) from None
-        self.logger.info(
-            "Host %s: updated with data %s.", self.name, sanatize_log_output(kwargs)
-        )
-        self.create_journal_entry("info", "Updated host in Zabbix with latest NB data.")
+        self.pending_update.update(kwargs)
+        self.logger.debug("Host %s: queued update of %s.", self.name, ", ".join(kwargs))
 
     def _get_zabbix_host(self) -> dict:
         """

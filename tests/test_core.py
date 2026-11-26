@@ -915,6 +915,51 @@ class TestDeviceStatusHandling(unittest.TestCase):
 
         mock_zabbix.host.update.assert_called_once_with(hostid=42, status="1")
 
+    # ------------------------------------------------------------------
+    # Scenario 9: several devices are fetched and updated in one call each
+    # ------------------------------------------------------------------
+    @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
+    @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
+    def test_devices_are_fetched_and_updated_in_batches(
+        self, mock_api, mock_zabbix_api
+    ):
+        """Updates are collected over the run and sent in batches."""
+        devices = [
+            self.netbox.device(
+                name=f"test-device-{hostid}",
+                status="Failed",
+                custom_fields={"zabbix_hostid": hostid},
+            )
+            for hostid in (42, 43)
+        ]
+        netbox_mock(mock_api, self.netbox, devices=devices)
+        mock_zabbix = zabbix_mock(mock_zabbix_api, hostgroup=self.EXPECTED_HOSTGROUP)
+
+        def host_get(**kwargs):
+            if "filter" not in kwargs or "hostid" not in kwargs["filter"]:
+                return []
+            ids = kwargs["filter"]["hostid"]
+            ids = ids if isinstance(ids, list) else [ids]
+            return [
+                zabbix_host(hostname=f"test-device-{i}", status="0", hostid=str(i))[0]
+                for i in ids
+            ]
+
+        mock_zabbix.host.get.side_effect = host_get
+
+        syncer = Sync()
+        connect(syncer)
+        syncer.start()
+
+        mock_zabbix.host.update.assert_called_once_with(
+            [{"hostid": 42, "status": "1"}, {"hostid": 43, "status": "1"}]
+        )
+        # Both hosts were fetched for their consistency check in one call.
+        mock_zabbix.host.get.assert_called_once()
+        self.assertEqual(
+            mock_zabbix.host.get.call_args.kwargs["filter"], {"hostid": ["42", "43"]}
+        )
+
     @patch("netbox_zabbix_sync.modules.core.RetryingZabbixAPI")
     @patch("netbox_zabbix_sync.modules.core.RetryingNetBoxAPI")
     def test_inventory_of_the_other_host_type_is_not_compared(

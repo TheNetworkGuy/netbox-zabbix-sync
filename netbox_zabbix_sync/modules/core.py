@@ -14,6 +14,7 @@ from netbox_zabbix_sync.modules.api_clients import RetryingNetBoxAPI, RetryingZa
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
 from netbox_zabbix_sync.modules.host import Host
+from netbox_zabbix_sync.modules.host_updates import HostUpdateQueue
 from netbox_zabbix_sync.modules.logging import get_logger
 from netbox_zabbix_sync.modules.settings import DEFAULT_CONFIG
 from netbox_zabbix_sync.modules.tools import (
@@ -50,6 +51,7 @@ class Sync:
         self.netbox = None
         self.zabbix = None
         self.nb_version = None
+        self.host_updates: HostUpdateQueue | None = None
         self.zabbix_hosts: ZabbixHostLookup | None = None
 
         default_config = DEFAULT_CONFIG.copy()
@@ -335,13 +337,18 @@ class Sync:
 
         if host.zabbix_id:
             host.zabbix_obj = self.zabbix_hosts.get(host.zabbix_id)
-            host.consistency_check(
-                zabbix_groups,
-                zabbix_templates,
-                zabbix_proxy_list,
-                self.config["full_proxy_sync"],
-                self.config["create_hostgroups"],
-            )
+            try:
+                host.consistency_check(
+                    zabbix_groups,
+                    zabbix_templates,
+                    zabbix_proxy_list,
+                    self.config["full_proxy_sync"],
+                    self.config["create_hostgroups"],
+                )
+            finally:
+                # Changes found before a check failed part-way are still sent,
+                # as they were when every change was pushed to Zabbix at once.
+                self.host_updates.add(host)
             return
         host.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
 
@@ -358,6 +365,13 @@ class Sync:
         if not self.nb_version:
             self.logger.error("NetBox version is not set. Cannot proceed with sync.")
             return False
+
+        # Host updates found by the consistency checks are sent in batches.
+        self.host_updates = HostUpdateQueue(
+            self.zabbix,
+            self.logger,
+            batch_size=self.config["zabbix_update_batch_size"],
+        )
 
         device_cfs = []
         vm_cfs = []
@@ -570,4 +584,6 @@ class Sync:
                 )
             except SyncError:
                 pass
+        # Send the host updates that are still waiting for a full batch.
+        self.host_updates.flush()
         return True
