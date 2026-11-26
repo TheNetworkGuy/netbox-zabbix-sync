@@ -10,7 +10,11 @@ from pynetbox.core.query import RequestError as NetBoxRequestError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from zabbix_utils import APIRequestError, ProcessingError
 
-from netbox_zabbix_sync.modules.api_clients import RetryingNetBoxAPI, RetryingZabbixAPI
+from netbox_zabbix_sync.modules.api_clients import (
+    ObjectCachingSession,
+    RetryingNetBoxAPI,
+    RetryingZabbixAPI,
+)
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
 from netbox_zabbix_sync.modules.host import Host
@@ -214,6 +218,16 @@ class Sync:
             return True
         return False
 
+    def _object_cache(self, enabled: bool) -> None:
+        """Turn the NetBox object cache on (emptied) or off for a sync run."""
+        session = getattr(self.netbox, "http_session", None)
+        if not isinstance(session, ObjectCachingSession):
+            return
+        if enabled:
+            session.enable_cache()
+        else:
+            session.disable_cache()
+
     def _inventory_fields(self) -> set[str]:
         """The Zabbix inventory fields the consistency checks compare."""
         if not self.config["inventory_sync"]:
@@ -377,6 +391,8 @@ class Sync:
             self.logger.error("NetBox version is not set. Cannot proceed with sync.")
             return False
 
+        # Related NetBox objects are fetched once per run instead of per host.
+        self._object_cache(enabled=True)
         # New hosts are created in batches.
         self.host_creates = HostCreateQueue(
             self.zabbix,
@@ -613,4 +629,5 @@ class Sync:
         self.host_creates.flush()
         self.host_updates.flush()
         self.journals.flush()
+        self._object_cache(enabled=False)
         return True

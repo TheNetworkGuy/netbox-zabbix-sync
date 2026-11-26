@@ -11,12 +11,16 @@ How the retries are added differs per client:
   support, so each API request is wrapped with tenacity instead.
 """
 
+import re
 import socket
 import ssl
+import threading
 from http.client import HTTPException
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 
 from pynetbox.core.api import Api
+from requests import Response, Session
 from requests.adapters import HTTPAdapter
 from tenacity import (
     RetryCallState,
@@ -56,18 +60,90 @@ NETBOX_RETRY = Retry(
 )
 
 
+# The path of a single NetBox object, such as /api/dcim/sites/12/.
+OBJECT_PATH = re.compile(r"/api/(?:[\w-]+/)+\d+/$")
+# The trailing object ID of such a path, to find the endpoint it belongs to.
+OBJECT_ID = re.compile(r"\d+/$")
+
+
+class ObjectCachingSession(Session):
+    """requests Session that can remember single NetBox objects for a sync run.
+
+    A sync reads the same related objects over and over: pynetbox loads the full
+    site, device type or tenant lazily for every device that points at it, so a
+    thousand devices on ten sites cost a thousand GETs of those ten sites. While
+    the cache is enabled, a GET of a single object is sent only once and later
+    GETs of the same object get the stored response.
+
+    Lists are never cached, as their filters and pages make them different
+    requests every time. Any write to an endpoint drops the cached objects of
+    that endpoint, so the sync never reads back an object it changed itself.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._cache: dict[str, Response] | None = None
+        self._lock = threading.Lock()
+
+    def enable_cache(self) -> None:
+        """Start caching, with an empty cache."""
+        with self._lock:
+            self._cache = {}
+
+    def disable_cache(self) -> None:
+        """Stop caching and drop everything cached."""
+        with self._lock:
+            self._cache = None
+
+    def request(self, method, url, *args, **kwargs):  # type: ignore[override]
+        if self._cache is None:
+            return super().request(method, url, *args, **kwargs)
+        # Keyed on the path: NetBox builds an object's own URL from the host it
+        # sees, which behind a proxy differs from the one the sync connects to.
+        path = urlsplit(url).path
+        if method.upper() != "GET":
+            self._invalidate(path)
+            return super().request(method, url, *args, **kwargs)
+        if kwargs.get("params") or urlsplit(url).query or not OBJECT_PATH.search(path):
+            return super().request(method, url, *args, **kwargs)
+        with self._lock:
+            cached = self._cache.get(path)
+        if cached is not None:
+            return cached
+        response = super().request(method, url, *args, **kwargs)
+        if response.ok:
+            # Read the body now: a cached response may be read from any thread.
+            _ = response.content
+            with self._lock:
+                if self._cache is not None:
+                    self._cache[path] = response
+        return response
+
+    def _invalidate(self, path: str) -> None:
+        endpoint = OBJECT_ID.sub("", path)
+        with self._lock:
+            if not self._cache:
+                return
+            for key in [key for key in self._cache if key.startswith(endpoint)]:
+                del self._cache[key]
+
+
 class RetryingNetBoxAPI(Api):
     """pynetbox API that retries requests on transient failures.
 
     The retry adapter is mounted in the constructor, so it is in place before
-    the first request is made.
+    the first request is made. The session can also cache single objects, see
+    ObjectCachingSession; the cache is off until a sync run turns it on.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.http_session = ObjectCachingSession()
         adapter = HTTPAdapter(max_retries=NETBOX_RETRY)
         self.http_session.mount("https://", adapter)
         self.http_session.mount("http://", adapter)
+
+        self._cache = {}
 
 
 # ----------------------------------------------------------------------------
