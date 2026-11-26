@@ -244,14 +244,21 @@ vm_tag_map = {"site/name": "site",
 # Larger batches mean fewer calls but larger responses for Zabbix to build.
 zabbix_fetch_batch_size = 100
 
+# New Zabbix hosts are created in batches: this sets how many hosts are sent in
+# one host.create call. Linking templates makes creating a host relatively heavy
+# work for Zabbix, so keep this lower than the update batch size below.
+# Set to 1 to create every host on its own.
+zabbix_create_batch_size = 50
+
 # Changes to existing Zabbix hosts are sent in batches instead of one API call
 # per change. This sets how many hosts are collected before a batch is sent.
 # Lower it for a slow or heavily loaded Zabbix server, raise it for a fast one.
 # Set to 1 to send every host on its own.
 zabbix_update_batch_size = 100
 
-# Writes to NetBox, such as journal entries, are also sent in batches. This sets
-# how many objects are sent to NetBox in one request.
+# Writes to NetBox, such as journal entries and the Zabbix host IDs of newly
+# created hosts, are also sent in batches. This sets how many objects are sent
+# to NetBox in one request.
 netbox_batch_size = 100
 
 

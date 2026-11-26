@@ -93,6 +93,7 @@ DEFAULT_CONFIG = {
     "render_config_context": False,
     "skip_version_check": False,
     "zabbix_fetch_batch_size": 100,
+    "zabbix_create_batch_size": 50,
     "zabbix_update_batch_size": 100,
     "netbox_batch_size": 100,
     "log_file": None,

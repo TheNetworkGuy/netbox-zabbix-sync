@@ -11,6 +11,16 @@ from unittest.mock import MagicMock
 from zabbix_utils import APIVersion
 
 
+def create_hosts(*args, **kwargs) -> dict:
+    """`host.create`: one new host ID per host sent, as Zabbix returns them.
+
+    The sync creates a single host with keyword arguments and a batch of hosts
+    with a list, so the number of IDs follows what was sent.
+    """
+    count = len(args[0]) if args and isinstance(args[0], list) else 1
+    return {"hostids": [str(n) for n in range(1, count + 1)]}
+
+
 def zabbix_api(version="7.0.0", hostgroup="TestGroup") -> MagicMock:
     """A Zabbix API with one hostgroup and one template, and no hosts yet.
 
@@ -26,7 +36,7 @@ def zabbix_api(version="7.0.0", hostgroup="TestGroup") -> MagicMock:
     zabbix.proxy.get.return_value = []
     zabbix.proxygroup.get.return_value = []
     zabbix.host.get.return_value = []
-    zabbix.host.create.return_value = {"hostids": ["1"]}
+    zabbix.host.create.side_effect = create_hosts
     zabbix.hostinterface.create.return_value = {"interfaceids": ["92"]}
     zabbix.host.update.return_value = {"hostids": ["42"]}
     zabbix.host.delete.return_value = [42]

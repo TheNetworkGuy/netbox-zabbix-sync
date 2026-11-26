@@ -14,6 +14,7 @@ from netbox_zabbix_sync.modules.api_clients import RetryingNetBoxAPI, RetryingZa
 from netbox_zabbix_sync.modules.device import PhysicalDevice
 from netbox_zabbix_sync.modules.exceptions import JinjaRenderError, SyncError
 from netbox_zabbix_sync.modules.host import Host
+from netbox_zabbix_sync.modules.host_creates import HostCreateQueue
 from netbox_zabbix_sync.modules.host_updates import HostUpdateQueue
 from netbox_zabbix_sync.modules.journal import JournalQueue
 from netbox_zabbix_sync.modules.logging import get_logger
@@ -52,6 +53,7 @@ class Sync:
         self.netbox = None
         self.zabbix = None
         self.nb_version = None
+        self.host_creates: HostCreateQueue | None = None
         self.host_updates: HostUpdateQueue | None = None
         self.journals: JournalQueue | None = None
         self.zabbix_hosts: ZabbixHostLookup | None = None
@@ -352,7 +354,14 @@ class Sync:
                 # as they were when every change was pushed to Zabbix at once.
                 self.host_updates.add(host)
             return
-        host.create_in_zabbix(zabbix_groups, zabbix_templates, zabbix_proxy_list)
+        create_data = host.prepare_create(
+            zabbix_groups,
+            zabbix_templates,
+            zabbix_proxy_list,
+            name_exists=self.host_creates.name_exists,
+        )
+        if create_data is not None:
+            self.host_creates.add(host, create_data)
 
     def start(self, device_filter=None, vm_filter=None):
         """
@@ -368,6 +377,13 @@ class Sync:
             self.logger.error("NetBox version is not set. Cannot proceed with sync.")
             return False
 
+        # New hosts are created in batches.
+        self.host_creates = HostCreateQueue(
+            self.zabbix,
+            self.logger,
+            batch_size=self.config["zabbix_create_batch_size"],
+            netbox_batch_size=self.config["netbox_batch_size"],
+        )
         # Host updates found by the consistency checks are sent in batches.
         self.host_updates = HostUpdateQueue(
             self.zabbix,
@@ -593,7 +609,8 @@ class Sync:
             except SyncError:
                 pass
         # Send what is still waiting for a full batch. Journals go last, as
-        # the host updates add entries of their own.
+        # the host creates and updates add entries of their own.
+        self.host_creates.flush()
         self.host_updates.flush()
         self.journals.flush()
         return True

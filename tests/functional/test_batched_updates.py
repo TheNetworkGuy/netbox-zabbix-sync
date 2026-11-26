@@ -1,7 +1,9 @@
-"""Host updates reach Zabbix in batches, not one call per host or per change.
+"""Hosts reach Zabbix in batches, not one call per host or per change.
 
-`consistency_check` only collects what is out of sync and `HostUpdateQueue`
-sends it in one `host.update` carrying one object per host.
+New hosts are created by `HostCreateQueue` with one `host.create` per batch,
+and their Zabbix IDs written back to NetBox with one bulk PATCH. For existing
+hosts, `consistency_check` only collects what is out of sync and
+`HostUpdateQueue` sends it in one `host.update` carrying one object per host.
 
 The other functional tests each sync a single device, so they only ever see a
 batch of one -- the tests here put several hosts through the same run, which is
@@ -101,3 +103,47 @@ def test_one_rejected_host_does_not_cost_the_batch(
         "the rejected host was partly updated"
     )
 
+
+# --- creation ------------------------------------------------------------------
+
+
+def test_hosts_created_together_each_get_their_own_zabbix_id(
+    nb, device_factory, sync_runner, zabbix_host
+):
+    """The IDs of a batched host.create land on the right NetBox objects."""
+    devices = [device_factory() for _ in range(3)]
+    sync_runner(device_filter=names(devices))
+
+    for device in devices:
+        host = zabbix_host(device.name)
+        assert host is not None, f"{device.name} was not created"
+        stored = nb.dcim.devices.get(device.id).custom_fields["zabbix_hostid"]
+        assert str(stored) == host["hostid"], (
+            f"{device.name} points at Zabbix host {stored}, not its own {host['hostid']}"
+        )
+
+
+def test_one_rejected_new_host_does_not_cost_the_batch(
+    nb, device_factory, sync_runner, zabbix_host
+):
+    """A host Zabbix refuses to create fails alone; the others are created."""
+    devices = [
+        device_factory(serial="1.5"),
+        device_factory(serial="9" * (LOCATION_LAT_LIMIT + 10)),
+        device_factory(serial="2.5"),
+    ]
+    sync_runner(
+        device_filter=names(devices),
+        inventory_sync=True,
+        inventory_mode="manual",
+        device_inventory_map={"serial": "location_lat"},
+    )
+
+    good, bad = (devices[0], devices[2]), devices[1]
+    for device in good:
+        host = zabbix_host(device.name)
+        assert host is not None, f"{device.name} was lost with the rejected host"
+        stored = nb.dcim.devices.get(device.id).custom_fields["zabbix_hostid"]
+        assert str(stored) == host["hostid"]
+    assert zabbix_host(bad.name) is None
+    assert nb.dcim.devices.get(bad.id).custom_fields["zabbix_hostid"] is None
