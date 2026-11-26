@@ -1,6 +1,5 @@
 """Core component of the sync process"""
 
-import contextlib
 import ssl
 from logging import Logger
 from os import environ
@@ -26,6 +25,7 @@ from netbox_zabbix_sync.modules.tools import (
     verify_hg_format,
 )
 from netbox_zabbix_sync.modules.virtual_machine import VirtualMachine
+from netbox_zabbix_sync.modules.zabbix_hosts import ZabbixHostLookup
 
 
 class Sync:
@@ -50,6 +50,7 @@ class Sync:
         self.netbox = None
         self.zabbix = None
         self.nb_version = None
+        self.zabbix_hosts: ZabbixHostLookup | None = None
 
         default_config = DEFAULT_CONFIG.copy()
 
@@ -207,6 +208,33 @@ class Sync:
             return True
         return False
 
+    def _inventory_fields(self) -> set[str]:
+        """The Zabbix inventory fields the consistency checks compare."""
+        if not self.config["inventory_sync"]:
+            return set()
+        fields = set()
+        if self.config["sync_devices"]:
+            fields.update(self.config["device_inventory_map"].values())
+        if self.config["sync_vms"]:
+            fields.update(self.config["vm_inventory_map"].values())
+        return fields
+
+    def _linked_hostids(self, nb_objects) -> list:
+        """
+        Zabbix host IDs of the NetBox objects that get a consistency check.
+
+        Objects in a removal state are left out: their host is deleted rather
+        than checked. A secondary cluster member is still listed, which costs a
+        host in the batch fetch at most.
+        """
+        cf = self.config["device_cf"]
+        return [
+            nb.custom_fields.get(cf)
+            for nb in nb_objects
+            if nb.custom_fields.get(cf)
+            and nb.status.label not in self.config["zabbix_device_removal"]
+        ]
+
     def _render_config_context(self, host, nb_obj):
         """
         Render config context with Jinja2 if enabled.
@@ -306,6 +334,7 @@ class Sync:
                 zabbix_groups.append(group)
 
         if host.zabbix_id:
+            host.zabbix_obj = self.zabbix_hosts.get(host.zabbix_id)
             host.consistency_check(
                 zabbix_groups,
                 zabbix_templates,
@@ -409,70 +438,16 @@ class Sync:
         # Prepare list of all proxy and proxy_groups
         zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
 
-        virtual_machines = []
-        physical_devices = []
-
-        for nb_vm in netbox_vms:
-            with contextlib.suppress(SyncError):
-                virtual_machines.append(
-                    VirtualMachine(
-                        nb_vm,
-                        self.zabbix,
-                        netbox_journals,
-                        self.nb_version,
-                        self.config["create_journal"],
-                        self.logger,
-                        config=self.config,
-                    )
-                )
-
-        for nb_device in netbox_devices:
-            with contextlib.suppress(SyncError):
-                physical_devices.append(
-                    PhysicalDevice(
-                        nb_device,
-                        self.zabbix,
-                        netbox_journals,
-                        self.nb_version,
-                        self.config["create_journal"],
-                        self.logger,
-                        config=self.config,
-                    )
-                )
-
-        all_hosts = virtual_machines + physical_devices
-        existing_hosts = [host for host in all_hosts if host.zabbix_id]
-
-        self.logger.info("Splitting Zabbix calls into %s batches", (len(existing_hosts) + 99) // 100)
-
-        for i in range(0, len(existing_hosts), 100):
-            batch = existing_hosts[i : i + 100]
-            zabbix_ids = [host.zabbix_id for host in batch if host.zabbix_id]
-
-            if zabbix_ids:
-                zabbix_devices = self.zabbix.host.get(
-                    filter={"hostid": zabbix_ids},
-                    selectInterfaces=[
-                        "type",
-                        "ip",
-                        "useip",
-                        "dns",
-                        "port",
-                        "details",
-                        "interfaceid",
-                    ],
-                    selectGroups=["groupid"],
-                    selectHostGroups=["groupid"],
-                    selectParentTemplates=["templateid"],
-                    selectInventory="extend",
-                    selectMacros=["macro", "value", "type", "description"],
-                    selectTags=["tag", "value"],
-                )
-
-            for device in zabbix_devices:
-                for host in batch:
-                    if host.zabbix_id == device["hostid"]:
-                        host.set_zabbix_obj(device)
+        # The linked Zabbix hosts are fetched in batches, in the order below.
+        self.zabbix_hosts = ZabbixHostLookup(
+            self.zabbix,
+            self.logger,
+            inventory_fields=self._inventory_fields(),
+            batch_size=self.config["zabbix_fetch_batch_size"],
+        )
+        self.zabbix_hosts.plan(
+            [*self._linked_hostids(netbox_vms), *self._linked_hostids(netbox_devices)]
+        )
 
         for nb_vm in netbox_vms:
             try:

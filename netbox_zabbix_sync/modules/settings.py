@@ -92,6 +92,7 @@ DEFAULT_CONFIG = {
     "description": "static",
     "render_config_context": False,
     "skip_version_check": False,
+    "zabbix_fetch_batch_size": 100,
     "log_file": None,
     "log_rotation": True,
     "log_console": True,

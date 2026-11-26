@@ -238,6 +238,13 @@ vm_tag_map = {"site/name": "site",
               "platform/name": "target"}
 
 
+## Performance
+# Each run compares the existing Zabbix hosts with NetBox. Those hosts are
+# fetched in batches: this sets how many are fetched in one host.get call.
+# Larger batches mean fewer calls but larger responses for Zabbix to build.
+zabbix_fetch_batch_size = 100
+
+
 ### EXPERIMENTAL FEATURES ###
 # The features below are experimental and should be run on your own risk.
 # Please see https://github.com/TheNetworkGuy/netbox-zabbix-sync/wiki/Experimental-Features

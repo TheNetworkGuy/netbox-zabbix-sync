@@ -30,6 +30,7 @@ from netbox_zabbix_sync.modules.tools import (
     sanatize_log_output,
 )
 from netbox_zabbix_sync.modules.usermacros import ZabbixUsermacros
+from netbox_zabbix_sync.modules.zabbix_hosts import host_query
 
 
 class Host(ABC):
@@ -845,16 +846,35 @@ class Host(ABC):
         )
         self.create_journal_entry("info", "Updated host in Zabbix with latest NB data.")
 
-    def set_zabbix_obj(self, zabbix_obj: dict):
-        self.zabbix_obj = zabbix_obj
+    def _get_zabbix_host(self) -> dict:
+        """
+        The Zabbix host this host is linked to, as consistency_check compares it.
 
-    def __get_zabbix_obj(self):
-
-        if self.zabbix_obj is None:
-            raise SyncInventoryError(
-                f"Host {self.name}: Zabbix object not found for host ID {self.zabbix_id}."
+        A sync run fetches these in batches and sets zabbix_obj beforehand (see
+        ZabbixHostLookup). Without it, the host is fetched here on its own.
+        """
+        if self.zabbix_obj is not None:
+            return self.zabbix_obj
+        hosts = self.zabbix.host.get(
+            filter={"hostid": self.zabbix_id},
+            **host_query(self._inventory_map().values()),
+        )
+        if len(hosts) > 1:
+            e = (
+                f"Got {len(hosts)} results for Zabbix hosts "
+                f"with ID {self.zabbix_id} - hostname {self.name}."
             )
-
+            self.logger.error(e)
+            raise SyncInventoryError(e)
+        if not hosts:
+            e = (
+                f"Host {self.name}: No Zabbix host found. "
+                f"This is likely the result of a deleted Zabbix host "
+                f"without zeroing the ID field in NetBox."
+            )
+            self.logger.error(e)
+            raise SyncInventoryError(e)
+        self.zabbix_obj = hosts[0]
         return self.zabbix_obj
 
     def consistency_check(
@@ -888,25 +908,7 @@ class Host(ABC):
         self.zbx_template_prepper(templates)
         self._set_proxy(proxies)
         # Get host object from Zabbix
-
-        host = self.__get_zabbix_obj()
-
-        if len(host) > 1:
-            e = (
-                f"Got {len(host)} results for Zabbix hosts "
-                f"with ID {self.zabbix_id} - hostname {self.name}."
-            )
-            self.logger.error(e)
-            raise SyncInventoryError(e)
-        if len(host) == 0:
-            e = (
-                f"Host {self.name}: No Zabbix host found. "
-                f"This is likely the result of a deleted Zabbix host "
-                f"without zeroing the ID field in NetBox."
-            )
-            self.logger.error(e)
-            raise SyncInventoryError(e)
-        host = host[0]
+        host = self._get_zabbix_host()
         if host["host"] == self.name:
             self.logger.debug("Host %s: Hostname in-sync.", self.name)
         else:
@@ -1050,7 +1052,15 @@ class Host(ABC):
             self.update_zabbix_host(inventory_mode=str(self.inventory_mode))
         if self.config["inventory_sync"] and self.inventory_mode in [0, 1]:
             # Check host inventory mapping
-            if host["inventory"] == self.inventory:
+            # A batched fetch also carries the inventory fields of the other
+            # host type's map. Zabbix sends a list when inventory is disabled.
+            mapped = set(self._inventory_map().values())
+            zabbix_inventory = host.get("inventory") or {}
+            if isinstance(zabbix_inventory, dict):
+                zabbix_inventory = {
+                    k: v for k, v in zabbix_inventory.items() if k in mapped
+                }
+            if zabbix_inventory == self.inventory:
                 self.logger.debug("Host %s: Inventory in-sync.", self.name)
             else:
                 self.logger.info("Host %s: Inventory OUT of sync.", self.name)
