@@ -39,6 +39,7 @@ class Host(ABC):
 
     nb: Record
     zabbix: Any
+    zabbix_obj: dict | None
 
     id: str
     name: str
@@ -86,6 +87,7 @@ class Host(ABC):
         self.visible_name = None
         self.status = nb.status.label
         self.zabbix = zabbix
+        self.zabbix_obj = None
         self.zabbix_id = None
         self.group_ids = []
         self.nb_api_version = nb_version
@@ -843,6 +845,18 @@ class Host(ABC):
         )
         self.create_journal_entry("info", "Updated host in Zabbix with latest NB data.")
 
+    def set_zabbix_obj(self, zabbix_obj: dict):
+        self.zabbix_obj = zabbix_obj
+
+    def __get_zabbix_obj(self):
+
+        if self.zabbix_obj is None:
+            raise SyncInventoryError(
+                f"Host {self.name}: Zabbix object not found for host ID {self.zabbix_id}."
+            )
+
+        return self.zabbix_obj
+
     def consistency_check(
         self, groups, templates, proxies, proxy_power, create_hostgroups
     ):
@@ -874,24 +888,9 @@ class Host(ABC):
         self.zbx_template_prepper(templates)
         self._set_proxy(proxies)
         # Get host object from Zabbix
-        host = self.zabbix.host.get(
-            filter={"hostid": self.zabbix_id},
-            selectInterfaces=[
-                "type",
-                "ip",
-                "useip",
-                "dns",
-                "port",
-                "details",
-                "interfaceid",
-            ],
-            selectGroups=["groupid"],
-            selectHostGroups=["groupid"],
-            selectParentTemplates=["templateid"],
-            selectInventory=list(self._inventory_map().values()),
-            selectMacros=["macro", "value", "type", "description"],
-            selectTags=["tag", "value"],
-        )
+
+        host = self.__get_zabbix_obj()
+
         if len(host) > 1:
             e = (
                 f"Got {len(host)} results for Zabbix hosts "

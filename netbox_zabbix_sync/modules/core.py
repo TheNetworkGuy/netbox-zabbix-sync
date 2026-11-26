@@ -1,5 +1,6 @@
 """Core component of the sync process"""
 
+import contextlib
 import ssl
 from logging import Logger
 from os import environ
@@ -407,6 +408,71 @@ class Sync:
 
         # Prepare list of all proxy and proxy_groups
         zabbix_proxy_list = proxy_prepper(zabbix_proxies, zabbix_proxygroups)
+
+        virtual_machines = []
+        physical_devices = []
+
+        for nb_vm in netbox_vms:
+            with contextlib.suppress(SyncError):
+                virtual_machines.append(
+                    VirtualMachine(
+                        nb_vm,
+                        self.zabbix,
+                        netbox_journals,
+                        self.nb_version,
+                        self.config["create_journal"],
+                        self.logger,
+                        config=self.config,
+                    )
+                )
+
+        for nb_device in netbox_devices:
+            with contextlib.suppress(SyncError):
+                physical_devices.append(
+                    PhysicalDevice(
+                        nb_device,
+                        self.zabbix,
+                        netbox_journals,
+                        self.nb_version,
+                        self.config["create_journal"],
+                        self.logger,
+                        config=self.config,
+                    )
+                )
+
+        all_hosts = virtual_machines + physical_devices
+        existing_hosts = [host for host in all_hosts if host.zabbix_id]
+
+        self.logger.info("Splitting Zabbix calls into %s batches", (len(existing_hosts) + 99) // 100)
+
+        for i in range(0, len(existing_hosts), 100):
+            batch = existing_hosts[i : i + 100]
+            zabbix_ids = [host.zabbix_id for host in batch if host.zabbix_id]
+
+            if zabbix_ids:
+                zabbix_devices = self.zabbix.host.get(
+                    filter={"hostid": zabbix_ids},
+                    selectInterfaces=[
+                        "type",
+                        "ip",
+                        "useip",
+                        "dns",
+                        "port",
+                        "details",
+                        "interfaceid",
+                    ],
+                    selectGroups=["groupid"],
+                    selectHostGroups=["groupid"],
+                    selectParentTemplates=["templateid"],
+                    selectInventory="extend",
+                    selectMacros=["macro", "value", "type", "description"],
+                    selectTags=["tag", "value"],
+                )
+
+            for device in zabbix_devices:
+                for host in batch:
+                    if host.zabbix_id == device["hostid"]:
+                        host.set_zabbix_obj(device)
 
         for nb_vm in netbox_vms:
             try:
