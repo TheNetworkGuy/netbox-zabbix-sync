@@ -1,7 +1,7 @@
 """Core component of the sync process"""
 
 import ssl
-from logging import Logger
+from logging import DEBUG, Logger
 from os import environ
 from pprint import pformat
 from typing import Any
@@ -537,9 +537,11 @@ class Sync:
                     netbox_regions,
                     netbox_roles,
                 )
-                self.logger.debug(
-                    "Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm))
-                )
+                # Formatting the record is costly, so only do it when it is logged.
+                if self.logger.isEnabledFor(DEBUG):
+                    self.logger.debug(
+                        "Host %s: NetBox data:\n%s", vm.name, pformat(dict(nb_vm))
+                    )
                 if not vm.zbx_template_names:
                     continue
                 if not vm.hostgroups:
@@ -596,9 +598,13 @@ class Sync:
                     netbox_roles,
                 )
                 device.set_ipmi()
-                self.logger.debug(
-                    "Host %s: NetBox data:\n%s", device.name, pformat(dict(nb_device))
-                )
+                # Formatting the record is costly, so only do it when it is logged.
+                if self.logger.isEnabledFor(DEBUG):
+                    self.logger.debug(
+                        "Host %s: NetBox data:\n%s",
+                        device.name,
+                        pformat(dict(nb_device)),
+                    )
                 if not device.zbx_template_names:
                     continue
                 if not device.hostgroups:
